@@ -137,7 +137,9 @@ export function getSmsRecords(filters?: {
   status?: 'success' | 'failed';
   limit?: number;
 }): SmsRecord[] {
-  let records = [...smsRecords];
+  let records = [...smsRecords].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   if (filters) {
     if (filters.phone) {
@@ -154,7 +156,7 @@ export function getSmsRecords(filters?: {
     }
   }
 
-  return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return records;
 }
 
 /**
