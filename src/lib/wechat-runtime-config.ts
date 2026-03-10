@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { sqlClient } from './db';
+import { db, platformSettings } from './db';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
 const DEFAULT_PROD_BASE_URL = 'https://hfb.yugioh.top';
@@ -69,41 +69,17 @@ export function resolveWechatRedirectUri(request?: MaybeRequest): string {
 
 export async function getWechatPlatformSettingsCompat(): Promise<WechatPlatformSettingsCompat | null> {
   try {
-    const desiredColumns = [
-      'wechat_mp_app_id',
-      'wechat_mp_app_secret',
-      'wechat_open_app_id',
-      'wechat_open_app_secret',
-    ];
+    const [setting] = await db.select().from(platformSettings).limit(1);
 
-    const columnRows = await sqlClient<{ column_name: string }[]>`
-      select column_name
-      from information_schema.columns
-      where table_schema = current_schema()
-        and table_name = 'platform_settings'
-        and column_name in (${sqlClient(desiredColumns)})
-    `;
-
-    const existingColumns = desiredColumns.filter((column) =>
-      columnRows.some((row) => row.column_name === column)
-    );
-
-    if (existingColumns.length === 0) {
+    if (!setting) {
       return null;
     }
 
-    const selectList = existingColumns.map((column) => `"${column}"`).join(', ');
-    const rows = await sqlClient.unsafe<Record<string, string | null>[]>(
-      `select ${selectList} from platform_settings limit 1`
-    );
-
-    const row = rows[0] || {};
-
     return {
-      wechatMpAppId: row.wechat_mp_app_id ?? null,
-      wechatMpAppSecret: row.wechat_mp_app_secret ?? null,
-      wechatOpenAppId: row.wechat_open_app_id ?? null,
-      wechatOpenAppSecret: row.wechat_open_app_secret ?? null,
+      wechatMpAppId: setting.wechatMpAppId ?? null,
+      wechatMpAppSecret: setting.wechatMpAppSecret ?? null,
+      wechatOpenAppId: setting.wechatOpenAppId ?? null,
+      wechatOpenAppSecret: setting.wechatOpenAppSecret ?? null,
     };
   } catch (error) {
     console.error('[wechat-runtime-config] Failed to load platform settings compat:', error);
