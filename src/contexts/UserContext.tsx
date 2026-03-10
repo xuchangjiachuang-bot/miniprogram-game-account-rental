@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@/lib/user-service';
-import { getToken, setToken, removeToken, clearAuth } from '@/lib/auth-token';
+import { clearAuth, getToken, setToken } from '@/lib/auth-token';
 
 interface UserContextType {
   user: User | null;
@@ -12,7 +12,78 @@ interface UserContextType {
   logout: () => Promise<void>;
 }
 
+const USER_CACHE_KEY = 'cached_user';
+const USER_CACHE_TIME_KEY = 'user_cache_time';
+const USER_CACHE_TTL = 5 * 60 * 1000;
+const LOGIN_CALLBACK_QUERY_KEYS = ['token', 'login_success', 'wechat_login'] as const;
+
 const UserContext = createContext<UserContextType | undefined>(undefined);
+
+function readCachedUser(): User | null {
+  if (typeof window === 'undefined') return null;
+
+  const cachedUser = localStorage.getItem(USER_CACHE_KEY);
+  const cacheTime = localStorage.getItem(USER_CACHE_TIME_KEY);
+  if (!cachedUser || !cacheTime) {
+    return null;
+  }
+
+  const timeDiff = Date.now() - Number.parseInt(cacheTime, 10);
+  if (!Number.isFinite(timeDiff) || timeDiff >= USER_CACHE_TTL) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cachedUser) as User;
+  } catch (error) {
+    console.error('Failed to parse cached user:', error);
+    return null;
+  }
+}
+
+function writeCachedUser(user: User) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+  localStorage.setItem(USER_CACHE_TIME_KEY, Date.now().toString());
+}
+
+function consumeTokenFromUrl() {
+  if (typeof window === 'undefined') {
+    return { token: null as string | null, tokenChanged: false };
+  }
+
+  const currentUrl = new URL(window.location.href);
+  const urlToken = currentUrl.searchParams.get('token');
+  if (!urlToken) {
+    return { token: null as string | null, tokenChanged: false };
+  }
+
+  const previousToken = getToken();
+  setToken(urlToken);
+
+  LOGIN_CALLBACK_QUERY_KEYS.forEach((key) => currentUrl.searchParams.delete(key));
+
+  const nextUrl =
+    `${currentUrl.pathname}` +
+    `${currentUrl.search ? currentUrl.search : ''}` +
+    `${currentUrl.hash ? currentUrl.hash : ''}`;
+  window.history.replaceState({}, '', nextUrl || '/');
+
+  return {
+    token: urlToken,
+    tokenChanged: previousToken !== urlToken,
+  };
+}
+
+function hasAuthCookie() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  return document.cookie
+    .split('; ')
+    .some((entry) => entry.startsWith('auth_token='));
+}
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,57 +95,48 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      // 从 localStorage 获取 token
-      const token = getToken();
-      
-      // 如果没有 token，直接返回未登录
-      if (!token) {
+      const { token: urlToken, tokenChanged } = consumeTokenFromUrl();
+      const token = urlToken ?? getToken();
+      const cookieLoggedIn = hasAuthCookie();
+
+      if (!token && !cookieLoggedIn) {
         setUser(null);
-        setLoading(false);
+        clearAuth();
         return;
       }
 
-      // 检查 localStorage 缓存
-      const cachedUser = localStorage.getItem('cached_user');
-      const cacheTime = localStorage.getItem('user_cache_time');
-      
-      // 如果有缓存且未过期（5分钟内），直接使用缓存
-      if (cachedUser && cacheTime) {
-        const timeDiff = Date.now() - parseInt(cacheTime);
-        if (timeDiff < 5 * 60 * 1000) {
-          try {
-            setUser(JSON.parse(cachedUser));
-            setLoading(false);
-            return;
-          } catch (e) {
-            console.error('缓存解析失败:', e);
-          }
+      if (token && !tokenChanged) {
+        const cachedUser = readCachedUser();
+        if (cachedUser) {
+          setUser(cachedUser);
+          return;
         }
       }
 
-      // 从服务器获取最新用户信息，通过 header 发送 token
-      const response = await fetch('/api/auth', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        cache: 'no-store'
-      });
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
 
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/auth', {
+        headers,
+        cache: 'no-store',
+      });
       const data = await response.json();
 
       if (data.success) {
         setUser(data.data);
-        // 缓存用户信息
-        localStorage.setItem('cached_user', JSON.stringify(data.data));
-        localStorage.setItem('user_cache_time', Date.now().toString());
-      } else {
-        setUser(null);
-        // 清除所有认证数据
-        clearAuth();
-        setError(data.error || '获取用户信息失败');
+        writeCachedUser(data.data);
+        return;
       }
-    } catch (err) {
+
+      setUser(null);
+      clearAuth();
+      setError(data.error || '获取用户信息失败');
+    } catch (error) {
       setUser(null);
       clearAuth();
       setError('网络错误，请稍后重试');
@@ -86,17 +148,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       const token = getToken();
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
       if (token) {
-        await fetch('/api/auth', {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        headers.Authorization = `Bearer ${token}`;
       }
-    } catch (err) {
-      console.error('退出登录失败:', err);
+
+      await fetch('/api/auth', {
+        method: 'DELETE',
+        headers,
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
     } finally {
       setUser(null);
       setError(null);

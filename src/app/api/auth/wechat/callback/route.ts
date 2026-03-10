@@ -5,6 +5,18 @@ import { db } from '@/lib/db';
 import { systemConfig } from '@/storage/database/shared/schema';
 import { eq } from 'drizzle-orm';
 
+function attachAuthCookie(response: NextResponse, token: string) {
+  response.cookies.set('auth_token', token, {
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+
+  return response;
+}
+
 /**
  * 微信OAuth回调 - 处理微信授权回调
  * GET /api/auth/wechat/callback?code=xxx&state=xxx
@@ -248,7 +260,7 @@ export async function GET(request: NextRequest) {
 
           // 返回一个 HTML 页面，通过 postMessage 通知父页面
           console.log('[微信回调] 通知父页面');
-          return new NextResponse(`
+          return attachAuthCookie(new NextResponse(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -335,7 +347,7 @@ export async function GET(request: NextRequest) {
             headers: {
               'Content-Type': 'text/html; charset=utf-8',
             },
-          });
+          }), loginResult.token);
         } else {
           // 普通登录：跳转到首页
           const redirectUrl = new URL('/?login_success=true', baseUrl);
@@ -343,7 +355,7 @@ export async function GET(request: NextRequest) {
 
           console.log('[微信回调] 微信登录成功，跳转到首页:', redirectUrl.toString());
           console.log('[微信回调] Token长度:', loginResult.token.length);
-          return NextResponse.redirect(redirectUrl);
+          return attachAuthCookie(NextResponse.redirect(redirectUrl), loginResult.token);
         }
       } else {
         console.error('[微信回调] ❌ 微信登录失败:', loginResult.message);
