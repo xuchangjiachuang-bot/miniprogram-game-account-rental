@@ -6,12 +6,32 @@ import { checkWechatPayConfig, getWechatPayConfigStatus } from '@/lib/wechat/con
  * GET /api/payment/wechat/config
  */
 export async function GET() {
-  const status = await getWechatPayConfigStatus();
+  try {
+    const status = await getWechatPayConfigStatus();
 
-  return NextResponse.json({
-    success: true,
-    data: status,
-  });
+    return NextResponse.json({
+      success: true,
+      data: status,
+    });
+  } catch (error: any) {
+    console.error('[payment/wechat/config] Failed to read config status:', error);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        configured: false,
+        missingFields: [],
+        certConfigured: false,
+        certMissing: [],
+        appId: '',
+        mchId: '',
+        notifyUrl: '',
+        certPath: '',
+        keyPath: '',
+        error: error.message || 'Failed to read payment config',
+      },
+    });
+  }
 }
 
 /**
