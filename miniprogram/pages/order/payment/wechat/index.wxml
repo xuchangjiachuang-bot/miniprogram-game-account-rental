@@ -1,0 +1,72 @@
+<!-- pages/order/payment/wechat/index.wxml -->
+<view class="page">
+  <view class="container">
+    <!-- 标题 -->
+    <view class="header">
+      <view class="title">订单支付</view>
+      <view class="subtitle">请确认订单信息并完成支付</view>
+    </view>
+
+    <!-- 账号信息 -->
+    <view class="card account-info">
+      <view class="card-title">账号信息</view>
+      <view class="info-row">
+        <text class="label">账号标题</text>
+        <text class="value">{{accountInfo.title}}</text>
+      </view>
+      <view class="info-row">
+        <text class="label">哈夫币数量</text>
+        <text class="value">{{accountInfo.coinsM}}M</text>
+      </view>
+      <view class="info-row">
+        <text class="label">租期</text>
+        <text class="value">{{rentalHours}}小时</text>
+      </view>
+    </view>
+
+    <!-- 价格信息 -->
+    <view class="card price-info">
+      <view class="card-title">费用明细</view>
+      <view class="info-row">
+        <text class="label">租金</text>
+        <text class="value">¥{{rentalPrice}}</text>
+      </view>
+      <view class="info-row">
+        <text class="label">押金</text>
+        <text class="value">¥{{deposit}}</text>
+      </view>
+      <view class="divider"></view>
+      <view class="info-row total">
+        <text class="label">合计</text>
+        <text class="value highlight">¥{{totalPrice}}</text>
+      </view>
+    </view>
+
+    <!-- 支付方式 -->
+    <view class="card payment-method">
+      <view class="card-title">支付方式</view>
+      <view class="method-item selected">
+        <image class="method-icon" src="/images/wechat-pay.png" mode="aspectFit"></image>
+        <text class="method-name">微信支付</text>
+        <view class="method-check">
+          <view class="check-icon">✓</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 支付按钮 -->
+    <view class="footer">
+      <view class="total-price">
+        <text class="price-label">合计：</text>
+        <text class="price-value">¥{{totalPrice}}</text>
+      </view>
+      <button
+        class="pay-btn {{loading ? 'disabled' : ''}}"
+        bindtap="onPayment"
+        disabled="{{loading}}"
+      >
+        {{loading ? '支付中...' : '立即支付'}}
+      </button>
+    </view>
+  </view>
+</view>

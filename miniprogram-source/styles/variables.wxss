@@ -1,0 +1,92 @@
+/* styles/variables.wxss */
+:root {
+  /* 主题颜色 */
+  --primary: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  
+  --secondary: #8b5cf6;
+  --secondary-light: #a78bfa;
+  --secondary-dark: #7c3aed;
+  
+  /* 功能色 */
+  --success: #10b981;
+  --success-light: #34d399;
+  --success-dark: #059669;
+  
+  --warning: #f59e0b;
+  --warning-light: #fbbf24;
+  --warning-dark: #d97706;
+  
+  --danger: #ef4444;
+  --danger-light: #f87171;
+  --danger-dark: #dc2626;
+  
+  --info: #3b82f6;
+  --info-light: #60a5fa;
+  --info-dark: #2563eb;
+  
+  /* 中性色 */
+  --bg-background: #ffffff;
+  --bg-muted: #f9fafb;
+  --bg-card: #ffffff;
+  
+  --text-foreground: #111827;
+  --text-muted-foreground: #6b7280;
+  --text-secondary: #9ca3af;
+  
+  --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
+  
+  /* 间距 */
+  --spacing-1: 8rpx;
+  --spacing-2: 16rpx;
+  --spacing-3: 24rpx;
+  --spacing-4: 32rpx;
+  --spacing-5: 40rpx;
+  --spacing-6: 48rpx;
+  
+  /* 圆角 */
+  --radius-sm: 4rpx;
+  --radius-md: 8rpx;
+  --radius-lg: 12rpx;
+  --radius-xl: 16rpx;
+  --radius-2xl: 24rpx;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1rpx 2rpx rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4rpx 6rpx rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10rpx 15rpx rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20rpx 25rpx rgba(0, 0, 0, 0.1);
+  
+  /* 字体大小 */
+  --font-xs: 20rpx;
+  --font-sm: 24rpx;
+  --font-base: 28rpx;
+  --font-lg: 32rpx;
+  --font-xl: 36rpx;
+  --font-2xl: 42rpx;
+  --font-3xl: 56rpx;
+  
+  /* 字重 */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+}
+
+/* 暗黑模式适配 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-background: #111827;
+    --bg-muted: #1f2937;
+    --bg-card: #1f2937;
+    
+    --text-foreground: #f9fafb;
+    --text-muted-foreground: #9ca3af;
+    --text-secondary: #6b7280;
+    
+    --border-color: #374151;
+    --border-light: #4b5563;
+  }
+}

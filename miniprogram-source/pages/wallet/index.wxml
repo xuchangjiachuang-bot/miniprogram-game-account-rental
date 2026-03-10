@@ -1,0 +1,75 @@
+<!-- pages/wallet/index.wxml -->
+<view class="page">
+  <!-- 余额卡片 -->
+  <view class="balance-card">
+    <view class="balance-header">
+      <text class="balance-label">账户余额</text>
+      <button class="btn-detail" bindtap="onDetailTap">明细</button>
+    </view>
+    <view class="balance-amount">¥{{wallet.balance}}</view>
+    <view class="balance-actions">
+      <button class="btn-action btn-recharge" bindtap="onRechargeTap">
+        <text class="action-icon">💰</text>
+        <text class="action-text">充值</text>
+      </button>
+      <button class="btn-action btn-withdraw" bindtap="onWithdrawTap">
+        <text class="action-icon">💸</text>
+        <text class="action-text">提现</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 统计信息 -->
+  <view class="stats-section">
+    <view class="stat-item">
+      <text class="stat-label">累计充值</text>
+      <text class="stat-value">¥{{wallet.totalRecharge}}</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-label">累计提现</text>
+      <text class="stat-value">¥{{wallet.totalWithdraw}}</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-label">可用余额</text>
+      <text class="stat-value">¥{{wallet.availableBalance}}</text>
+    </view>
+  </view>
+
+  <!-- 最近交易记录 -->
+  <view class="transactions-section">
+    <view class="section-header">
+      <text class="section-title">最近交易</text>
+      <text class="section-more" bindtap="onTransactionsTap">全部 ›</text>
+    </view>
+
+    <view class="transaction-list">
+      <view 
+        class="transaction-item"
+        wx:for="{{transactions}}"
+        wx:key="id"
+        bindtap="onTransactionTap"
+        data-transaction="{{item}}"
+      >
+        <view class="transaction-info">
+          <image class="transaction-icon" src="{{item.icon}}" />
+          <view class="transaction-details">
+            <view class="transaction-title">{{item.title}}</view>
+            <view class="transaction-time">{{item.time}}</view>
+          </view>
+        </view>
+        <view class="transaction-amount {{item.type}}">
+          {{item.type === 'income' ? '+' : '-'}}¥{{item.amount}}
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty" wx:if="{{transactions.length === 0}}">
+        <view class="empty-icon">📝</view>
+        <view class="empty-text">暂无交易记录</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="tabbar-placeholder"></view>
+</view>

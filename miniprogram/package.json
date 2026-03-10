@@ -1,0 +1,13 @@
+{
+  "name": "havoc-miniprogram",
+  "version": "1.0.0",
+  "description": "游戏账号租赁平台小程序",
+  "scripts": {
+    "upload": "bash ./upload-miniprogram.sh",
+    "upload:quick": "bash ./upload-miniprogram.sh",
+    "upload:version": "node ./upload-wechat-miniprogram.sh"
+  },
+  "devDependencies": {
+    "miniprogram-ci": "^2.1.26"
+  }
+}

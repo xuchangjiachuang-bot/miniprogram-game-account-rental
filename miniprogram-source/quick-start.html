@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小程序预览快速开始</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+    .header p {
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    .content {
+      padding: 40px;
+    }
+    .section {
+      margin-bottom: 40px;
+    }
+    .section-title {
+      font-size: 24px;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid #667eea;
+    }
+    .method-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 2px solid transparent;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .method-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+    .method-card.recommended {
+      border-color: #667eea;
+      background: #f0f3ff;
+    }
+    .method-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .method-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #667eea;
+      color: white;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+    .method-desc {
+      color: #666;
+      line-height: 1.6;
+    }
+    .step-list {
+      margin-top: 16px;
+      padding-left: 20px;
+    }
+    .step-list li {
+      margin-bottom: 8px;
+      color: #555;
+    }
+    .appid-display {
+      background: #e7f3ff;
+      border: 2px dashed #667eea;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .appid-label {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .appid-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+      letter-spacing: 2px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .btn {
+      flex: 1;
+      padding: 16px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+    .notice {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 16px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .notice-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #856404;
+    }
+    .notice-text {
+      color: #856404;
+      line-height: 1.6;
+    }
+    .copy-btn {
+      background: none;
+      border: none;
+      color: #667eea;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      margin-left: 8px;
+    }
+    .copy-btn:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📱 小程序预览配置</h1>
+      <p>游戏账号租赁平台 - AppID: twx2382e1949d031ba6</p>
+    </div>
+    
+    <div class="content">
+      <div class="appid-display">
+        <div class="appid-label">您的小程序 AppID</div>
+        <div class="appid-value">
+          twx2382e1949d031ba6
+          <button class="copy-btn" onclick="copyAppId()">复制</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">选择预览方式</h2>
+        
+        <div class="method-card recommended" onclick="showDetail('devtools')">
+          <div class="method-title">
+            方式一：微信开发者工具
+            <span class="method-badge">推荐</span>
+          </div>
+          <p class="method-desc">适合已开发完成的项目，功能完善，调试便捷</p>
+        </div>
+
+        <div class="method-card" onclick="showDetail('coze')">
+          <div class="method-title">
+            方式二：Coze 编程预览
+          </div>
+          <p class="method-desc">通过AI自动生成代码，适合新项目或快速原型</p>
+        </div>
+      </div>
+
+      <div class="section" id="devtools-detail" style="display: none;">
+        <h2 class="section-title">微信开发者工具预览步骤</h2>
+        
+        <div class="method-card">
+          <div class="method-title">步骤 1：安装开发者工具</div>
+          <p class="method-desc">下载微信开发者工具并安装</p>
+          <a href="https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html" 
+             style="color: #667eea; text-decoration: underline;" target="_blank">
+            前往下载页面 →
+          </a>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 2：导入项目</div>
+          <ul class="step-list">
+            <li>打开微信开发者工具</li>
+            <li>选择"导入项目"</li>
+            <li>项目目录：<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 4px;">/workspace/projects/miniprogram</code></li>
+            <li>AppID：<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 4px;">twx2382e1949d031ba6</code></li>
+          </ul>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 3：配置服务器域名</div>
+          <ul class="step-list">
+            <li>登录 <a href="https://mp.weixin.qq.com" style="color: #667eea;" target="_blank">微信公众平台</a></li>
+            <li>进入：开发 → 开发管理 → 开发设置 → 服务器域名</li>
+            <li>配置 request、socket、uploadFile、downloadFile 合法域名</li>
+          </ul>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 4：配置后端地址</div>
+          <p class="method-desc">编辑 <code>miniprogram/utils/config.js</code>，替换API_BASE_URL和WEBSOCKET_URL</p>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 5：生成预览二维码</div>
+          <ul class="step-list">
+            <li>点击工具栏"预览"按钮</li>
+            <li>使用微信扫描二维码</li>
+            <li>在手机上预览小程序</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section" id="coze-detail" style="display: none;">
+        <h2 class="section-title">Coze 编程预览步骤</h2>
+        
+        <div class="method-card">
+          <div class="method-title">步骤 1：访问 Coze 编程</div>
+          <p class="method-desc">登录 Coze 官网，进入小程序开发页面</p>
+          <a href="https://www.coze.cn" 
+             style="color: #667eea; text-decoration: underline;" target="_blank">
+            前往 Coze →
+          </a>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 2：输入需求描述</div>
+          <p class="method-desc">详细描述小程序功能，让 AI 自动生成代码</p>
+          <p style="color: #666; font-size: 14px; margin-top: 8px;">
+            参考：<code>miniprogram/COZE预览配置完整指南.md</code> 中的提示词
+          </p>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 3：绑定微信小程序</div>
+          <ul class="step-list">
+            <li>在页面右下角点击"AppID 设置"</li>
+            <li>填写 AppID：<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 4px;">twx2382e1949d031ba6</code></li>
+            <li>点击"绑定"</li>
+            <li>使用管理员微信号扫描授权二维码</li>
+            <li>在微信中完成授权</li>
+          </ul>
+        </div>
+
+        <div class="method-card">
+          <div class="method-title">步骤 4：生成预览二维码</div>
+          <ul class="step-list">
+            <li>等待 AI 生成代码</li>
+            <li>在页面右侧找到预览二维码</li>
+            <li>使用管理员微信号扫描</li>
+            <li>在微信中预览小程序</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="notice">
+        <div class="notice-title">⚠️ 重要提示</div>
+        <div class="notice-text">
+          1. 您的小程序代码已开发完成，推荐使用<strong>微信开发者工具</strong>预览<br>
+          2. 域名必须使用 HTTPS 协议<br>
+          3. 域名需要在微信公众平台配置白名单<br>
+          4. 域名必须已完成 ICP 备案
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn btn-primary" onclick="startWithDevTools()">
+          使用微信开发者工具
+        </button>
+        <button class="btn btn-secondary" onclick="startWithCoze()">
+          使用 Coze 编程
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showDetail(method) {
+      document.getElementById('devtools-detail').style.display = 'none';
+      document.getElementById('coze-detail').style.display = 'none';
+      
+      if (method === 'devtools') {
+        document.getElementById('devtools-detail').style.display = 'block';
+      } else if (method === 'coze') {
+        document.getElementById('coze-detail').style.display = 'block';
+      }
+    }
+
+    function copyAppId() {
+      navigator.clipboard.writeText('twx2382e1949d031ba6');
+      alert('AppID 已复制：twx2382e1949d031ba6');
+    }
+
+    function startWithDevTools() {
+      showDetail('devtools');
+      window.open('https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html', '_blank');
+    }
+
+    function startWithCoze() {
+      showDetail('coze');
+      window.open('https://www.coze.cn', '_blank');
+    }
+  </script>
+</body>
+</html>

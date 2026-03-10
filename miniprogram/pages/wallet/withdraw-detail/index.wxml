@@ -1,0 +1,126 @@
+<!-- pages/wallet/withdraw-detail/index.wxml -->
+<view class="page">
+  <!-- 顶部导航 -->
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="onBack">
+      <text class="nav-arrow">←</text>
+    </view>
+    <text class="nav-title">提现详情</text>
+    <view class="nav-placeholder"></view>
+  </view>
+
+  <!-- 提现详情内容 -->
+  <view class="content" wx:if="{{withdrawal}}">
+    <!-- 状态卡片 -->
+    <view class="status-card">
+      <view class="status-icon" style="background: {{getStatusColor(withdrawal.status)}}20">
+        <text class="status-emoji">{{withdrawal.status === 'completed' ? '🎉' : withdrawal.status === 'rejected' ? '❌' : '💰'}}</text>
+      </view>
+      <text class="status-text" style="color: {{getStatusColor(withdrawal.status)}}">{{getStatusText(withdrawal.status)}}</text>
+      <text class="amount-text">¥{{formatMoney(withdrawal.actualAmount)}}</text>
+    </view>
+
+    <!-- 进度时间线 -->
+    <view class="timeline-card">
+      <view class="card-title">处理进度</view>
+      <view class="timeline">
+        <view class="timeline-item {{withdrawal.status === 'pending' || ['approved', 'processing', 'completed'].includes(withdrawal.status) ? 'active' : ''}}">
+          <view class="timeline-dot"></view>
+          <view class="timeline-content">
+            <text class="timeline-title">提交申请</text>
+            <text class="timeline-time">{{withdrawal.createdAt}}</text>
+          </view>
+        </view>
+        
+        <view class="timeline-line"></view>
+        
+        <view class="timeline-item {{['approved', 'processing', 'completed'].includes(withdrawal.status) ? 'active' : ''}} {{withdrawal.status === 'rejected' ? 'rejected' : ''}}">
+          <view class="timeline-dot"></view>
+          <view class="timeline-content">
+            <text class="timeline-title">审核通过</text>
+            <text class="timeline-time">{{withdrawal.reviewTime || '待审核'}}</text>
+          </view>
+        </view>
+        
+        <view class="timeline-line"></view>
+        
+        <view class="timeline-item {{withdrawal.status === 'processing' || withdrawal.status === 'completed' ? 'active' : ''}}">
+          <view class="timeline-dot"></view>
+          <view class="timeline-content">
+            <text class="timeline-title">正在打款</text>
+            <text class="timeline-time">{{withdrawal.status === 'completed' ? withdrawal.reviewTime : '待处理'}}</text>
+          </view>
+        </view>
+        
+        <view class="timeline-line"></view>
+        
+        <view class="timeline-item {{withdrawal.status === 'completed' ? 'active' : ''}}">
+          <view class="timeline-dot"></view>
+          <view class="timeline-content">
+            <text class="timeline-title">提现成功</text>
+            <text class="timeline-time">{{withdrawal.status === 'completed' ? withdrawal.reviewTime : '待完成'}}</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 审核备注 -->
+      <view class="review-remark" wx:if="{{withdrawal.reviewRemark}}">
+        <text class="remark-label">审核备注：</text>
+        <text class="remark-text">{{withdrawal.reviewRemark}}</text>
+      </view>
+    </view>
+
+    <!-- 提现信息 -->
+    <view class="info-card">
+      <view class="card-title">提现信息</view>
+      <view class="info-row">
+        <text class="info-label">提现单号</text>
+        <view class="info-value-wrapper">
+          <text class="info-value">{{withdrawal.withdrawalNo}}</text>
+          <text class="copy-btn" bindtap="onCopyNo">复制</text>
+        </view>
+      </view>
+      <view class="info-row">
+        <text class="info-label">提现方式</text>
+        <text class="info-value">{{getWithdrawalTypeText(withdrawal.withdrawalType)}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">提现账户</text>
+        <text class="info-value">{{withdrawal.accountInfo.name}} ({{withdrawal.accountInfo.account}})</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">申请时间</text>
+        <text class="info-value">{{withdrawal.createdAt}}</text>
+      </view>
+    </view>
+
+    <!-- 金额明细 -->
+    <view class="amount-card">
+      <view class="card-title">金额明细</view>
+      <view class="amount-row">
+        <text class="amount-label">提现金额</text>
+        <text class="amount-value">¥{{formatMoney(withdrawal.amount)}}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">手续费</text>
+        <text class="amount-value">-¥{{formatMoney(withdrawal.feeAmount)}}</text>
+      </view>
+      <view class="amount-divider"></view>
+      <view class="amount-row total">
+        <text class="amount-label">实际到账</text>
+        <text class="amount-value highlight">¥{{formatMoney(withdrawal.actualAmount)}}</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="action-buttons">
+      <button class="btn secondary" bindtap="onContactService">联系客服</button>
+      <button class="btn primary" bindtap="onRefresh">刷新状态</button>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{!withdrawal}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+</view>

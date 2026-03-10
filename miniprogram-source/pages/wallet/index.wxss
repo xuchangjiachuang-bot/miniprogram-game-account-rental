@@ -1,0 +1,188 @@
+/* pages/wallet/index.wxss */
+
+/* 余额卡片 */
+.balance-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 60rpx 40rpx;
+  color: #ffffff;
+}
+
+.balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.balance-label {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+.btn-detail {
+  padding: 12rpx 24rpx;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 100rpx;
+  font-size: 24rpx;
+  color: #ffffff;
+}
+
+.balance-amount {
+  font-size: 72rpx;
+  font-weight: 700;
+  margin-bottom: 40rpx;
+}
+
+.balance-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn-action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  background: rgba(255,255,255,0.2);
+  border: 2rpx solid rgba(255,255,255,0.3);
+  border-radius: 12rpx;
+  backdrop-filter: blur(10rpx);
+}
+
+.action-icon {
+  font-size: 40rpx;
+}
+
+.action-text {
+  font-size: 26rpx;
+}
+
+/* 统计信息 */
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+  padding: 30rpx 20rpx;
+  background: #ffffff;
+  margin-bottom: 20rpx;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-bottom: 12rpx;
+}
+
+.stat-value {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* 交易记录 */
+.transactions-section {
+  background: #ffffff;
+  padding: 0 20rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.section-more {
+  font-size: 26rpx;
+  color: #667eea;
+}
+
+.transaction-list {
+  padding: 10rpx 0;
+}
+
+.transaction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.transaction-info {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.transaction-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 12rpx;
+  background: #f5f5f5;
+}
+
+.transaction-details {
+  flex: 1;
+}
+
+.transaction-title {
+  font-size: 28rpx;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.transaction-time {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.transaction-amount {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.transaction-amount.income {
+  color: #2ed573;
+}
+
+.transaction-amount.expense {
+  color: #ff6b6b;
+}
+
+/* 空状态 */
+.empty {
+  padding: 80rpx 0;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: 20rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+/* 底部占位 */
+.tabbar-placeholder {
+  height: 100rpx;
+}

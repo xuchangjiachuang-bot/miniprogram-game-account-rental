@@ -1,0 +1,27 @@
+<!-- pages/auth/bind-phone/index.wxml -->
+<view class="page">
+  <view class="container">
+    <!-- 标题 -->
+    <view class="header">
+      <view class="title">绑定手机号</view>
+      <view class="subtitle">为了保障您的账户安全，请绑定手机号</view>
+    </view>
+
+    <!-- 微信授权手机号 -->
+    <view class="form">
+      <button
+        class="phone-btn {{loading ? 'disabled' : ''}}"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumber"
+        disabled="{{loading}}"
+      >
+        {{loading ? '绑定中...' : '微信授权手机号'}}
+      </button>
+
+      <!-- 跳过 -->
+      <view class="skip-section">
+        <text class="skip-text" bindtap="onSkip">暂时跳过</text>
+      </view>
+    </view>
+  </view>
+</view>

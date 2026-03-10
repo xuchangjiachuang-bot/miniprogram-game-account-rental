@@ -1,0 +1,72 @@
+<!-- pages/profile/edit/index.wxml -->
+<view class="page">
+  <!-- 头像区域 -->
+  <view class="avatar-section">
+    <image 
+      class="avatar-image" 
+      src="{{userInfo.avatar || '/images/default-avatar.png'}}" 
+      mode="aspectFill"
+      bindtap="onAvatarTap"
+    />
+    <view class="avatar-tip">点击更换头像</view>
+  </view>
+
+  <!-- 表单区域 -->
+  <view class="form-section">
+    <view class="form-item">
+      <text class="form-label">昵称</text>
+      <input 
+        class="form-input" 
+        type="text" 
+        placeholder="请输入昵称"
+        value="{{form.nickname}}"
+        bindinput="onNicknameInput"
+        maxlength="20"
+      />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">性别</text>
+      <picker 
+        mode="selector" 
+        range="{{genderOptions}}" 
+        range-key="label"
+        value="{{form.genderIndex}}"
+        bindchange="onGenderChange"
+      >
+        <view class="picker-value">
+          {{genderOptions[form.genderIndex].label}}
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">手机号</text>
+      <view class="form-value">
+        {{userInfo.phone || '未绑定'}}
+        <text class="bind-link" bindtap="onBindPhone" wx:if="{{!userInfo.phone}}">去绑定</text>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">个性签名</text>
+      <textarea 
+        class="form-textarea" 
+        placeholder="介绍一下自己吧"
+        value="{{form.bio}}"
+        bindinput="onBioInput"
+        maxlength="100"
+        auto-height
+      />
+      <view class="char-count">{{form.bio.length}}/100</view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-section">
+    <button class="btn-save" bindtap="onSave" disabled="{{saving}}">
+      {{saving ? '保存中...' : '保存'}}
+    </button>
+  </view>
+</view>

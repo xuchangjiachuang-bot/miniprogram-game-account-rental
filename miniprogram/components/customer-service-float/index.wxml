@@ -1,0 +1,12 @@
+<!-- components/customer-service-float/index.wxml -->
+<view class="customer-service-float {{visible ? 'show' : 'hide'}}">
+  <view class="float-button" bindtap="onTap">
+    <view class="button-icon">
+      <text class="icon-text">💬</text>
+    </view>
+    <view class="button-text" wx:if="{{showText}}">客服</view>
+  </view>
+  <view class="close-button" bindtap="onClose" wx:if="{{showClose}}">
+    <text class="close-icon">×</text>
+  </view>
+</view>

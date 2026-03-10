@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小程序预览配置</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 30px;
+      font-size: 32px;
+    }
+    .status-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border-left: 4px solid #667eea;
+    }
+    .status-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+    }
+    .status-value {
+      font-size: 24px;
+      color: #667eea;
+      font-weight: 700;
+    }
+    .checklist {
+      margin-top: 30px;
+    }
+    .checklist-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .checkbox {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid #667eea;
+      margin-right: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: white;
+      flex-shrink: 0;
+    }
+    .checkbox.checked {
+      background: #667eea;
+    }
+    .checkbox.checked::after {
+      content: '✓';
+    }
+    .item-text {
+      flex: 1;
+      color: #333;
+    }
+    .item-text.completed {
+      color: #999;
+      text-decoration: line-through;
+    }
+    .input-group {
+      margin-top: 20px;
+    }
+    .input-label {
+      display: block;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .input-field {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .note {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 30px;
+      color: #856404;
+    }
+    .note-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📱 小程序预览配置</h1>
+    
+    <div class="status-card">
+      <div class="status-title">小程序AppID</div>
+      <div class="status-value">twx2382e1949d031ba6</div>
+    </div>
+    
+    <div class="status-card">
+      <div class="status-title">项目名称</div>
+      <div class="status-value">游戏账号租赁平台</div>
+    </div>
+
+    <div class="checklist">
+      <div class="checklist-title">配置检查清单</div>
+      
+      <div class="checklist-item">
+        <div class="checkbox checked"></div>
+        <span class="item-text completed">AppID已配置</span>
+      </div>
+      
+      <div class="checklist-item">
+        <div class="checkbox"></div>
+        <span class="item-text">后端API域名已配置</span>
+      </div>
+      
+      <div class="checklist-item">
+        <div class="checkbox"></div>
+        <span class="item-text">WebSocket域名已配置</span>
+      </div>
+      
+      <div class="checklist-item">
+        <div class="checkbox"></div>
+        <span class="item-text">微信开发者工具已安装</span>
+      </div>
+      
+      <div class="checklist-item">
+        <div class="checkbox"></div>
+        <span class="item-text">服务器域名已在微信公众平台配置</span>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">后端API域名</label>
+      <input type="text" class="input-field" placeholder="例如：https://api.yourdomain.com">
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">WebSocket域名</label>
+      <input type="text" class="input-field" placeholder="例如：wss://ws.yourdomain.com">
+    </div>
+
+    <button class="btn">保存配置</button>
+
+    <div class="note">
+      <div class="note-title">⚠️ 注意事项</div>
+      <div>1. 域名必须使用HTTPS协议</div>
+      <div>2. 域名需要在微信公众平台配置白名单</div>
+      <div>3. 域名必须已完成ICP备案</div>
+      <div>4. 配置完成后使用微信开发者工具预览</div>
+    </div>
+
+    <div class="note" style="background: #d1ecf1; border-color: #17a2b8; color: #0c5460; margin-top: 20px;">
+      <div class="note-title">💡 关于Coze预览协议</div>
+      <div>如果您指的是Coze的小程序预览协议，这是一个较新的功能。如果您的Coze工作区支持此功能，请：</div>
+      <div>1. 登录Coze控制台</div>
+      <div>2. 查找"小程序预览"或相关功能入口</div>
+      <div>3. 输入AppID：twx2382e1949d031ba6</div>
+      <div>4. 按提示扫码授权</div>
+    </div>
+  </div>
+
+  <script>
+    // 简单的交互逻辑
+    document.querySelectorAll('.checkbox:not(.checked)').forEach(checkbox => {
+      checkbox.addEventListener('click', function() {
+        this.classList.toggle('checked');
+        const text = this.nextElementSibling;
+        if (this.classList.contains('checked')) {
+          text.classList.add('completed');
+        } else {
+          text.classList.remove('completed');
+        }
+      });
+    });
+
+    document.querySelector('.btn').addEventListener('click', function() {
+      const apiDomain = document.querySelector('.input-field').value;
+      const wsDomain = document.querySelectorAll('.input-field')[1].value;
+      
+      if (apiDomain || wsDomain) {
+        alert('配置已保存！\n\nAPI域名: ' + (apiDomain || '未设置') + '\nWebSocket域名: ' + (wsDomain || '未设置') + '\n\n请继续使用微信开发者工具预览小程序。');
+      } else {
+        alert('请至少填写一个域名配置！');
+      }
+    });
+  </script>
+</body>
+</html>

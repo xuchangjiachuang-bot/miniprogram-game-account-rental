@@ -1,0 +1,62 @@
+/* pages/auth/bind-phone/index.wxss */
+.page {
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.container {
+  min-height: 100vh;
+  padding: 80rpx 60rpx;
+  background: #ffffff;
+}
+
+/* Header */
+.header {
+  margin-bottom: 80rpx;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 20rpx;
+}
+
+.subtitle {
+  font-size: 28rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* Form */
+.form {
+  width: 100%;
+}
+
+.phone-btn {
+  width: 100%;
+  height: 96rpx;
+  background: linear-gradient(90deg, #2563eb 0%, #9333ea 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 50rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-top: 40rpx;
+  box-shadow: 0 8rpx 24rpx rgba(147, 51, 234, 0.3);
+}
+
+.phone-btn.disabled {
+  opacity: 0.6;
+}
+
+/* Skip Section */
+.skip-section {
+  margin-top: 40rpx;
+  text-align: center;
+}
+
+.skip-text {
+  font-size: 26rpx;
+  color: #9ca3af;
+}

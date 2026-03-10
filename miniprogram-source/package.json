@@ -1,0 +1,12 @@
+{
+  "name": "miniprogram-upload",
+  "version": "1.0.0",
+  "description": "微信小程序上传工具",
+  "main": "upload.js",
+  "scripts": {
+    "upload": "node upload.js"
+  },
+  "dependencies": {
+    "miniprogram-ci": "^1.6.1"
+  }
+}

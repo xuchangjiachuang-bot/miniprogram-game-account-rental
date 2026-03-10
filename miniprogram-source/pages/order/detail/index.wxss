@@ -1,0 +1,308 @@
+/* pages/order/detail/index.wxss */
+@import "../../../styles/variables.wxss";
+
+.page {
+  min-height: 100vh;
+  background: var(--page-bg);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+/* 状态栏 */
+.status-header {
+  padding: 60rpx 40rpx;
+  display: flex;
+  align-items: center;
+  gap: 30rpx;
+}
+
+.status-header.status-pending {
+  background: linear-gradient(135deg, #ffa940 0%, #ff7a45 100%);
+}
+
+.status-header.status-paid {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+}
+
+.status-header.status-active {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+}
+
+.status-header.status-completed {
+  background: linear-gradient(135deg, #8c8c8c 0%, #595959 100%);
+}
+
+.status-header.status-cancelled {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+}
+
+.status-header.status-refunded {
+  background: linear-gradient(135deg, #fa8c16 0%, #d46b08 100%);
+}
+
+.status-icon {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+}
+
+.status-info {
+  flex: 1;
+  color: white;
+}
+
+.status-text {
+  font-size: 36rpx;
+  font-weight: var(--font-weight-bold);
+  margin-bottom: 10rpx;
+}
+
+.status-desc {
+  font-size: var(--font-size-sm);
+  opacity: 0.9;
+}
+
+/* 通用区块 */
+.section {
+  margin: 30rpx;
+  padding: 30rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.section-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.btn-copy {
+  padding: 10rpx 20rpx;
+  font-size: var(--font-size-sm);
+  color: var(--primary);
+  border: 1rpx solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+/* 账号卡片 */
+.account-card {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+}
+
+.account-image {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: var(--radius-md);
+  background: var(--placeholder-bg);
+}
+
+.account-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.account-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 10rpx;
+}
+
+.account-tags {
+  display: flex;
+  gap: 10rpx;
+  margin-bottom: 10rpx;
+}
+
+.tag {
+  padding: 5rpx 12rpx;
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-xs);
+}
+
+.tag-skin {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.tag-level {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.account-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.price-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.price-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary);
+}
+
+/* 订单信息 */
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.info-value {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.info-value.price {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary);
+}
+
+.info-value.refund {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--warning);
+}
+
+/* 游戏账号 */
+.game-account {
+  display: flex;
+  flex-direction: column;
+  gap: 15rpx;
+  padding: 20rpx;
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+}
+
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10rpx 0;
+}
+
+.row-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  min-width: 80rpx;
+}
+
+.row-value {
+  flex: 1;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.row-value.masked {
+  letter-spacing: 5rpx;
+}
+
+/* 退租信息 */
+.refund-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 操作栏 */
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+}
+
+.action-list {
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn-action {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-lg);
+  border: none;
+}
+
+.btn-secondary {
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+/* 聊天入口 */
+.chat-entry {
+  position: fixed;
+  right: 30rpx;
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.chat-icon {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+}
+
+.chat-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}

@@ -1,0 +1,121 @@
+<!-- pages/profile/index.wxml -->
+<view class="page">
+  <!-- 用户信息头部 -->
+  <view class="profile-header">
+    <view class="user-info" bindtap="onEditProfile">
+      <image class="user-avatar" src="{{userInfo.avatar}}" mode="aspectFill" />
+      <view class="user-details">
+        <view class="user-name">{{userInfo.nickname || '未设置昵称'}}</view>
+        <view class="user-id">ID: {{userInfo.id || '-'}}</view>
+        <view class="user-tags" wx:if="{{userInfo.tags && userInfo.tags.length > 0}}">
+          <view class="tag" wx:for="{{userInfo.tags}}" wx:key="*this">{{item}}</view>
+        </view>
+      </view>
+      <text class="arrow">›</text>
+    </view>
+
+    <!-- 统计数据 -->
+    <view class="stats-row">
+      <view class="stat-item" bindtap="onOrdersTap">
+        <text class="stat-value">{{stats.orderCount}}</text>
+        <text class="stat-label">订单</text>
+      </view>
+      <view class="stat-item" bindtap="onCollectTap">
+        <text class="stat-value">{{stats.collectCount}}</text>
+        <text class="stat-label">收藏</text>
+      </view>
+      <view class="stat-item" bindtap="onWalletTap">
+        <text class="stat-value">¥{{stats.balance}}</text>
+        <text class="stat-label">余额</text>
+      </view>
+      <view class="stat-item" bindtap="onCreditTap">
+        <text class="stat-value">{{stats.creditScore}}</text>
+        <text class="stat-label">信用分</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 认证状态 -->
+  <view class="auth-section" wx:if="{{!userInfo.isVerified}}">
+    <view class="auth-content">
+      <text class="auth-icon">⚠️</text>
+      <text class="auth-text">完成实名认证，解锁更多功能</text>
+      <button class="btn-auth" bindtap="onVerifyTap">去认证</button>
+    </view>
+  </view>
+
+  <!-- 菜单列表 -->
+  <view class="menu-section">
+    <view class="menu-group">
+      <view class="menu-item" bindtap="onOrdersTap">
+        <text class="menu-icon">📦</text>
+        <text class="menu-text">我的订单</text>
+        <text class="menu-badge" wx:if="{{menuBadges.order > 0}}">{{menuBadges.order}}</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onAccountTap">
+        <text class="menu-icon">🎮</text>
+        <text class="menu-text">我的账号</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onCollectTap">
+        <text class="menu-icon">⭐</text>
+        <text class="menu-text">我的收藏</text>
+        <text class="menu-badge" wx:if="{{menuBadges.collect > 0}}">{{menuBadges.collect}}</text>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+
+    <view class="menu-group">
+      <view class="menu-item" bindtap="onWalletTap">
+        <text class="menu-icon">💰</text>
+        <text class="menu-text">我的钱包</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onAddressTap">
+        <text class="menu-icon">📍</text>
+        <text class="menu-text">收货地址</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onSecurityTap">
+        <text class="menu-icon">🔒</text>
+        <text class="menu-text">账户安全</text>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+
+    <view class="menu-group">
+      <view class="menu-item" bindtap="onHelpTap">
+        <text class="menu-icon">❓</text>
+        <text class="menu-text">帮助中心</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onFeedbackTap">
+        <text class="menu-icon">💬</text>
+        <text class="menu-text">意见反馈</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onAboutTap">
+        <text class="menu-icon">ℹ️</text>
+        <text class="menu-text">关于我们</text>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+
+    <view class="menu-group">
+      <view class="menu-item logout" bindtap="onLogout">
+        <text class="menu-icon">🚪</text>
+        <text class="menu-text">退出登录</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="tabbar-placeholder"></view>
+
+  <!-- 登录弹窗 -->
+  <login-modal
+    visible="{{showLoginModal}}"
+    bind:loginSuccess="onLoginSuccess"
+  />
+</view>

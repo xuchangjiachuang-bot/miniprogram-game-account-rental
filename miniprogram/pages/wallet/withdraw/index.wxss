@@ -1,0 +1,231 @@
+/* pages/wallet/withdraw/index.wxss */
+@import "../../../styles/variables.wxss";
+
+.page {
+  min-height: 100vh;
+  background: var(--page-bg);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+/* 余额展示 */
+.balance-section {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  padding: 60rpx 40rpx;
+  color: white;
+  text-align: center;
+}
+
+.balance-label {
+  font-size: var(--font-size-sm);
+  opacity: 0.9;
+  margin-bottom: 20rpx;
+}
+
+.balance-amount {
+  font-size: 56rpx;
+  font-weight: var(--font-weight-bold);
+  margin-bottom: 10rpx;
+}
+
+.balance-desc {
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
+}
+
+/* 通用区块 */
+.section {
+  margin: 30rpx;
+  padding: 30rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+}
+
+.section-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 30rpx;
+}
+
+/* 金额输入 */
+.amount-input-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 20rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: 20rpx;
+}
+
+.currency-symbol {
+  font-size: 48rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-right: 10rpx;
+}
+
+.amount-input {
+  flex: 1;
+  font-size: 48rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.withdraw-all {
+  font-size: var(--font-size-sm);
+  color: var(--primary);
+  padding: 10rpx 20rpx;
+  background: var(--primary-light);
+  border-radius: var(--radius-sm);
+}
+
+.amount-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.tip-item {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* 实际到账 */
+.actual-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  margin-top: 20rpx;
+}
+
+.actual-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.actual-value {
+  font-size: 32rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary);
+}
+
+/* 账户列表 */
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  padding: 25rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.account-item.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.account-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  font-weight: var(--font-weight-bold);
+  color: white;
+  margin-right: 20rpx;
+}
+
+.account-info {
+  flex: 1;
+}
+
+.account-bank {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 5rpx;
+}
+
+.account-number {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.account-check {
+  font-size: 40rpx;
+  color: var(--primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.btn-add-account {
+  width: 100%;
+  padding: 25rpx;
+  background: transparent;
+  border: 2rpx dashed var(--primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--primary);
+  margin-top: 10rpx;
+}
+
+/* 提示 */
+.tips {
+  margin: 0 30rpx;
+  padding: 20rpx;
+  background: var(--warning-bg);
+  border-radius: var(--radius-md);
+}
+
+.tips .tip-item {
+  font-size: var(--font-size-xs);
+  color: var(--warning-text);
+  line-height: 1.6;
+  margin-bottom: 5rpx;
+}
+
+.tips .tip-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 底部操作栏 */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+}
+
+.btn-withdraw {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: var(--primary);
+  color: white;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-lg);
+  border: none;
+}
+
+.btn-withdraw[disabled] {
+  background: var(--text-disabled);
+  opacity: 0.5;
+}

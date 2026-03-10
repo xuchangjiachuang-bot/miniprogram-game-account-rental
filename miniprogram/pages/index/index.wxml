@@ -1,0 +1,399 @@
+<!-- pages/index/index.wxml -->
+<view class="page">
+  <!-- 轮播图区域 -->
+  <view class="hero-section">
+    <view class="hero-container">
+      <swiper
+        wx:if="{{carousels.length > 0}}"
+        class="carousel"
+        indicator-dots
+        autoplay
+        interval="3000"
+        circular
+        indicator-color="rgba(255,255,255,0.5)"
+        indicator-active-color="#ffffff"
+      >
+        <swiper-item wx:for="{{carousels}}" wx:key="id">
+          <view class="carousel-item">
+            <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
+            <view class="carousel-overlay"></view>
+            <view class="carousel-content">
+              <view class="carousel-title">{{item.title}}</view>
+              <view class="carousel-desc" wx:if="{{item.description}}">{{item.description}}</view>
+            </view>
+          </view>
+        </swiper-item>
+      </swiper>
+
+      <!-- 备用标题（无轮播图时） -->
+      <view wx:else class="fallback-hero">
+        <view class="badge">
+          <text>📈 专业哈夫币出租平台</text>
+        </view>
+        <view class="main-title">
+          三角洲行动
+          <text class="gradient-text">哈夫币出租</text>
+        </view>
+        <view class="sub-title">安全快捷的哈夫币租赁服务 | 担保交易 | 押金保障</view>
+      </view>
+    </view>
+
+    <!-- 发布账号按钮（固定在轮播图下方） -->
+    <view class="publish-section" bindtap="onPublishTap">
+      <view class="publish-btn">
+        <text class="publish-icon">+</text>
+        <text class="publish-text">发布账号</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 筛选区域 -->
+  <view class="filter-section">
+    <view class="filter-container">
+      <!-- 筛选标题 -->
+      <view class="filter-header">
+        <image class="filter-icon" src="/images/icons/shield.svg" mode="aspectFit" />
+        <text class="filter-title">筛选账号</text>
+      </view>
+
+      <!-- 第一行：基本筛选（7列） -->
+      <view class="filter-row filter-row-7">
+        <!-- 平台·上号方式 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">平台·上号方式</view>
+          <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
+            <view class="picker-box">
+              {{platformOptions[filters.platformIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 哈夫币 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">哈夫币(M)</view>
+          <view class="range-box">
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最小"
+              value="{{filters.minCoins}}"
+              bindinput="onMinCoinsInput"
+            />
+            <text class="range-separator">-</text>
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最大"
+              value="{{filters.maxCoins}}"
+              bindinput="onMaxCoinsInput"
+            />
+          </view>
+        </view>
+
+        <!-- 段位 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">段位</view>
+          <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
+            <view class="picker-box">
+              {{rankOptions[filters.rankIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 安全箱 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">安全箱</view>
+          <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
+            <view class="picker-box">
+              {{safeboxOptions[filters.safeboxIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 体力等级 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">体力等级</view>
+          <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
+            <view class="picker-box">
+              {{staminaOptions[filters.staminaIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 负重等级 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">负重等级</view>
+          <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
+            <view class="picker-box">
+              {{loadOptions[filters.loadIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 地区 -->
+        <view class="filter-item filter-item-7">
+          <view class="filter-label">地区</view>
+          <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
+            <view class="picker-box">
+              {{provinceOptions[filters.provinceIndex] || '全部'}}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+      </view>
+
+      <!-- 第二行：价格筛选 -->
+      <view class="filter-row filter-row-3">
+        <!-- 租金 -->
+        <view class="filter-item filter-item-3">
+          <view class="filter-label">租金(元)</view>
+          <view class="range-box">
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最小"
+              value="{{filters.minRental}}"
+              bindinput="onMinRentalInput"
+            />
+            <text class="range-separator">-</text>
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最大"
+              value="{{filters.maxRental}}"
+              bindinput="onMaxRentalInput"
+            />
+          </view>
+        </view>
+
+        <!-- 押金 -->
+        <view class="filter-item filter-item-3">
+          <view class="filter-label">押金(元)</view>
+          <view class="range-box">
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最小"
+              value="{{filters.minDeposit}}"
+              bindinput="onMinDepositInput"
+            />
+            <text class="range-separator">-</text>
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最大"
+              value="{{filters.maxDeposit}}"
+              bindinput="onMaxDepositInput"
+            />
+          </view>
+        </view>
+
+        <!-- 总价 -->
+        <view class="filter-item filter-item-3">
+          <view class="filter-label">总价(元)</view>
+          <view class="range-box">
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最小"
+              value="{{filters.minTotal}}"
+              bindinput="onMinTotalInput"
+            />
+            <text class="range-separator">-</text>
+            <input
+              class="range-input"
+              type="number"
+              placeholder="最大"
+              value="{{filters.maxTotal}}"
+              bindinput="onMaxTotalInput"
+            />
+          </view>
+        </view>
+      </view>
+
+      <!-- 第三行：搜索框 -->
+      <view class="search-row">
+        <view class="search-box">
+          <text class="search-icon">🔍</text>
+          <input
+            class="search-input"
+            placeholder="输入账号名进行搜索..."
+            value="{{searchQuery}}"
+            bindinput="onSearchInput"
+          />
+        </view>
+      </view>
+
+      <!-- 第四行：操作按钮 -->
+      <view class="action-row">
+        <view class="btn-toggle" bindtap="onShowMoreFilters">
+          <text>{{showMoreFilters ? '▲' : '▼'}}</text>
+          <text>{{showMoreFilters ? '收起皮肤' : '展开皮肤'}}</text>
+        </view>
+        <view class="btn-reset" bindtap="onResetFilters">
+          <text>重置</text>
+        </view>
+      </view>
+
+      <!-- 皮肤筛选（可折叠） -->
+      <view class="skin-filter" wx:if="{{showMoreFilters}}">
+        <view class="skin-header">
+          <text class="skin-label">皮肤筛选（可多选）</text>
+          <text class="skin-count" wx:if="{{selectedSkins.length > 0}}">已选 {{selectedSkins.length}} 个</text>
+        </view>
+        <view class="skin-list">
+          <view
+            class="skin-tag {{selectedSkins.includes(item.name) ? 'active' : ''}}"
+            wx:for="{{skinOptions}}"
+            wx:key="id"
+            bindtap="onSkinTap"
+            data-name="{{item.name}}"
+          >
+            <text class="skin-check" wx:if="{{selectedSkins.includes(item.name)}}">✓</text>
+            {{item.name}}
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 账号列表 -->
+  <view class="account-section">
+    <view class="account-container">
+      <!-- 列表头部 -->
+      <view class="list-header">
+        <text class="account-count">共 {{accounts.length}} 个账号</text>
+      </view>
+
+      <!-- 账号网格 -->
+      <view class="account-grid">
+        <view
+          class="account-card"
+          wx:for="{{displayAccounts}}"
+          wx:key="id"
+          bindtap="onAccountTap"
+          data-account="{{item}}"
+        >
+          <!-- 卡片图片 -->
+          <view class="card-image">
+            <image class="card-img" src="{{item.images[0] || '/images/default-account.png'}}" mode="aspectFill" />
+            <view class="card-status {{item.status}}">{{item.statusText}}</view>
+            <!-- 平台标签 -->
+            <view class="platform-badge">{{item.login_method}}</view>
+          </view>
+
+          <!-- 卡片内容 -->
+          <view class="card-content">
+            <!-- 自动构建的标题 -->
+            <view class="card-title">{{item.fullTitle}}</view>
+
+            <!-- 核心信息卡片 -->
+            <view class="info-row">
+              <view class="info-box coins">
+                <text class="info-label">哈夫币</text>
+                <text class="info-value">{{item.coins_display}}</text>
+              </view>
+              <view class="info-box ratio">
+                <text class="info-label">比例</text>
+                <text class="info-value">{{item.ratio_display}}</text>
+              </view>
+            </view>
+
+            <!-- 属性行 -->
+            <view class="attributes-row">
+              <view class="attribute">
+                <text class="attr-label">安全箱</text>
+                <text class="attr-value">{{item.safebox}}</text>
+              </view>
+              <view class="attribute">
+                <text class="attr-label">体力/负重</text>
+                <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
+              </view>
+              <view class="attribute">
+                <text class="attr-label">等级</text>
+                <text class="attr-value">Lv.{{item.account_level}}</text>
+              </view>
+              <view class="attribute">
+                <text class="attr-label">段位</text>
+                <text class="attr-value">{{item.rank_display}}</text>
+              </view>
+            </view>
+
+            <!-- KD和地区 -->
+            <view class="kd-region-row" wx:if="{{item.kd > 0 || item.region.city}}">
+              <text class="kd-text" wx:if="{{item.kd > 0}}">KD: {{item.kd}}</text>
+              <text class="region-text">{{item.region.city}}</text>
+            </view>
+
+            <!-- 皮肤标签 -->
+            <view class="skins-row" wx:if="{{item.skins.length > 0}}">
+              <text class="skin-tag" wx:for="{{item.skins.slice(0,3)}}" wx:for-item="skin" wx:key="index">{{skin}}</text>
+              <text class="skin-more" wx:if="{{item.skins.length > 3}}">+{{item.skins.length - 3}}</text>
+            </view>
+
+            <!-- 价格区域 -->
+            <view class="price-row">
+              <view class="price-box">
+                <text class="price-label">租金</text>
+                <text class="price-value">¥{{item.actual_rental}}</text>
+              </view>
+              <view class="price-box">
+                <text class="price-label">押金</text>
+                <text class="price-value">¥{{item.deposit}}</text>
+              </view>
+              <view class="price-box">
+                <text class="price-label">总价</text>
+                <text class="price-value total">¥{{item.total_price}}</text>
+              </view>
+            </view>
+
+            <!-- 租期 -->
+            <view class="rental-duration">
+              <text class="duration-label">租期</text>
+              <text class="duration-value">{{item.rental_description}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 加载更多 -->
+      <view class="load-more" wx:if="{{hasMore && !loading}}">
+        <view class="btn-load-more" bindtap="onLoadMore">加载更多</view>
+      </view>
+
+      <!-- 加载中 -->
+      <view class="loading" wx:if="{{loading}}">
+        <view class="loading-spinner"></view>
+        <text>加载中...</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty" wx:if="{{!loading && accounts.length === 0}}">
+        <view class="empty-icon">📭</view>
+        <view class="empty-text">暂无账号</view>
+        <view class="empty-hint">调整筛选条件或稍后再试</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="tabbar-placeholder"></view>
+
+  <!-- 企业微信客服悬浮按钮 -->
+  <customer-service-float
+    visible="{{showCustomerService}}"
+    bind:tap="onCustomerServiceTap"
+    bind:close="onCustomerServiceClose"
+  />
+
+  <!-- 登录弹窗 -->
+  <login-modal
+    visible="{{showLoginModal}}"
+    bind:loginSuccess="onLoginSuccess"
+  />
+</view>

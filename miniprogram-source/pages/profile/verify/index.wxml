@@ -1,0 +1,103 @@
+<!-- pages/profile/verify/index.wxml -->
+<view class="page">
+  <!-- 认证状态 -->
+  <view class="verify-status status-{{statusKey}}">
+    <view class="status-icon">{{statusIcon}}</view>
+    <view class="status-text">{{statusText}}</view>
+    <view class="status-desc">{{statusDesc}}</view>
+  </view>
+
+  <!-- 认证表单 -->
+  <form bindsubmit="onSubmit" wx:if="{{canSubmit}}">
+    <view class="section">
+      <view class="section-title required">真实姓名</view>
+      <input
+        class="form-input"
+        placeholder="请输入真实姓名"
+        value="{{form.realName}}"
+        bindinput="onNameInput"
+      />
+    </view>
+
+    <view class="section">
+      <view class="section-title required">身份证号</view>
+      <input
+        class="form-input"
+        placeholder="请输入身份证号"
+        value="{{form.idCard}}"
+        bindinput="onIdCardInput"
+        maxlength="18"
+      />
+    </view>
+
+    <view class="section">
+      <view class="section-title required">身份证照片</view>
+      
+      <view class="id-card-upload">
+        <view class="upload-item" bindtap="onIdCardFrontTap">
+          <image class="id-card-image" src="{{form.idCardFront}}" mode="aspectFill" wx:if="{{form.idCardFront}}" />
+          <view class="upload-placeholder" wx:else>
+            <text class="placeholder-icon">📷</text>
+            <text class="placeholder-text">上传人像面</text>
+          </view>
+        </view>
+        
+        <view class="upload-item" bindtap="onIdCardBackTap">
+          <image class="id-card-image" src="{{form.idCardBack}}" mode="aspectFill" wx:if="{{form.idCardBack}}" />
+          <view class="upload-placeholder" wx:else>
+            <text class="placeholder-icon">📷</text>
+            <text class="placeholder-text">上传国徽面</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">手机号</view>
+      <input
+        class="form-input"
+        type="number"
+        placeholder="请输入手机号"
+        value="{{form.phone}}"
+        bindinput="onPhoneInput"
+        maxlength="11"
+      />
+    </view>
+
+    <!-- 认证须知 -->
+    <view class="tips">
+      <view class="tip-item">• 请确保上传的身份证照片清晰、完整</view>
+      <view class="tip-item">• 身份证信息仅用于实名认证，将严格保密</view>
+      <view class="tip-item">• 认证通过后无法修改，请仔细核对</view>
+      <view class="tip-item">• 审核周期：1-3个工作日</view>
+    </view>
+
+    <view class="submit-bar">
+      <button class="btn-submit" form-type="submit" disabled="{{submitting}}">
+        {{submitting ? '提交中...' : '提交认证'}}
+      </button>
+    </view>
+  </form>
+
+  <!-- 认证信息 -->
+  <view class="verify-info" wx:if="{{!canSubmit && userInfo.realName}}">
+    <view class="section">
+      <view class="section-title">认证信息</view>
+      
+      <view class="info-row">
+        <text class="info-label">真实姓名</text>
+        <text class="info-value">{{userInfo.realName}}</text>
+      </view>
+      
+      <view class="info-row">
+        <text class="info-label">身份证号</text>
+        <text class="info-value">{{maskedIdCard}}</text>
+      </view>
+      
+      <view class="info-row">
+        <text class="info-label">认证时间</text>
+        <text class="info-value">{{userInfo.verifiedAt}}</text>
+      </view>
+    </view>
+  </view>
+</view>

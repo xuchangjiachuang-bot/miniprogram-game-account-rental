@@ -1,0 +1,62 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/auth/login/index",
+    "pages/auth/wechat-login/index",
+    "pages/auth/bind-phone/index",
+    "pages/order/list/index",
+    "pages/order/detail/index",
+    "pages/order/payment/index",
+    "pages/order/payment/wechat/index",
+    "pages/account/detail/index",
+    "pages/account/publish/index",
+    "pages/wallet/index",
+    "pages/wallet/recharge/index",
+    "pages/wallet/withdraw/index",
+    "pages/wallet/bill/index",
+    "pages/wallet/withdraw-detail/index",
+    "pages/chat/list/index",
+    "pages/chat/detail/index",
+    "pages/profile/index",
+    "pages/profile/edit/index",
+    "pages/profile/verify/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#6366f1",
+    "navigationBarTitleText": "哈夫币租赁",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f9fafb"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#6366f1",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/order/list/index",
+        "text": "订单"
+      },
+      {
+        "pagePath": "pages/chat/list/index",
+        "text": "消息"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "usingComponents": {
+    "login-modal": "/components/login-modal/index",
+    "customer-service-float": "/components/customer-service-float/index"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

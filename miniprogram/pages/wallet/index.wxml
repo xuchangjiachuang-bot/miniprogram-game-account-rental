@@ -1,0 +1,115 @@
+<!-- pages/wallet/index.wxml -->
+<view class="page">
+  <!-- 余额卡片 -->
+  <view class="balance-card">
+    <view class="balance-header">
+      <text class="balance-title">可用余额</text>
+      <text class="balance-amount">¥{{wallet.balance}}</text>
+    </view>
+    <view class="balance-actions">
+      <view class="action-item" bindtap="onRechargeTap">
+        <view class="action-icon recharge-icon"></view>
+        <text class="action-text">充值</text>
+      </view>
+      <view class="action-item" bindtap="onWithdrawTap">
+        <view class="action-icon withdraw-icon"></view>
+        <text class="action-text">提现</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 统计卡片 -->
+  <view class="statistics-card">
+    <view class="card-header">
+      <text class="card-title">收支统计</text>
+      <picker mode="selector" range="{{periodList}}" range-key="label" bindchange="onPeriodChange">
+        <view class="period-selector">
+          <text class="period-text">{{periodList[currentPeriod].label}}</text>
+          <text class="period-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+    
+    <!-- 统计数据 -->
+    <view class="statistics-summary" wx:if="{{statistics}}">
+      <view class="summary-item">
+        <text class="summary-label">总收入</text>
+        <text class="summary-value income">+¥{{statistics.summary.totalIncome}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">总支出</text>
+        <text class="summary-value expense">-¥{{statistics.summary.totalExpense}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">净收入</text>
+        <text class="summary-value {{statistics.summary.netIncome >= 0 ? 'income' : 'expense'}}">
+          {{statistics.summary.netIncome >= 0 ? '+' : ''}}¥{{statistics.summary.netIncome}}
+        </text>
+      </view>
+    </view>
+
+    <!-- 图表（简化版：使用柱状图） -->
+    <view class="chart-container" wx:if="{{statistics && statistics.dailyStats}}">
+      <view class="chart-title">收支趋势</view>
+      <scroll-view class="chart-scroll" scroll-x>
+        <view class="chart-bars">
+          <view class="chart-bar" wx:for="{{statistics.dailyStats}}" wx:key="date">
+            <view class="bar-wrapper">
+              <view class="bar-income" style="height: {{item.income / 5}}%"></view>
+              <view class="bar-expense" style="height: {{item.expense / 5}}%"></view>
+            </view>
+            <view class="bar-label">{{item.date.substring(5)}}</view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="chart-legend">
+        <view class="legend-item">
+          <view class="legend-color income"></view>
+          <text class="legend-text">收入</text>
+        </view>
+        <view class="legend-item">
+          <view class="legend-color expense"></view>
+          <text class="legend-text">支出</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="chart-footer" bindtap="onStatisticsTap">
+      <text class="footer-text">查看详细统计 ></text>
+    </view>
+  </view>
+
+  <!-- 账单入口 -->
+  <view class="bill-entry" bindtap="onMonthlyBillTap">
+    <view class="bill-icon"></view>
+    <view class="bill-info">
+      <text class="bill-title">月度账单</text>
+      <text class="bill-desc">查看每月收支明细</text>
+    </view>
+    <text class="bill-arrow">></text>
+  </view>
+
+  <!-- 交易记录 -->
+  <view class="transactions-card">
+    <view class="card-header">
+      <text class="card-title">近期交易</text>
+      <text class="card-link" bindtap="onTransactionsTap">全部 ></text>
+    </view>
+    
+    <view class="transaction-list">
+      <view class="transaction-item" wx:for="{{transactions}}" wx:key="id" bindtap="onTransactionTap" data-id="{{item.id}}">
+        <image class="transaction-icon" src="{{item.icon}}" mode="aspectFit"></image>
+        <view class="transaction-info">
+          <text class="transaction-title">{{item.title || item.description}}</text>
+          <text class="transaction-time">{{item.createdAt}}</text>
+        </view>
+        <text class="transaction-amount {{item.type}}">{{item.type === 'income' ? '+' : '-'}}¥{{item.amount_display}}</text>
+      </view>
+      
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{transactions.length === 0}}">
+        <text class="empty-text">暂无交易记录</text>
+      </view>
+    </view>
+  </view>
+</view>

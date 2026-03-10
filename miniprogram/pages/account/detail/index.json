@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "账号详情",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "usingComponents": {
+    "login-modal": "/components/login-modal/index"
+  }
+}

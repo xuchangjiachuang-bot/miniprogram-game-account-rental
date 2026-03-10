@@ -1,0 +1,77 @@
+<!-- pages/chat/detail/index.wxml -->
+<view class="page">
+  <!-- 顶部信息栏 -->
+  <view class="header">
+    <view class="header-info">
+      <image class="avatar" src="{{group.avatar}}" mode="aspectFill" />
+      <view class="info">
+        <view class="name">{{group.name}}</view>
+        <view class="members">{{group.memberCount}}人</view>
+      </view>
+    </view>
+    <view class="header-actions">
+      <view class="action-item" bindtap="onViewOrder" wx:if="{{order}}">
+        <text>订单</text>
+      </view>
+      <view class="action-item" bindtap="onViewMembers">
+        <text>成员</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 消息列表 -->
+  <scroll-view 
+    class="message-list" 
+    scroll-y 
+    scroll-into-view="{{scrollIntoView}}"
+    scroll-with-animation
+  >
+    <view class="message-item" wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}">
+      <!-- 时间戳 -->
+      <view class="message-time" wx:if="{{item.showTime}}">
+        <text>{{item.time}}</text>
+      </view>
+
+      <!-- 系统消息 -->
+      <view class="message-system" wx:if="{{item.type === 'system'}}">
+        <text>{{item.content}}</text>
+      </view>
+
+      <!-- 用户消息 -->
+      <view 
+        class="message-content {{item.isSelf ? 'message-self' : 'message-other'}}"
+        wx:if="{{item.type === 'text'}}"
+      >
+        <image class="message-avatar" src="{{item.avatar}}" mode="aspectFill" />
+        <view class="message-body">
+          <view class="message-name" wx:if="{{!item.isSelf}}">{{item.senderName}}</view>
+          <view class="message-bubble">{{item.content}}</view>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{loadingMore}}">
+      <text>加载中...</text>
+    </view>
+  </scroll-view>
+
+  <!-- 输入框 -->
+  <view class="input-bar">
+    <view class="input-wrapper">
+      <input
+        class="input-field"
+        placeholder="输入消息..."
+        value="{{inputText}}"
+        bindinput="onInputInput"
+        bindconfirm="onSend"
+        confirm-type="send"
+      />
+      <view class="btn-actions">
+        <button class="btn-send" bindtap="onSend" disabled="{{!inputText}}">
+          发送
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

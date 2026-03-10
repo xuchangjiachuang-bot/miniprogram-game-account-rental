@@ -1,0 +1,107 @@
+<!-- pages/wallet/bill/index.wxml -->
+<view class="page">
+  <!-- 顶部导航 -->
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="onBack">
+      <text class="nav-arrow">←</text>
+    </view>
+    <text class="nav-title">月度账单</text>
+    <view class="nav-placeholder"></view>
+  </view>
+
+  <!-- 月份选择器 -->
+  <view class="month-selector">
+    <picker mode="selector" range="{{monthList}}" range-key="label" value="{{selectedMonthIndex}}" bindchange="onMonthChange">
+      <view class="selector-box">
+        <text class="selector-text">{{year}}年{{month}}月账单</text>
+        <text class="selector-arrow">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 账单汇总 -->
+  <view class="bill-summary" wx:if="{{bill}}">
+    <view class="summary-card">
+      <view class="summary-title">本月收支</view>
+      <view class="summary-row">
+        <view class="summary-col">
+          <text class="summary-label">总收入</text>
+          <text class="summary-value income">¥{{bill.summary.totalIncome}}</text>
+        </view>
+        <view class="summary-divider"></view>
+        <view class="summary-col">
+          <text class="summary-label">总支出</text>
+          <text class="summary-value expense">¥{{bill.summary.totalExpense}}</text>
+        </view>
+      </view>
+      <view class="summary-net">
+        <text class="net-label">净收入</text>
+        <text class="net-value {{bill.summary.netIncome >= 0 ? 'income' : 'expense'}}">
+          {{bill.summary.netIncome >= 0 ? '+' : ''}}¥{{bill.summary.netIncome}}
+        </text>
+      </view>
+      <view class="summary-info">
+        <text class="info-text">共 {{bill.summary.transactionCount}} 笔交易</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 分类统计 -->
+  <view class="category-section" wx:if="{{bill && bill.categoryStats}}">
+    <view class="section-title">分类统计</view>
+    <view class="category-list">
+      <view class="category-item" wx:for="{{bill.categoryStats}}" wx:key="type">
+        <view class="category-info">
+          <text class="category-name">{{item.type}}</text>
+          <text class="category-count">{{item.count}} 笔</text>
+        </view>
+        <view class="category-amount">
+          <text class="amount-value {{item.totalIncome > 0 ? 'income' : 'expense'}}">
+            {{item.totalIncome > 0 ? '+' : '-'}}¥{{item.totalIncome || item.totalExpense}}
+          </text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 每日统计 -->
+  <view class="daily-section" wx:if="{{bill && bill.dailyStats}}">
+    <view class="section-title">每日收支</view>
+    <view class="daily-chart">
+      <view class="chart-row" wx:for="{{bill.dailyStats}}" wx:key="date">
+        <text class="row-date">{{item.date.substring(5)}}</text>
+        <view class="row-bar-wrapper">
+          <view class="row-bar income" style="width: {{item.income / 20}}%"></view>
+          <view class="row-bar expense" style="width: {{item.expense / 20}}%"></view>
+        </view>
+        <view class="row-amounts">
+          <text class="amount income">¥{{item.income}}</text>
+          <text class="amount expense">¥{{item.expense}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 交易明细 -->
+  <view class="transactions-section" wx:if="{{bill && bill.transactions}}">
+    <view class="section-title">交易明细</view>
+    <view class="transaction-list">
+      <view class="transaction-item" wx:for="{{bill.transactions}}" wx:key="id" bindtap="onTransactionTap" data-id="{{item.id}}">
+        <view class="transaction-left">
+          <text class="transaction-type">{{item.transactionType}}</text>
+          <text class="transaction-desc">{{item.description}}</text>
+          <text class="transaction-time">{{item.createdAt}}</text>
+        </view>
+        <text class="transaction-amount {{item.amount >= 0 ? 'income' : 'expense'}}">
+          {{item.amount >= 0 ? '+' : '-'}}¥{{formatMoney(item.amount)}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!bill || bill.transactions.length === 0}}">
+    <text class="empty-icon">📊</text>
+    <text class="empty-text">本月暂无交易记录</text>
+  </view>
+</view>

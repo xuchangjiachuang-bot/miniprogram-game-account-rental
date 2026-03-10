@@ -1,0 +1,237 @@
+/* pages/order/payment/index.wxss */
+@import "../../../styles/variables.wxss";
+
+.page {
+  min-height: 100vh;
+  background: var(--page-bg);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+/* 通用区块 */
+.section {
+  margin: 30rpx;
+  padding: 30rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.section-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.order-status {
+  padding: 8rpx 20rpx;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+}
+
+.order-status.status-pending {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+/* 订单卡片 */
+.order-card {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: 20rpx;
+}
+
+.account-image {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: var(--radius-md);
+  background: var(--placeholder-bg);
+}
+
+.account-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.account-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 10rpx;
+}
+
+.account-detail {
+  display: flex;
+  gap: 20rpx;
+}
+
+.detail-item {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.order-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20rpx;
+  border-top: 1rpx solid var(--border-color);
+}
+
+.price-label {
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+}
+
+.price-value {
+  font-size: 36rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary);
+}
+
+/* 支付方式 */
+.payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.payment-item {
+  display: flex;
+  align-items: center;
+  padding: 25rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.payment-item.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.payment-icon {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: var(--radius-sm);
+  margin-right: 20rpx;
+}
+
+.payment-info {
+  flex: 1;
+}
+
+.payment-name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 5rpx;
+}
+
+.payment-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.payment-check {
+  font-size: 40rpx;
+  color: var(--primary);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 余额不足提示 */
+.balance-warning {
+  margin: 0 30rpx;
+  padding: 20rpx;
+  background: var(--warning-bg);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--warning-text);
+}
+
+.btn-recharge {
+  padding: 8rpx 20rpx;
+  background: var(--warning);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* 倒计时 */
+.countdown {
+  text-align: center;
+  padding: 20rpx;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.countdown-time {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--danger);
+  margin: 0 5rpx;
+}
+
+/* 底部操作栏 */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+}
+
+.total-info {
+  flex: 1;
+}
+
+.total-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 5rpx;
+}
+
+.total-price {
+  font-size: 36rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary);
+}
+
+.btn-pay {
+  height: 88rpx;
+  padding: 0 50rpx;
+  line-height: 88rpx;
+  background: var(--primary);
+  color: white;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-lg);
+  border: none;
+  flex-shrink: 0;
+}
+
+.btn-pay[disabled] {
+  background: var(--text-disabled);
+  opacity: 0.5;
+}

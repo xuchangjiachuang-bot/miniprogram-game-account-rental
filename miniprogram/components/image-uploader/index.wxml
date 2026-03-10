@@ -1,0 +1,19 @@
+<!-- components/image-uploader/index.wxml -->
+<view class="image-uploader">
+  <view class="image-list">
+    <!-- 已上传的图片 -->
+    <view class="image-item" wx:for="{{images}}" wx:key="index">
+      <image class="image" src="{{item}}" mode="aspectFill" bindtap="previewImage" data-index="{{index}}" />
+      <view class="delete-btn" catchtap="deleteImage" data-index="{{index}}">
+        <text class="delete-icon">×</text>
+      </view>
+    </view>
+
+    <!-- 上传按钮 -->
+    <view class="upload-btn" wx:if="{{images.length < maxCount}}" bindtap="chooseImage">
+      <text class="upload-icon">+</text>
+      <text class="upload-text">上传图片</text>
+    </view>
+  </view>
+  <view class="upload-tip" wx:if="{{tip}}">{{tip}}</view>
+</view>

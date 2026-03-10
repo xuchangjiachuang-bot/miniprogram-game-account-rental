@@ -1,0 +1,87 @@
+<!-- pages/order/payment/index.wxml -->
+<view class="page">
+  <!-- 订单信息 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">订单信息</text>
+      <text class="order-status status-pending">待支付</text>
+    </view>
+    
+    <view class="order-card">
+      <image class="account-image" src="{{account.avatar}}" mode="aspectFill" />
+      <view class="account-info">
+        <view class="account-title">{{account.title}}</view>
+        <view class="account-detail">
+          <text class="detail-item">皮肤：{{account.skinName}}</text>
+          <text class="detail-item">时长：{{order.duration}}</text>
+        </view>
+      </view>
+    </view>
+    
+    <view class="order-price">
+      <text class="price-label">订单金额</text>
+      <text class="price-value">¥{{order.totalPrice}}</text>
+    </view>
+  </view>
+
+  <!-- 支付方式 -->
+  <view class="section">
+    <view class="section-title">支付方式</view>
+    
+    <view class="payment-list">
+      <view 
+        class="payment-item {{selectedPayment === 'wechat' ? 'active' : ''}}"
+        bindtap="onPaymentTap"
+        data-payment="wechat"
+      >
+        <image class="payment-icon" src="/images/wechat-pay.png" mode="aspectFit" />
+        <view class="payment-info">
+          <view class="payment-name">微信支付</view>
+          <view class="payment-desc">推荐使用微信支付</view>
+        </view>
+        <view class="payment-check">
+          <text wx:if="{{selectedPayment === 'wechat'}}">✓</text>
+        </view>
+      </view>
+
+      <view 
+        class="payment-item {{selectedPayment === 'balance' ? 'active' : ''}}"
+        bindtap="onPaymentTap"
+        data-payment="balance"
+      >
+        <image class="payment-icon" src="/images/wallet-icon.png" mode="aspectFit" />
+        <view class="payment-info">
+          <view class="payment-name">余额支付</view>
+          <view class="payment-desc">当前余额：¥{{wallet.availableBalance}}</view>
+        </view>
+        <view class="payment-check">
+          <text wx:if="{{selectedPayment === 'balance'}}">✓</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 余额不足提示 -->
+  <view class="balance-warning" wx:if="{{selectedPayment === 'balance' && insufficient}}">
+    <text>⚠️ 余额不足，还需支付 ¥{{insufficientAmount}}</text>
+    <view class="btn-recharge" bindtap="onRecharge">去充值</view>
+  </view>
+
+  <!-- 倒计时 -->
+  <view class="countdown">
+    <text>订单将在</text>
+    <text class="countdown-time">{{countdown}}</text>
+    <text>后自动取消</text>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <view class="total-info">
+      <text class="total-label">实付金额</text>
+      <text class="total-price">¥{{order.totalPrice}}</text>
+    </view>
+    <button class="btn-pay" bindtap="onPay" disabled="{{paying || (selectedPayment === 'balance' && insufficient)}}">
+      {{paying ? '支付中...' : '立即支付'}}
+    </button>
+  </view>
+</view>

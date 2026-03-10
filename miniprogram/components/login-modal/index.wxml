@@ -1,0 +1,21 @@
+<!-- components/login-modal/index.wxml -->
+<view class="login-modal" wx:if="{{visible}}">
+  <view class="modal-mask" bindtap="onMaskTap"></view>
+  <view class="modal-content">
+    <view class="modal-header">
+      <view class="modal-icon">🔐</view>
+      <view class="modal-title">登录授权</view>
+      <view class="modal-desc">为了提供更好的服务，请先授权登录</view>
+    </view>
+    <view class="modal-body">
+      <button
+        class="btn-wechat-login"
+        bindtap="onGetUserProfile"
+        hover-class="btn-hover"
+      >
+        <text class="btn-icon">💬</text>
+        <text class="btn-text">微信授权登录</text>
+      </button>
+    </view>
+  </view>
+</view>

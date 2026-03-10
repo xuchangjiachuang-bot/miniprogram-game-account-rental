@@ -1,0 +1,445 @@
+/* pages/order/detail/index.wxss */
+page {
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.page {
+  padding-bottom: 140rpx;
+}
+
+/* 状态栏 */
+.status-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40rpx 30rpx;
+  color: #ffffff;
+}
+
+.status-header.status-pending {
+  background: linear-gradient(135deg, #ff9f43 0%, #f39c12 100%);
+}
+
+.status-header.status-paid {
+  background: linear-gradient(135deg, #54a0ff 0%, #2e86de 100%);
+}
+
+.status-header.status-pending_start {
+  background: linear-gradient(135deg, #2ed573 0%, #26de81 100%);
+}
+
+.status-header.status-active {
+  background: linear-gradient(135deg, #00d2d3 0%, #01a3a4 100%);
+}
+
+.status-header.status-completed {
+  background: linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%);
+}
+
+.status-header.status-cancelled {
+  background: linear-gradient(135deg, #8395a7 0%, #576574 100%);
+}
+
+.status-header.status-refunded {
+  background: linear-gradient(135deg, #a4b0be 0%, #7f8c8d 100%);
+}
+
+.status-header.status-dispute {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.status-icon {
+  font-size: 80rpx;
+  line-height: 1;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-text {
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+
+.status-desc {
+  font-size: 26rpx;
+  opacity: 0.9;
+}
+
+/* 区域 */
+.section {
+  background: #ffffff;
+  margin: 20rpx;
+  padding: 30rpx;
+  border-radius: 16rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.section-icon {
+  font-size: 32rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* 账号卡片 */
+.account-card {
+  display: flex;
+  gap: 20rpx;
+  padding: 16rpx;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12rpx;
+  transition: all 0.3s ease;
+}
+
+.account-card:active {
+  background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+.account-image {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.account-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.account-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.4;
+  margin-bottom: 12rpx;
+}
+
+.account-metas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.meta-item {
+  display: inline-block;
+  padding: 6rpx 12rpx;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  font-size: 22rpx;
+  border-radius: 6rpx;
+  font-weight: 500;
+}
+
+.account-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  color: #667eea;
+  font-size: 22rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(102, 126, 234, 0.3);
+  font-weight: 500;
+}
+
+.card-arrow {
+  font-size: 40rpx;
+  color: #cccccc;
+  align-self: center;
+  margin-left: 12rpx;
+}
+
+/* 信息列表 */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.info-label {
+  font-size: 26rpx;
+  color: #666666;
+  font-weight: 500;
+  min-width: 180rpx;
+}
+
+.info-value-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.info-value {
+  font-size: 26rpx;
+  color: #1a1a1a;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+
+.info-item.price .info-value,
+.info-item.price-breakdown .info-value {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.price-value {
+  font-size: 40rpx !important;
+  color: #667eea !important;
+  text-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.3);
+}
+
+.btn-copy {
+  padding: 8rpx 20rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  font-size: 22rpx;
+  border-radius: 20rpx;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.btn-copy:active {
+  opacity: 0.8;
+}
+
+/* 时间卡片 */
+.time-card {
+  padding: 24rpx;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12rpx;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.time-label {
+  font-size: 26rpx;
+  color: #666666;
+  font-weight: 500;
+}
+
+.time-value {
+  font-size: 28rpx;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.time-divider {
+  text-align: center;
+  font-size: 40rpx;
+  color: #667eea;
+  padding: 16rpx 0;
+}
+
+/* 游戏账号卡片 */
+.game-account-card {
+  padding: 24rpx;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
+  border-radius: 12rpx;
+  border: 2rpx solid rgba(255, 107, 107, 0.3);
+}
+
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(255, 107, 107, 0.2);
+}
+
+.account-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.account-row:first-child {
+  padding-top: 0;
+}
+
+.row-label {
+  font-size: 28rpx;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.row-value-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.row-value {
+  font-size: 28rpx;
+  color: #666666;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.row-value.masked {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 4rpx;
+}
+
+.btn-copy-small {
+  padding: 6rpx 16rpx;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+  color: #ffffff;
+  font-size: 22rpx;
+  border-radius: 16rpx;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.btn-copy-small:active {
+  opacity: 0.8;
+}
+
+/* 操作栏 */
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  backdrop-filter: blur(10rpx);
+}
+
+.action-list {
+  display: flex;
+  gap: 16rpx;
+}
+
+.btn-action {
+  flex: 1;
+  height: 90rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.btn-action.outline {
+  background: #ffffff;
+  color: #666666;
+  border: 2rpx solid #e0e0e0;
+}
+
+.btn-action.outline:active {
+  background: #f5f5f5;
+}
+
+.btn-action.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.4);
+}
+
+.btn-action.primary:active {
+  opacity: 0.8;
+  transform: translateY(-2rpx);
+}
+
+.btn-action.danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.4);
+}
+
+.btn-action.danger:active {
+  opacity: 0.8;
+  transform: translateY(-2rpx);
+}
+
+/* 聊天浮动按钮 */
+.chat-float {
+  position: fixed;
+  bottom: 160rpx;
+  right: 30rpx;
+  width: 100rpx;
+  height: 100rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.5);
+  z-index: 99;
+}
+
+.chat-icon {
+  font-size: 48rpx;
+}
+
+.chat-badge {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  width: 32rpx;
+  height: 32rpx;
+  background: #ff4757;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: bold;
+  border: 4rpx solid #ffffff;
+}
+
+/* 底部占位 */
+.bottom-placeholder {
+  height: 140rpx;
+}

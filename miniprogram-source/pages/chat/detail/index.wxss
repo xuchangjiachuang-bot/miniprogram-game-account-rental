@@ -1,0 +1,200 @@
+/* pages/chat/detail/index.wxss */
+@import "../../../styles/variables.wxss";
+
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page-bg);
+}
+
+/* 顶部信息栏 */
+.header {
+  padding: 20rpx 30rpx;
+  background: var(--card-bg);
+  border-bottom: 1rpx solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 15rpx;
+}
+
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: var(--placeholder-bg);
+}
+
+.info {
+  flex: 1;
+}
+
+.name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 5rpx;
+}
+
+.members {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.header-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.action-item {
+  padding: 10rpx 25rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  text-align: center;
+}
+
+/* 消息列表 */
+.message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20rpx 30rpx;
+}
+
+.message-item {
+  margin-bottom: 20rpx;
+}
+
+/* 时间戳 */
+.message-time {
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.message-time text {
+  padding: 8rpx 20rpx;
+  background: var(--text-disabled);
+  color: white;
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+  opacity: 0.6;
+}
+
+/* 系统消息 */
+.message-system {
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.message-system text {
+  padding: 8rpx 20rpx;
+  background: var(--page-bg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+}
+
+/* 消息内容 */
+.message-content {
+  display: flex;
+  gap: 15rpx;
+  align-items: flex-start;
+}
+
+.message-self {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: var(--placeholder-bg);
+  flex-shrink: 0;
+}
+
+.message-body {
+  max-width: 70%;
+}
+
+.message-name {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: 8rpx;
+}
+
+.message-bubble {
+  padding: 15rpx 20rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.message-self .message-bubble {
+  background: var(--primary);
+  color: white;
+}
+
+/* 加载更多 */
+.load-more {
+  text-align: center;
+  padding: 20rpx;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* 输入框 */
+.input-bar {
+  padding: 20rpx 30rpx;
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+  flex-shrink: 0;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 20rpx;
+  align-items: flex-end;
+}
+
+.input-field {
+  flex: 1;
+  min-height: 80rpx;
+  max-height: 200rpx;
+  padding: 15rpx 20rpx;
+  background: var(--page-bg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+}
+
+.btn-actions {
+  flex-shrink: 0;
+}
+
+.btn-send {
+  height: 80rpx;
+  padding: 0 30rpx;
+  line-height: 80rpx;
+  background: var(--primary);
+  color: white;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-md);
+  border: none;
+}
+
+.btn-send[disabled] {
+  background: var(--text-disabled);
+  opacity: 0.5;
+}

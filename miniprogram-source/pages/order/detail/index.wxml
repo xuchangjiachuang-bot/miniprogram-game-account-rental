@@ -1,0 +1,139 @@
+<!-- pages/order/detail/index.wxml -->
+<view class="page">
+  <!-- 状态栏 -->
+  <view class="status-header status-{{orderStatusKey}}">
+    <view class="status-icon">
+      <text>{{statusIcon}}</text>
+    </view>
+    <view class="status-info">
+      <view class="status-text">{{order.statusText}}</view>
+      <view class="status-desc">{{order.statusDesc}}</view>
+    </view>
+  </view>
+
+  <!-- 账号信息 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">账号信息</text>
+    </view>
+    
+    <view class="account-card">
+      <image class="account-image" src="{{account.avatar}}" mode="aspectFill" />
+      <view class="account-info">
+        <view class="account-title">{{account.title}}</view>
+        <view class="account-tags">
+          <text class="tag tag-skin">皮肤：{{account.skinName}}</text>
+          <text class="tag tag-level">等级：{{account.level}}</text>
+        </view>
+        <view class="account-price">
+          <text class="price-label">租期价格</text>
+          <text class="price-value">¥{{order.price}}/{{order.duration}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">订单信息</text>
+    </view>
+    
+    <view class="order-info">
+      <view class="info-row">
+        <text class="info-label">订单编号</text>
+        <text class="info-value">{{order.orderNo}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">下单时间</text>
+        <text class="info-value">{{order.createdAt}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">租赁时长</text>
+        <text class="info-value">{{order.duration}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">订单金额</text>
+        <text class="info-value price">¥{{order.totalPrice}}</text>
+      </view>
+      <view class="info-row" wx:if="{{order.status === 'completed'}}">
+        <text class="info-label">结束时间</text>
+        <text class="info-value">{{order.endedAt}}</text>
+      </view>
+      <view class="info-row" wx:if="{{order.status === 'completed'}}">
+        <text class="info-label">实际租期</text>
+        <text class="info-value">{{order.actualDuration}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 游戏账号 -->
+  <view class="section" wx:if="{{showGameAccount}}">
+    <view class="section-header">
+      <text class="section-title">游戏账号</text>
+      <view class="btn-copy" bindtap="onCopyAccount" data-account="{{account.gameAccount}}">
+        <text>复制</text>
+      </view>
+    </view>
+    
+    <view class="game-account">
+      <view class="account-row">
+        <text class="row-label">账号</text>
+        <text class="row-value">{{account.gameAccount}}</text>
+      </view>
+      <view class="account-row">
+        <text class="row-label">密码</text>
+        <text class="row-value masked">{{account.gamePassword}}</text>
+      </view>
+      <view class="account-row" wx:if="{{account.gameVerify}}">
+        <text class="row-label">验证码</text>
+        <text class="row-value">{{account.gameVerify}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 退租信息 -->
+  <view class="section" wx:if="{{order.status === 'refunded'}}">
+    <view class="section-header">
+      <text class="section-title">退租信息</text>
+    </view>
+    
+    <view class="refund-info">
+      <view class="info-row">
+        <text class="info-label">退租时间</text>
+        <text class="info-value">{{order.refundedAt}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">退租原因</text>
+        <text class="info-value">{{order.refundReason}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">退款金额</text>
+        <text class="info-value refund">¥{{order.refundAmount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-bar" wx:if="{{actions.length > 0}}">
+    <view class="action-list">
+      <button 
+        class="btn-action {{item.primary ? 'btn-primary' : 'btn-secondary'}}"
+        wx:for="{{actions}}"
+        wx:key="action"
+        bindtap="onActionTap"
+        data-action="{{item.action}}"
+      >
+        {{item.text}}
+      </button>
+    </view>
+  </view>
+
+  <!-- 聊天入口 -->
+  <view class="chat-entry" wx:if="{{canChat}}" bindtap="onChat">
+    <view class="chat-icon">
+      <text>💬</text>
+    </view>
+    <view class="chat-label">联系对方</view>
+  </view>
+</view>

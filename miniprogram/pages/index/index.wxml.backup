@@ -1,0 +1,196 @@
+<!-- pages/index/index.wxml -->
+<view class="page">
+  <!-- 轮播图 -->
+  <view class="carousel-section" wx:if="{{carousels.length > 0}}">
+    <swiper 
+      class="carousel" 
+      indicator-dots 
+      autoplay 
+      interval="3000" 
+      circular
+      indicator-color="rgba(255,255,255,0.5)"
+      indicator-active-color="#ffffff"
+    >
+      <swiper-item wx:for="{{carousels}}" wx:key="id" bindtap="onCarouselTap" data-url="{{item.linkUrl}}">
+        <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
+        <view class="carousel-content">
+          <view class="carousel-title">{{item.title}}</view>
+          <view class="carousel-desc" wx:if="{{item.description}}">{{item.description}}</view>
+        </view>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <!-- 备用标题（无轮播图时） -->
+  <view class="fallback-title-section" wx:if="{{carousels.length === 0}}">
+    <view class="badge">{{fallbackTitle.badgeText}}</view>
+    <view class="main-title">
+      三角洲行动
+      <text class="gradient-text">{{fallbackTitle.mainTitle}}</text>
+    </view>
+    <view class="sub-title">{{fallbackTitle.subTitle}}</view>
+    <button class="publish-btn" bindtap="onPublishTap">{{fallbackTitle.buttonText}}</button>
+  </view>
+
+  <!-- 筛选区域 -->
+  <view class="filter-section">
+    <view class="filter-header">
+      <text class="filter-icon">🛡️</text>
+      <text class="filter-title">筛选账号</text>
+    </view>
+
+    <!-- 第一行：上架必填项 -->
+    <view class="filter-row">
+      <view class="filter-item">
+        <text class="filter-label">平台·上号方式</text>
+        <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
+          <view class="picker-value">
+            {{platformOptions[filters.platformIndex] || '全部'}}
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="filter-item">
+        <text class="filter-label">哈夫币(M)</text>
+        <view class="range-input">
+          <input 
+            class="range-input-field" 
+            type="number" 
+            placeholder="最小" 
+            value="{{filters.minCoins}}"
+            bindinput="onMinCoinsInput"
+          />
+          <text class="range-separator">-</text>
+          <input 
+            class="range-input-field" 
+            type="number" 
+            placeholder="最大" 
+            value="{{filters.maxCoins}}"
+            bindinput="onMaxCoinsInput"
+          />
+        </view>
+      </view>
+
+      <view class="filter-item">
+        <text class="filter-label">段位</text>
+        <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
+          <view class="picker-value">
+            {{rankOptions[filters.rankIndex] || '全部'}}
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="filter-item">
+        <text class="filter-label">安全箱</text>
+        <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
+          <view class="picker-value">
+            {{safeboxOptions[filters.safeboxIndex] || '全部'}}
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+
+    <!-- 更多筛选按钮 -->
+    <view class="filter-actions">
+      <button class="btn-outline" bindtap="onShowMoreFilters">
+        {{showMoreFilters ? '收起筛选' : '展开筛选'}}
+      </button>
+      <button class="btn-ghost" bindtap="onResetFilters">重置</button>
+    </view>
+
+    <!-- 展开的筛选器 -->
+    <view class="more-filters" wx:if="{{showMoreFilters}}">
+      <view class="filter-section-title">皮肤筛选（可多选）</view>
+      <view class="skin-list">
+        <view 
+          class="skin-item {{selectedSkins.includes(item.name) ? 'active' : ''}}"
+          wx:for="{{skinOptions}}" 
+          wx:key="id"
+          bindtap="onSkinTap"
+          data-name="{{item.name}}"
+        >
+          <text class="skin-check" wx:if="{{selectedSkins.includes(item.name)}}">✓</text>
+          {{item.name}}
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 账号列表 -->
+  <view class="account-list">
+    <view class="list-header">
+      <text class="account-count">共 {{accounts.length}} 个账号</text>
+    </view>
+
+    <view class="account-grid">
+      <view 
+        class="account-card" 
+        wx:for="{{displayAccounts}}" 
+        wx:key="id"
+        bindtap="onAccountTap"
+        data-account="{{item}}"
+      >
+        <view class="card-image">
+          <image class="card-img" src="{{item.images[0]}}" mode="aspectFill" />
+        </view>
+        <view class="card-content">
+          <view class="card-title">{{item.account_name}}</view>
+          
+          <view class="card-info-row">
+            <view class="info-card coins-card">
+              <text class="info-label">哈夫币</text>
+              <text class="info-value">{{item.coins_display}}</text>
+            </view>
+            <view class="info-card ratio-card">
+              <text class="info-label">比例</text>
+              <text class="info-value">{{item.ratio_display}}</text>
+            </view>
+          </view>
+
+          <view class="card-attributes">
+            <view class="attribute-item">
+              <text class="attr-label">安全箱</text>
+              <text class="attr-value">{{item.safebox}}</text>
+            </view>
+            <view class="attribute-item">
+              <text class="attr-label">等级</text>
+              <text class="attr-value">Lv.{{item.account_level}}</text>
+            </view>
+            <view class="attribute-item">
+              <text class="attr-label">段位</text>
+              <text class="attr-value">{{item.rank}}</text>
+            </view>
+          </view>
+
+          <view class="card-price">
+            <text class="price-label">总价</text>
+            <text class="price-value">¥{{item.total_price}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{hasMore && !loading}}">
+      <button class="btn-outline" bindtap="onLoadMore">加载更多</button>
+    </view>
+
+    <!-- 加载中 -->
+    <view class="loading" wx:if="{{loading}}">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty" wx:if="{{!loading && accounts.length === 0}}">
+      <view class="empty-icon">📭</view>
+      <view class="empty-text">暂无账号</view>
+      <view class="empty-hint">调整筛选条件或稍后再试</view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="tabbar-placeholder"></view>
+</view>

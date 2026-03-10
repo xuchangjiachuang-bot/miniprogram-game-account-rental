@@ -1,0 +1,79 @@
+/* components/customer-service-float/index.wxss */
+
+.customer-service-float {
+  position: fixed;
+  right: 30rpx;
+  bottom: 180rpx;
+  z-index: 9999;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.customer-service-float.hide {
+  opacity: 0;
+  transform: translateY(20rpx);
+  pointer-events: none;
+}
+
+.customer-service-float.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.float-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100rpx;
+  height: 100rpx;
+  background: linear-gradient(135deg, #07c160 0%, #059b4c 100%);
+  border-radius: 50%;
+  box-shadow: 0 4rpx 20rpx rgba(7, 193, 96, 0.4);
+  position: relative;
+  transition: transform 0.3s;
+}
+
+.float-button:active {
+  transform: scale(0.9);
+}
+
+.button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-text {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.button-text {
+  font-size: 20rpx;
+  color: #ffffff;
+  margin-top: 4rpx;
+  font-weight: 500;
+}
+
+.close-button {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  width: 32rpx;
+  height: 32rpx;
+  background: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+  border: 2rpx solid #e5e7eb;
+}
+
+.close-icon {
+  font-size: 24rpx;
+  color: #9ca3af;
+  line-height: 1;
+  font-weight: 300;
+}

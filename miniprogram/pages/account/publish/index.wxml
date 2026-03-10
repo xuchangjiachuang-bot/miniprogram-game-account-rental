@@ -1,0 +1,361 @@
+<!-- pages/account/publish/index.wxml -->
+<view class="page">
+  <!-- 表单 -->
+  <form bindsubmit="onSubmit">
+    <!-- 账号图片 -->
+    <view class="section">
+      <view class="section-title required">
+        <text class="title-icon">📸</text>
+        账号截图
+        <text class="required-mark">*</text>
+      </view>
+      <view class="uploader-wrapper">
+        <view class="image-list">
+          <view class="image-item" wx:for="{{form.images}}" wx:key="*this">
+            <image class="image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" data-url="{{item}}" />
+            <view class="image-delete" bindtap="onImageDelete" data-index="{{index}}">✕</view>
+            <view class="image-cover" wx:if="{{index === 0}}">封面</view>
+          </view>
+          <view class="image-add" wx:if="{{form.images.length < 5}}" bindtap="onChooseImage">
+            <text class="add-icon">+</text>
+            <text class="add-text">添加图片</text>
+          </view>
+        </view>
+      </view>
+      <view class="section-tips">最多上传5张截图，第一张将作为封面</view>
+    </view>
+
+    <!-- 基本信息 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">ℹ️</text>
+        基本信息
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">游戏账号
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          placeholder="请输入游戏账号"
+          value="{{form.accountId}}"
+          bindinput="onAccountIdInput"
+        />
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">游戏密码
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          password
+          placeholder="请输入游戏密码"
+          value="{{form.password}}"
+          bindinput="onPasswordInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">验证码</text>
+        <input
+          class="form-input"
+          placeholder="如果有验证码，请输入"
+          value="{{form.verifyCode}}"
+          bindinput="onVerifyCodeInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">登录方式
+          <text class="required-mark">*</text>
+        </text>
+        <picker
+          range="{{loginMethodOptions}}"
+          range-key="label"
+          value="{{form.loginMethodIndex}}"
+          bindchange="onLoginMethodChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">{{loginMethodOptions[form.loginMethodIndex].label}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+
+    <!-- 游戏数据 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">🎮</text>
+        游戏数据
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">哈夫币数量（万）
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          type="digit"
+          placeholder="例如：120万"
+          value="{{form.coinsM}}"
+          bindinput="onCoinsMInput"
+        />
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">安全箱格数
+          <text class="required-mark">*</text>
+        </text>
+        <picker
+          range="{{safeboxOptions}}"
+          range-key="label"
+          value="{{form.safeboxIndex}}"
+          bindchange="onSafeboxChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">{{safeboxOptions[form.safeboxIndex].label}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">体力等级
+          <text class="required-mark">*</text>
+        </text>
+        <picker
+          range="{{levelOptions}}"
+          value="{{form.staminaLevel}}"
+          bindchange="onStaminaLevelChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">Lv.{{form.staminaLevel}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">负重等级
+          <text class="required-mark">*</text>
+        </text>
+        <picker
+          range="{{levelOptions}}"
+          value="{{form.energyLevel}}"
+          bindchange="onEnergyLevelChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">Lv.{{form.energyLevel}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">段位</text>
+        <picker
+          range="{{rankOptions}}"
+          range-key="label"
+          value="{{form.rankIndex}}"
+          bindchange="onRankChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">{{rankOptions[form.rankIndex].label}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">KD值</text>
+        <input
+          class="form-input"
+          type="digit"
+          placeholder="例如：2.5"
+          value="{{form.kd}}"
+          bindinput="onKdInput"
+        />
+      </view>
+    </view>
+
+    <!-- 皮肤配置 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">🎨</text>
+        皮肤配置
+      </view>
+
+      <view class="form-item-switch">
+        <text class="switch-label">是否有皮肤</text>
+        <switch
+          checked="{{form.hasSkins}}"
+          bindchange="onHasSkinsChange"
+          color="var(--primary)"
+        />
+      </view>
+
+      <view class="form-item" wx:if="{{form.hasSkins}}">
+        <text class="form-label">皮肤等级</text>
+        <picker
+          range="{{skinTierOptions}}"
+          value="{{form.skinTierIndex}}"
+          bindchange="onSkinTierChange"
+        >
+          <view class="form-picker">
+            <text class="picker-value">{{skinTierOptions[form.skinTierIndex]}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item" wx:if="{{form.hasSkins}}">
+        <text class="form-label">皮肤数量</text>
+        <input
+          class="form-input"
+          type="number"
+          placeholder="大约有多少个皮肤"
+          value="{{form.skinCount}}"
+          bindinput="onSkinCountInput"
+        />
+      </view>
+    </view>
+
+    <!-- 战斗通行证 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">⭐</text>
+        战斗通行证
+      </view>
+
+      <view class="form-item-switch">
+        <text class="switch-label">是否有战斗通行证</text>
+        <switch
+          checked="{{form.hasBattlepass}}"
+          bindchange="onHasBattlepassChange"
+          color="var(--primary)"
+        />
+      </view>
+
+      <view class="form-item" wx:if="{{form.hasBattlepass}}">
+        <text class="form-label">通行证等级</text>
+        <input
+          class="form-input"
+          type="number"
+          placeholder="例如：50级"
+          value="{{form.battlepassLevel}}"
+          bindinput="onBattlepassLevelInput"
+        />
+      </view>
+    </view>
+
+    <!-- 账号描述 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">📝</text>
+        账号描述
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">详细描述</text>
+        <textarea
+          class="form-textarea"
+          placeholder="请详细描述账号特色、武器、服装等"
+          value="{{form.description}}"
+          bindinput="onDescriptionInput"
+          maxlength="500"
+          autoHeight
+        />
+        <view class="char-count">{{form.description.length}}/500</view>
+      </view>
+    </view>
+
+    <!-- 租赁设置 -->
+    <view class="section">
+      <view class="section-title">
+        <text class="title-icon">💰</text>
+        租赁设置
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">租金（元）
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          type="digit"
+          placeholder="请输入租金金额"
+          value="{{form.rentalPrice}}"
+          bindinput="onRentalPriceInput"
+        />
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">押金（元）
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          type="digit"
+          placeholder="请输入押金金额"
+          value="{{form.deposit}}"
+          bindinput="onDepositInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">租期类型</text>
+        <view class="rental-type-tabs">
+          <view
+            class="rental-type-tab {{form.rentalType === 'hour' ? 'active' : ''}}"
+            bindtap="onRentalTypeTap"
+            data-type="hour"
+          >
+            按小时
+          </view>
+          <view
+            class="rental-type-tab {{form.rentalType === 'day' ? 'active' : ''}}"
+            bindtap="onRentalTypeTap"
+            data-type="day"
+          >
+            按天
+          </view>
+        </view>
+      </view>
+
+      <view class="form-item required">
+        <text class="form-label">
+          {{form.rentalType === 'hour' ? '租赁时长（小时）' : '租赁天数'}}
+          <text class="required-mark">*</text>
+        </text>
+        <input
+          class="form-input"
+          type="number"
+          placeholder="{{form.rentalType === 'hour' ? '例如：2小时' : '例如：1天'}}"
+          value="{{form.rentalDuration}}"
+          bindinput="onRentalDurationInput"
+        />
+      </view>
+
+      <view class="price-preview">
+        <text class="preview-label">总价：</text>
+        <text class="preview-price">¥{{form.totalPrice}}</text>
+        <text class="preview-detail">
+          (租金¥{{form.rentalPrice}} + 押金¥{{form.deposit}})
+        </text>
+      </view>
+    </view>
+
+    <!-- 提交按钮 -->
+    <view class="submit-bar">
+      <button class="btn-submit" form-type="submit" disabled="{{submitting}}">
+        {{submitting ? '发布中...' : '立即发布'}}
+      </button>
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="bottom-placeholder"></view>
+  </form>
+</view>

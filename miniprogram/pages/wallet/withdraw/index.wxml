@@ -1,0 +1,81 @@
+<!-- pages/wallet/withdraw/index.wxml -->
+<view class="page">
+  <!-- 余额展示 -->
+  <view class="balance-section">
+    <view class="balance-label">可提现余额</view>
+    <view class="balance-amount">¥{{wallet.availableBalance}}</view>
+    <view class="balance-desc">冻结金额：¥{{wallet.frozenBalance}}</view>
+  </view>
+
+  <!-- 提现金额 -->
+  <view class="section">
+    <view class="section-title">提现金额</view>
+    
+    <view class="amount-input-wrapper">
+      <text class="currency-symbol">¥</text>
+      <input 
+        class="amount-input" 
+        type="digit"
+        placeholder="0.00"
+        value="{{withdrawAmount}}"
+        bindinput="onAmountInput"
+      />
+      <text class="withdraw-all" bindtap="onWithdrawAll">全部提现</text>
+    </view>
+
+    <view class="amount-tips">
+      <view class="tip-item">最低提现金额：¥{{config.minAmount}}</view>
+      <view class="tip-item">提现手续费：¥{{fee}}</view>
+    </view>
+
+    <!-- 提现到账金额 -->
+    <view class="actual-amount">
+      <text class="actual-label">实际到账</text>
+      <text class="actual-value">¥{{actualAmount}}</text>
+    </view>
+  </view>
+
+  <!-- 提现账户 -->
+  <view class="section">
+    <view class="section-title">提现账户</view>
+    
+    <view class="account-list">
+      <view 
+        class="account-item {{selectedAccountId === item.id ? 'active' : ''}}"
+        wx:for="{{accounts}}"
+        wx:key="id"
+        bindtap="onAccountTap"
+        data-id="{{item.id}}"
+      >
+        <view class="account-icon">
+          <text>{{item.bankName.charAt(0)}}</text>
+        </view>
+        <view class="account-info">
+          <view class="account-bank">{{item.bankName}}</view>
+          <view class="account-number">{{item.accountNumber}}</view>
+        </view>
+        <view class="account-check">
+          <text wx:if="{{selectedAccountId === item.id}}">✓</text>
+        </view>
+      </view>
+    </view>
+
+    <button class="btn-add-account" bindtap="onAddAccount" wx:if="{{accounts.length < 3}}">
+      + 添加提现账户
+    </button>
+  </view>
+
+  <!-- 提现说明 -->
+  <view class="tips">
+    <view class="tip-item">• 提现将在1-3个工作日内到账</view>
+    <view class="tip-item">• 单笔提现限额：¥{{config.maxAmount}}</view>
+    <view class="tip-item">• 每月提现次数：{{config.monthlyLimit}}次</view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <button class="btn-withdraw" bindtap="onWithdraw" disabled="{{!canWithdraw || withdrawing}}">
+      {{withdrawing ? '提现中...' : '确认提现'}}
+    </button>
+  </view>
+</view>

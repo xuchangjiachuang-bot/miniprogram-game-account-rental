@@ -1,0 +1,46 @@
+<!-- pages/auth/wechat-login/index.wxml -->
+<view class="page">
+  <view class="login-container">
+    <!-- Logo -->
+    <view class="logo-section">
+      <image class="logo" src="/images/logo.png" mode="aspectFit" />
+      <view class="app-name">哈夫币租赁平台</view>
+      <view class="app-slogan">安全快捷的哈夫币租赁服务</view>
+    </view>
+
+    <!-- 登录表单 -->
+    <view class="login-form">
+      <view class="form-title">微信授权登录</view>
+      
+      <view class="form-desc">
+        为了提供更好的服务，需要获取您的微信授权信息
+      </view>
+
+      <!-- 授权按钮 -->
+      <button
+        class="auth-btn {{loading ? 'disabled' : ''}}"
+        open-type="{{canIUse ? 'getUserInfo' : ''}}"
+        bindgetuserinfo="onGetUserInfo"
+        disabled="{{loading}}"
+      >
+        <text wx:if="{{loading}}">登录中...</text>
+        <text wx:else>微信授权登录</text>
+      </button>
+
+      <!-- 协议 -->
+      <view class="agreement">
+        <text>登录即表示同意</text>
+        <text class="link" bindtap="onTapAgreement">《用户协议》</text>
+        <text>和</text>
+        <text class="link" bindtap="onTapPrivacy">《隐私政策》</text>
+      </view>
+    </view>
+
+    <!-- 返回按钮 -->
+    <view class="back-section">
+      <view class="back-btn" bindtap="onBack">
+        <text>返回首页</text>
+      </view>
+    </view>
+  </view>
+</view>

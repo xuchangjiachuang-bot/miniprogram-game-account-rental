@@ -1,0 +1,295 @@
+/* pages/account/detail/index.wxss */
+
+/* 轮播图 */
+.account-swiper {
+  width: 100%;
+  height: 600rpx;
+  background: #f5f5f5;
+}
+
+.swiper-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* 信息区域 */
+.info-section {
+  background: #ffffff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30rpx;
+}
+
+.account-name {
+  flex: 1;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.4;
+}
+
+.account-status {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  color: #2ed573;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 12rpx;
+  height: 12rpx;
+  background: #2ed573;
+  border-radius: 50%;
+}
+
+/* 信息卡片网格 */
+.info-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+  margin-bottom: 30rpx;
+}
+
+.info-card {
+  padding: 24rpx;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.info-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-bottom: 12rpx;
+}
+
+.info-value {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* 属性区域 */
+.attributes-section {
+  margin-bottom: 30rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 16rpx;
+}
+
+.attribute-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+}
+
+.attribute-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  background: #f9f9f9;
+  border-radius: 8rpx;
+}
+
+.attr-label {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.attr-value {
+  font-size: 26rpx;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+/* 皮肤区域 */
+.skins-section {
+  margin-bottom: 30rpx;
+}
+
+.skins-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.skin-item {
+  position: relative;
+}
+
+.skin-image {
+  width: 100%;
+  height: 180rpx;
+  border-radius: 8rpx;
+  background: #f5f5f5;
+}
+
+.skin-name {
+  display: block;
+  font-size: 22rpx;
+  color: #666666;
+  text-align: center;
+  margin-top: 8rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 描述区域 */
+.desc-section {
+  margin-bottom: 30rpx;
+}
+
+.desc-content {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #666666;
+  padding: 24rpx;
+  background: #f9f9f9;
+  border-radius: 12rpx;
+}
+
+/* 出租方信息 */
+.owner-section {
+  margin-bottom: 30rpx;
+}
+
+.owner-info {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  background: #f9f9f9;
+  border-radius: 12rpx;
+}
+
+.owner-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  margin-right: 20rpx;
+}
+
+.owner-details {
+  flex: 1;
+}
+
+.owner-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.owner-meta {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.owner-meta text {
+  margin-right: 20rpx;
+}
+
+.arrow {
+  font-size: 40rpx;
+  color: #cccccc;
+}
+
+/* 价格区域 */
+.price-section {
+  background: #ffffff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12rpx 0;
+}
+
+.price-label {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+.price-value {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.price-row.total {
+  padding-top: 20rpx;
+  margin-top: 20rpx;
+  border-top: 1rpx solid #eeeeee;
+}
+
+.price-row.total .price-value {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #667eea;
+}
+
+/* 底部操作栏 */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  border-top: 1rpx solid #eeeeee;
+  z-index: 100;
+}
+
+.btn-share,
+.btn-collect {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding: 12rpx;
+  background: transparent;
+  border: none;
+  font-size: 22rpx;
+  color: #666666;
+  margin-right: 20rpx;
+}
+
+.btn-collect.active {
+  color: #ffa502;
+}
+
+.btn-rent {
+  flex: 3;
+  padding: 24rpx;
+  background: linear-gradient(to right, #667eea, #764ba2);
+  color: #ffffff;
+  border: none;
+  border-radius: 12rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.btn-rent[disabled] {
+  background: #cccccc;
+}

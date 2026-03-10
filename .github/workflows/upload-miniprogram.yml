@@ -1,0 +1,30 @@
+name: Upload WeChat Mini Program
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install miniprogram-ci
+    
+    - name: Create private key
+      run: |
+        echo "$MINIPROGRAM_PRIVATE_KEY" > private.wx2382e1949d031ba6.key
+    
+    - name: Upload to WeChat
+      run: node miniprogram/upload.js
+      env:
+        MINIPROGRAM_PRIVATE_KEY: ${{ secrets.MINIPROGRAM_PRIVATE_KEY }}

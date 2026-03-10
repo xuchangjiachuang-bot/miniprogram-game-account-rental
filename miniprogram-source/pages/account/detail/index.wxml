@@ -1,0 +1,127 @@
+<!-- pages/account/detail/index.wxml -->
+<view class="page">
+  <!-- 账号图片轮播 -->
+  <swiper class="account-swiper" indicator-dots circular wx:if="{{account.images && account.images.length > 0}}">
+    <swiper-item wx:for="{{account.images}}" wx:key="*this">
+      <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" data-urls="{{account.images}}" data-current="{{item}}" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 账号信息 -->
+  <view class="info-section">
+    <view class="account-header">
+      <view class="account-name">{{account.account_name}}</view>
+      <view class="account-status">
+        <text class="status-dot"></text>
+        <text>{{account.statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 核心信息卡片 -->
+    <view class="info-card-grid">
+      <view class="info-card">
+        <text class="info-label">哈夫币</text>
+        <text class="info-value">{{account.coins_display}}</text>
+      </view>
+      <view class="info-card">
+        <text class="info-label">比例</text>
+        <text class="info-value">{{account.ratio_display}}</text>
+      </view>
+      <view class="info-card">
+        <text class="info-label">安全箱</text>
+        <text class="info-value">{{account.safebox}}</text>
+      </view>
+      <view class="info-card">
+        <text class="info-label">等级</text>
+        <text class="info-value">Lv.{{account.account_level}}</text>
+      </view>
+    </view>
+
+    <!-- 详细属性 -->
+    <view class="attributes-section">
+      <view class="section-title">账号属性</view>
+      <view class="attribute-list">
+        <view class="attribute-item">
+          <text class="attr-label">段位</text>
+          <text class="attr-value">{{account.rank}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">登录方式</text>
+          <text class="attr-value">{{account.loginMethodText}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">所在地</text>
+          <text class="attr-value">{{account.province}} {{account.city}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">上架时间</text>
+          <text class="attr-value">{{account.created_at}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 皮肤列表 -->
+    <view class="skins-section" wx:if="{{account.skins && account.skins.length > 0}}">
+      <view class="section-title">皮肤列表</view>
+      <view class="skins-grid">
+        <view class="skin-item" wx:for="{{account.skins}}" wx:key="id">
+          <image class="skin-image" src="{{item.image}}" mode="aspectFill" />
+          <text class="skin-name">{{item.name}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 账号描述 -->
+    <view class="desc-section">
+      <view class="section-title">账号描述</view>
+      <view class="desc-content">{{account.description || '暂无描述'}}</view>
+    </view>
+
+    <!-- 出租方信息 -->
+    <view class="owner-section">
+      <view class="section-title">出租方</view>
+      <view class="owner-info" bindtap="onOwnerTap">
+        <image class="owner-avatar" src="{{account.owner.avatar}}" mode="aspectFill" />
+        <view class="owner-details">
+          <view class="owner-name">{{account.owner.nickname}}</view>
+          <view class="owner-meta">
+            <text>已出租 {{account.owner.rentCount}} 次</text>
+            <text>信用分 {{account.owner.creditScore}}</text>
+          </view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 价格信息 -->
+  <view class="price-section">
+    <view class="price-row">
+      <text class="price-label">租金</text>
+      <text class="price-value">¥{{account.rental_price}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">押金</text>
+      <text class="price-value">¥{{account.deposit}}</text>
+    </view>
+    <view class="price-row total">
+      <text class="price-label">总价</text>
+      <text class="price-value">¥{{account.total_price}}</text>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <button class="btn-share" bindtap="onShare">
+      <text>📤</text>
+      <text>分享</text>
+    </button>
+    <button class="btn-collect {{account.isCollected ? 'active' : ''}}" bindtap="onCollect">
+      <text>{{account.isCollected ? '⭐' : '☆'}}</text>
+      <text>{{account.isCollected ? '已收藏' : '收藏'}}</text>
+    </button>
+    <button class="btn-rent" bindtap="onRent" disabled="{{account.status !== 'available'}}">
+      {{account.status === 'available' ? '立即租赁' : '暂不可租'}}
+    </button>
+  </view>
+</view>

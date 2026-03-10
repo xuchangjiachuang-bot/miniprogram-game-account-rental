@@ -1,0 +1,289 @@
+/* pages/wallet/withdraw-detail/index.wxss */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 40rpx;
+}
+
+/* 导航栏 */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 30rpx;
+  background: #ffffff;
+}
+
+.nav-back {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-arrow {
+  font-size: 36rpx;
+  color: #333;
+  font-weight: 700;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.nav-placeholder {
+  width: 60rpx;
+}
+
+/* 状态卡片 */
+.status-card {
+  background: #ffffff;
+  padding: 60rpx 30rpx;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.status-icon {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.status-emoji {
+  font-size: 60rpx;
+}
+
+.status-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.amount-text {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #333;
+}
+
+/* 时间线卡片 */
+.timeline-card {
+  background: #ffffff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 24rpx;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin-bottom: 20rpx;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 20rpx;
+  position: relative;
+}
+
+.timeline-item.active .timeline-dot {
+  background: #07c160;
+  border-color: #07c160;
+}
+
+.timeline-item.active .timeline-title {
+  color: #07c160;
+}
+
+.timeline-item.rejected .timeline-dot {
+  background: #ff4444;
+  border-color: #ff4444;
+}
+
+.timeline-item.rejected .timeline-title {
+  color: #ff4444;
+}
+
+.timeline-dot {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: #f5f5f5;
+  border: 4rpx solid #e0e0e0;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.timeline-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  padding-top: 4rpx;
+}
+
+.timeline-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #999;
+}
+
+.timeline-time {
+  font-size: 22rpx;
+  color: #ccc;
+}
+
+.timeline-line {
+  width: 2rpx;
+  height: 40rpx;
+  background: #e0e0e0;
+  margin-left: 12rpx;
+}
+
+.timeline-item:last-child + .timeline-line {
+  display: none;
+}
+
+/* 审核备注 */
+.review-remark {
+  padding: 20rpx;
+  background: #fff3e0;
+  border-radius: 8rpx;
+  margin-top: 20rpx;
+}
+
+.remark-label {
+  font-size: 24rpx;
+  color: #ff9800;
+  margin-right: 8rpx;
+}
+
+.remark-text {
+  font-size: 24rpx;
+  color: #666;
+}
+
+/* 信息卡片 */
+.info-card,
+.amount-card {
+  background: #ffffff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.info-row,
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.info-row:last-child,
+.amount-row:last-child {
+  border-bottom: none;
+}
+
+.info-label,
+.amount-label {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.info-value,
+.amount-value {
+  font-size: 26rpx;
+  color: #333;
+  text-align: right;
+}
+
+.info-value-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.copy-btn {
+  font-size: 22rpx;
+  color: #667eea;
+}
+
+.amount-divider {
+  height: 1rpx;
+  background: #e0e0e0;
+  margin: 10rpx 0;
+}
+
+.amount-row.total {
+  margin-top: 10rpx;
+}
+
+.amount-row.total .amount-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.amount-row.total .amount-value {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.amount-row.total .amount-value.highlight {
+  color: #07c160;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  padding: 0 30rpx;
+  display: flex;
+  gap: 20rpx;
+}
+
+.btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+}
+
+.btn.secondary {
+  background: #ffffff;
+  color: #667eea;
+  border: 2rpx solid #667eea;
+}
+
+/* 加载中 */
+.loading {
+  padding: 120rpx 0;
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 26rpx;
+  color: #999;
+}

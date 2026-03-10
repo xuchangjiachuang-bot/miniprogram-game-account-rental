@@ -1,0 +1,187 @@
+<!-- pages/account/publish/index.wxml -->
+<view class="page">
+  <!-- 表单 -->
+  <form bindsubmit="onSubmit">
+    <!-- 头像 -->
+    <view class="section">
+      <view class="section-title required">账号封面</view>
+      <image-uploader
+        images="{{form.images}}"
+        maxCount="{{5}}"
+        bindchange="onImagesChange"
+      />
+      <view class="section-tips">最多上传5张图片，第一张将作为封面</view>
+    </view>
+
+    <!-- 基本信息 -->
+    <view class="section">
+      <view class="section-title required">基本信息</view>
+      
+      <view class="form-item">
+        <text class="form-label">账号标题</text>
+        <input
+          class="form-input"
+          placeholder="请输入账号标题（10-30字）"
+          value="{{form.title}}"
+          bindinput="onTitleInput"
+          maxlength="30"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">账号描述</text>
+        <textarea
+          class="form-textarea"
+          placeholder="请详细描述账号特色、等级、战绩等（20-500字）"
+          value="{{form.description}}"
+          bindinput="onDescriptionInput"
+          maxlength="500"
+          autoHeight
+        />
+      </view>
+    </view>
+
+    <!-- 游戏信息 -->
+    <view class="section">
+      <view class="section-title required">游戏信息</view>
+      
+      <view class="form-item">
+        <text class="form-label required">游戏账号</text>
+        <input
+          class="form-input"
+          placeholder="请输入游戏账号"
+          value="{{form.gameAccount}}"
+          bindinput="onGameAccountInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label required">游戏密码</text>
+        <input
+          class="form-input"
+          password
+          placeholder="请输入游戏密码"
+          value="{{form.gamePassword}}"
+          bindinput="onGamePasswordInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">验证码</text>
+        <input
+          class="form-input"
+          placeholder="如果有验证码，请输入"
+          value="{{form.gameVerify}}"
+          bindinput="onGameVerifyInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">段位等级</text>
+        <picker
+          range="{{rankOptions}}"
+          range-key="label"
+          value="{{form.rankIndex}}"
+          bindchange="onRankChange"
+        >
+          <view class="form-picker">
+            {{rankOptions[form.rankIndex].label}}
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">战力值</text>
+        <input
+          class="form-input"
+          type="number"
+          placeholder="请输入战力值"
+          value="{{form.power}}"
+          bindinput="onPowerInput"
+        />
+      </view>
+    </view>
+
+    <!-- 皮肤配置 -->
+    <view class="section">
+      <view class="section-title required">皮肤配置</view>
+      
+      <view class="form-item">
+        <text class="form-label required">主武器皮肤</text>
+        <input
+          class="form-input"
+          placeholder="例如：M416-雷神"
+          value="{{form.skinWeapon}}"
+          bindinput="onSkinWeaponInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">角色皮肤</text>
+        <input
+          class="form-input"
+          placeholder="例如：火箭少女101-紫幻"
+          value="{{form.skinCharacter}}"
+          bindinput="onSkinCharacterInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">其他皮肤</text>
+        <textarea
+          class="form-textarea"
+          placeholder="请列举其他特色皮肤，如：车、降落伞、头盔等（每行一个）"
+          value="{{form.otherSkins}}"
+          bindinput="onOtherSkinsInput"
+          autoHeight
+        />
+      </view>
+    </view>
+
+    <!-- 租赁设置 -->
+    <view class="section">
+      <view class="section-title required">租赁设置</view>
+      
+      <view class="duration-list">
+        <view
+          class="duration-item {{form.duration === item.value ? 'active' : ''}}"
+          wx:for="{{durationOptions}}"
+          wx:key="value"
+          bindtap="onDurationTap"
+          data-value="{{item.value}}"
+        >
+          <text class="duration-label">{{item.label}}</text>
+          <text class="duration-price">¥{{item.price}}</text>
+        </view>
+      </view>
+
+      <view class="form-item form-item-inline">
+        <text class="form-label">押金设置</text>
+        <switch
+          checked="{{form.depositRequired}}"
+          bindchange="onDepositChange"
+          color="var(--primary)"
+        />
+      </view>
+
+      <view class="form-item" wx:if="{{form.depositRequired}}">
+        <text class="form-label">押金金额</text>
+        <input
+          class="form-input"
+          type="digit"
+          placeholder="请输入押金金额"
+          value="{{form.depositAmount}}"
+          bindinput="onDepositAmountInput"
+        />
+      </view>
+    </view>
+
+    <!-- 提交按钮 -->
+    <view class="submit-bar">
+      <button class="btn-submit" form-type="submit" disabled="{{submitting}}">
+        {{submitting ? '发布中...' : '立即发布'}}
+      </button>
+    </view>
+  </form>
+</view>

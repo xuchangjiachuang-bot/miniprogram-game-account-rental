@@ -1,0 +1,380 @@
+/* pages/order/list/index.wxss */
+page {
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.page {
+  padding-bottom: 120rpx;
+}
+
+/* 标签切换 */
+.tabs {
+  display: flex;
+  background: #ffffff;
+  padding: 20rpx 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 16rpx 20rpx;
+  font-size: 28rpx;
+  color: #666666;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-item.active {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 4rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2rpx;
+}
+
+.tab-name {
+  font-size: 28rpx;
+}
+
+.tab-badge {
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
+  background: #ff4757;
+  color: #ffffff;
+  font-size: 20rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* 订单列表 */
+.order-list {
+  padding: 20rpx;
+}
+
+.order-card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.order-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+}
+
+/* 订单头部 */
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  margin-bottom: 20rpx;
+}
+
+.order-number {
+  font-size: 24rpx;
+  color: #999999;
+  font-weight: 500;
+}
+
+.order-status {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+}
+
+/* 订单主体 */
+.order-body {
+  margin-bottom: 20rpx;
+}
+
+/* 账号信息 */
+.account-info {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.account-image {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 12rpx;
+  background: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.account-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.account-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.4;
+  margin-bottom: 12rpx;
+}
+
+.account-metas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.meta-tag {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  color: #667eea;
+  font-size: 22rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(102, 126, 234, 0.3);
+  font-weight: 500;
+}
+
+/* 价格信息 */
+.price-info {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12rpx;
+}
+
+.price-item {
+  text-align: center;
+}
+
+.price-label {
+  display: block;
+  font-size: 22rpx;
+  color: #666666;
+  margin-bottom: 8rpx;
+}
+
+.price-value {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.price-item.total .price-value {
+  font-size: 32rpx;
+  color: #667eea;
+}
+
+/* 租期信息 */
+.rental-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  background: #f7f8fc;
+  border-radius: 10rpx;
+  margin-bottom: 16rpx;
+}
+
+.rental-label {
+  font-size: 24rpx;
+  color: #666666;
+}
+
+.rental-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* 时间信息 */
+.time-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 20rpx;
+  background: #fafafa;
+  border-radius: 10rpx;
+}
+
+.time-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.time-label {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.time-value {
+  font-size: 24rpx;
+  color: #666666;
+  font-weight: 500;
+}
+
+/* 订单操作 */
+.order-actions {
+  display: flex;
+  gap: 16rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f0f0f0;
+  margin-top: 20rpx;
+}
+
+.btn-action {
+  flex: 1;
+  height: 70rpx;
+  padding: 0 24rpx;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.btn-action.outline {
+  background: #ffffff;
+  color: #666666;
+  border: 2rpx solid #e0e0e0;
+}
+
+.btn-action.outline:active {
+  background: #f5f5f5;
+}
+
+.btn-action.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border: none;
+}
+
+.btn-action.primary:active {
+  opacity: 0.8;
+}
+
+.btn-action.danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+  color: #ffffff;
+  border: none;
+}
+
+.btn-action.danger:active {
+  opacity: 0.8;
+}
+
+/* 加载中 */
+.loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+  gap: 20rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 26rpx;
+  color: #999999;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  gap: 20rpx;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 30rpx;
+  color: #666666;
+  font-weight: 600;
+}
+
+.empty-hint {
+  font-size: 24rpx;
+  color: #999999;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.btn-go-home {
+  margin-top: 20rpx;
+  padding: 20rpx 60rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 30rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+/* 底部占位 */
+.tabbar-placeholder {
+  height: 120rpx;
+}

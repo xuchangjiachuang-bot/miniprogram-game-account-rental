@@ -1,0 +1,161 @@
+<!-- pages/account/detail/index.wxml -->
+<view class="page">
+  <!-- 账号图片轮播 -->
+  <view class="swiper-container" wx:if="{{account.images && account.images.length > 0}}">
+    <swiper class="account-swiper" bindchange="onSwiperChange">
+      <swiper-item wx:for="{{account.images}}" wx:key="*this">
+        <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" data-urls="{{account.images}}" data-current="{{item}}" />
+      </swiper-item>
+    </swiper>
+    <!-- 图片指示器 -->
+    <view class="swiper-indicators" wx:if="{{account.images.length > 1}}">
+      <view class="indicator" wx:for="{{account.images}}" wx:key="*this" wx:for-index="idx">
+        <view class="indicator-dot {{currentImageIndex === idx ? 'active' : ''}}"></view>
+      </view>
+    </view>
+    <!-- 左右切换按钮 -->
+    <view class="swiper-btn prev" wx:if="{{account.images.length > 1}}" bindtap="onPrevImage">‹</view>
+    <view class="swiper-btn next" wx:if="{{account.images.length > 1}}" bindtap="onNextImage">›</view>
+  </view>
+
+  <!-- 账号信息 -->
+  <view class="info-section">
+    <view class="account-header">
+      <view class="account-title">{{account.fullTitle}}</view>
+      <view class="account-status {{account.status}}">
+        <text class="status-dot"></text>
+        <text>{{account.statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 平台标签 -->
+    <view class="platform-badge">{{account.login_method}}</view>
+
+    <!-- 核心信息卡片 -->
+    <view class="info-card-grid">
+      <view class="info-card coins">
+        <text class="info-label">哈夫币</text>
+        <text class="info-value">{{account.coins_display}}</text>
+      </view>
+      <view class="info-card ratio">
+        <text class="info-label">比例</text>
+        <text class="info-value">{{account.ratio_display}}</text>
+      </view>
+      <view class="info-card safebox">
+        <text class="info-label">安全箱</text>
+        <text class="info-value">{{account.safebox}}</text>
+      </view>
+      <view class="info-card level">
+        <text class="info-label">等级</text>
+        <text class="info-value">Lv.{{account.account_level}}</text>
+      </view>
+    </view>
+
+    <!-- 详细属性 -->
+    <view class="attributes-section">
+      <view class="section-title">账号属性</view>
+      <view class="attribute-list">
+        <view class="attribute-item">
+          <text class="attr-label">段位</text>
+          <text class="attr-value">{{account.rank_display}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">体力/负重</text>
+          <text class="attr-value">{{account.stamina_level}}/{{account.load_level}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.kd > 0}}">
+          <text class="attr-label">KD值</text>
+          <text class="attr-value">{{account.kd}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.awmBullets > 0}}">
+          <text class="attr-label">AWM子弹</text>
+          <text class="attr-value">{{account.awmBullets}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.level6Armor > 0}}">
+          <text class="attr-label">6甲</text>
+          <text class="attr-value">{{account.level6Armor}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.level6Helmet > 0}}">
+          <text class="attr-label">6头</text>
+          <text class="attr-value">{{account.level6Helmet}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">所在地</text>
+          <text class="attr-value">{{account.region.province}} {{account.region.city}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.view_count > 0}}">
+          <text class="attr-label">浏览次数</text>
+          <text class="attr-value">{{account.view_count}}</text>
+        </view>
+        <view class="attribute-item" wx:if="{{account.trade_count > 0}}">
+          <text class="attr-label">交易次数</text>
+          <text class="attr-value">{{account.trade_count}}</text>
+        </view>
+        <view class="attribute-item">
+          <text class="attr-label">上架时间</text>
+          <text class="attr-value">{{account.listed_at}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 皮肤标签 -->
+    <view class="skins-section" wx:if="{{account.skins && account.skins.length > 0}}">
+      <view class="section-title">皮肤</view>
+      <view class="skins-list">
+        <text class="skin-tag" wx:for="{{account.skins}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 账号描述 -->
+    <view class="desc-section">
+      <view class="section-title">账号描述</view>
+      <view class="desc-content">{{account.description || '暂无描述'}}</view>
+    </view>
+  </view>
+
+  <!-- 价格信息 -->
+  <view class="price-section">
+    <view class="price-row">
+      <text class="price-label">租金</text>
+      <text class="price-value">¥{{account.actual_rental}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">押金</text>
+      <text class="price-value">¥{{account.deposit}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">租期</text>
+      <text class="price-value">{{account.rental_description}}</text>
+    </view>
+    <view class="price-row total">
+      <text class="price-label">总价</text>
+      <text class="price-value">¥{{account.total_price}}</text>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <button class="btn-service" bindtap="onContactService">
+      <text>💬</text>
+      <text>客服</text>
+    </button>
+    <button class="btn-favorite" bindtap="onFavorite">
+      <text>☆</text>
+      <text>收藏</text>
+    </button>
+    <button class="btn-rent" bindtap="onRentNow" disabled="{{account.status !== 'available'}}">
+      {{account.status === 'available' ? '立即租赁' : '暂不可租'}}
+    </button>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-placeholder"></view>
+
+  <!-- 登录弹窗 -->
+  <login-modal
+    wx:if="{{showLoginModal}}"
+    visible="{{showLoginModal}}"
+    bind:loginSuccess="onLoginSuccess"
+    bind:close="onLoginSuccess"
+  />
+</view>

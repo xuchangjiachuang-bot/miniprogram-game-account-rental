@@ -1,0 +1,493 @@
+/**
+ * 群聊服务
+ * 管理群聊、群成员、消息发送等功能
+ */
+
+import { db, groupChats, groupChatMembers, chatMessages, users } from './db';
+import { eq, and, or, desc } from 'drizzle-orm';
+
+// ==================== 类型定义 ====================
+
+export interface ChatGroup {
+  id: string;
+  orderId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  members?: ChatGroupMember[];
+}
+
+export interface ChatGroupMember {
+  id: string;
+  groupChatId: string;
+  userId: string;
+  role: 'buyer' | 'seller' | 'admin';
+  joinedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  groupChatId: string;
+  senderId: string;
+  senderType: 'buyer' | 'seller' | 'admin';
+  content: string;
+  messageType: 'text' | 'image' | 'system';
+  createdAt: string;
+  sender?: {
+    id: string;
+    username: string;
+    nickname: string;
+    avatar?: string;
+  };
+}
+
+export interface CreateGroupParams {
+  groupName: string;
+  groupType?: 'order' | 'platform' | 'custom';
+  relatedOrderId?: string;
+  creatorId: string;
+  maxMembers?: number;
+  avatar?: string;
+  description?: string;
+}
+
+export interface SendMessageParams {
+  groupId: string;
+  userId: string;
+  messageType?: 'text' | 'image' | 'file';
+  content?: string;
+  attachments?: any[];
+  replyTo?: string;
+}
+
+// ==================== 群聊管理 ====================
+
+/**
+ * 创建群聊
+ */
+export async function createGroup(params: CreateGroupParams): Promise<ChatGroup | null> {
+  try {
+    // 创建群聊
+    const [group] = await db.insert(chatGroups).values({
+      groupName: params.groupName,
+      groupType: params.groupType || 'order',
+      relatedOrderId: params.relatedOrderId,
+      creatorId: params.creatorId,
+      maxMembers: params.maxMembers || 10,
+      avatar: params.avatar,
+      description: params.description,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }).returning();
+
+    // 创建者自动加入群聊（作为 owner）
+    await db.insert(chatGroupMembers).values({
+      groupId: group.id,
+      userId: params.creatorId,
+      role: 'owner',
+      joinTime: new Date().toISOString()
+    });
+
+    return group as ChatGroup;
+  } catch (error) {
+    console.error('创建群聊失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 为订单创建群聊
+ */
+export async function createOrderChatGroup(orderId: string, orderTitle: string, buyerId: string, sellerId: string): Promise<ChatGroup | null> {
+  try {
+    // 创建群聊
+    const group = await createGroup({
+      groupName: `${orderTitle} - 订单沟通`,
+      groupType: 'order',
+      relatedOrderId: orderId,
+      creatorId: sellerId, // 卖家创建群聊
+      maxMembers: 5,
+      description: `订单 ${orderId} 的沟通群聊`
+    });
+
+    if (!group) {
+      throw new Error('创建群聊失败');
+    }
+
+    // 添加买家到群聊
+    await db.insert(chatGroupMembers).values({
+      groupId: group.id,
+      userId: buyerId,
+      role: 'member',
+      joinTime: new Date().toISOString()
+    });
+
+    return group;
+  } catch (error) {
+    console.error('创建订单群聊失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取群聊信息
+ */
+export async function getGroup(groupId: string): Promise<ChatGroup | null> {
+  try {
+    const result = await db
+      .select()
+      .from(chatGroups)
+      .where(eq(chatGroups.id, groupId))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0] as ChatGroup;
+  } catch (error) {
+    console.error('获取群聊信息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 根据订单ID获取群聊
+ */
+export async function getGroupByOrderId(orderId: string): Promise<ChatGroup | null> {
+  try {
+    const result = await db
+      .select()
+      .from(chatGroups)
+      .where(and(
+        eq(chatGroups.relatedOrderId, orderId),
+        eq(chatGroups.groupType, 'order')
+      ))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0] as ChatGroup;
+  } catch (error) {
+    console.error('获取订单群聊失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取用户的群聊列表
+ */
+export async function getUserGroups(userId: string): Promise<ChatGroup[]> {
+  try {
+    const result = await db
+      .select({
+        id: chatGroups.id,
+        groupName: chatGroups.groupName,
+        groupType: chatGroups.groupType,
+        relatedOrderId: chatGroups.relatedOrderId,
+        relatedPlatformId: chatGroups.relatedPlatformId,
+        creatorId: chatGroups.creatorId,
+        maxMembers: chatGroups.maxMembers,
+        avatar: chatGroups.avatar,
+        description: chatGroups.description,
+        isActive: chatGroups.isActive,
+        createdAt: chatGroups.createdAt,
+        updatedAt: chatGroups.updatedAt
+      })
+      .from(chatGroups)
+      .innerJoin(
+        chatGroupMembers,
+        and(eq(chatGroups.id, chatGroupMembers.groupId), eq(chatGroupMembers.userId, userId))
+      )
+      .where(eq(chatGroups.isActive, true));
+
+    return result as ChatGroup[];
+  } catch (error) {
+    console.error('获取用户群聊列表失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 添加群成员
+ */
+export async function addGroupMember(groupId: string, userId: string, role: 'admin' | 'member' = 'member'): Promise<boolean> {
+  try {
+    await db.insert(chatGroupMembers).values({
+      groupId,
+      userId,
+      role,
+      joinTime: new Date().toISOString()
+    });
+
+    return true;
+  } catch (error) {
+    console.error('添加群成员失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 移除群成员
+ */
+export async function removeGroupMember(groupId: string, userId: string): Promise<boolean> {
+  try {
+    await db
+      .delete(chatGroupMembers)
+      .where(and(
+        eq(chatGroupMembers.groupId, groupId),
+        eq(chatGroupMembers.userId, userId)
+      ));
+
+    return true;
+  } catch (error) {
+    console.error('移除群成员失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 检查用户是否在群聊中
+ */
+export async function isUserInGroup(groupId: string, userId: string): Promise<boolean> {
+  try {
+    const result = await db
+      .select()
+      .from(chatGroupMembers)
+      .where(and(
+        eq(chatGroupMembers.groupId, groupId),
+        eq(chatGroupMembers.userId, userId)
+      ))
+      .limit(1);
+
+    return result.length > 0;
+  } catch (error) {
+    console.error('检查群成员失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 获取群聊成员列表
+ */
+export async function getGroupMembers(groupId: string): Promise<ChatGroupMember[]> {
+  try {
+    const result = await db
+      .select({
+        id: chatGroupMembers.id,
+        groupId: chatGroupMembers.groupId,
+        userId: chatGroupMembers.userId,
+        role: chatGroupMembers.role,
+        joinTime: chatGroupMembers.joinTime,
+        mutedUntil: chatGroupMembers.mutedUntil
+      })
+      .from(chatGroupMembers)
+      .where(eq(chatGroupMembers.groupId, groupId));
+
+    return result as ChatGroupMember[];
+  } catch (error) {
+    console.error('获取群聊成员列表失败:', error);
+    return [];
+  }
+}
+
+// ==================== 消息管理 ====================
+
+/**
+ * 发送消息
+ */
+export async function sendMessage(params: SendMessageParams): Promise<ChatMessage | null> {
+  try {
+    // 检查用户是否在群聊中
+    const isInGroup = await isUserInGroup(params.groupId, params.userId);
+    if (!isInGroup) {
+      throw new Error('用户不在群聊中');
+    }
+
+    // 创建消息
+    const [message] = await db.insert(chatMessages).values({
+      groupId: params.groupId,
+      userId: params.userId,
+      messageType: params.messageType || 'text',
+      content: params.content,
+      attachments: params.attachments,
+      replyTo: params.replyTo,
+      isDeleted: false,
+      createdAt: new Date().toISOString()
+    }).returning();
+
+    return message as ChatMessage;
+  } catch (error) {
+    console.error('发送消息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取群聊消息列表
+ */
+export async function getGroupMessages(
+  groupId: string,
+  limit: number = 50,
+  beforeId?: string
+): Promise<ChatMessage[]> {
+  try {
+    let query = db
+      .select({
+        id: chatMessages.id,
+        groupId: chatMessages.groupId,
+        userId: chatMessages.userId,
+        messageType: chatMessages.messageType,
+        content: chatMessages.content,
+        attachments: chatMessages.attachments,
+        replyTo: chatMessages.replyTo,
+        isDeleted: chatMessages.isDeleted,
+        deletedBy: chatMessages.deletedBy,
+        deletedAt: chatMessages.deletedAt,
+        createdAt: chatMessages.createdAt,
+        senderId: users.id,
+        senderUsername: users.username,
+        senderNickname: users.nickname,
+        senderAvatar: users.avatar
+      })
+      .from(chatMessages)
+      .leftJoin(users, eq(chatMessages.userId, users.id))
+      .where(and(
+        eq(chatMessages.groupId, groupId),
+        eq(chatMessages.isDeleted, false)
+      ));
+
+    // 如果指定了 beforeId，获取此消息之前的消息
+    if (beforeId) {
+      // 这里需要动态构建条件，简化处理
+      const allMessages = await query.orderBy(desc(chatMessages.createdAt)).limit(limit + 50);
+      const beforeIndex = allMessages.findIndex((m: any) => m.id === beforeId);
+      if (beforeIndex !== -1) {
+        return allMessages.slice(beforeIndex + 1, beforeIndex + limit + 1) as ChatMessage[];
+      }
+      return allMessages.slice(0, limit) as ChatMessage[];
+    }
+
+    const messages = await query.orderBy(desc(chatMessages.createdAt)).limit(limit);
+
+    return messages.map((msg: any) => ({
+      id: msg.id,
+      groupId: msg.groupId,
+      userId: msg.userId,
+      messageType: msg.messageType,
+      content: msg.content,
+      attachments: msg.attachments,
+      replyTo: msg.replyTo,
+      isDeleted: msg.isDeleted,
+      deletedBy: msg.deletedBy,
+      deletedAt: msg.deletedAt,
+      createdAt: msg.createdAt,
+      sender: msg.senderId ? {
+        id: msg.senderId,
+        username: msg.senderUsername,
+        nickname: msg.senderNickname,
+        avatar: msg.senderAvatar
+      } : undefined
+    })) as ChatMessage[];
+  } catch (error) {
+    console.error('获取群聊消息失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 删除消息
+ */
+export async function deleteMessage(messageId: string, userId: string): Promise<boolean> {
+  try {
+    await db
+      .update(chatMessages)
+      .set({
+        isDeleted: true,
+        deletedBy: userId,
+        deletedAt: new Date().toISOString()
+      })
+      .where(eq(chatMessages.id, messageId));
+
+    return true;
+  } catch (error) {
+    console.error('删除消息失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 获取最新消息
+ */
+export async function getLatestMessage(groupId: string): Promise<ChatMessage | null> {
+  try {
+    const result = await db
+      .select()
+      .from(chatMessages)
+      .where(and(
+        eq(chatMessages.groupId, groupId),
+        eq(chatMessages.isDeleted, false)
+      ))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0] as ChatMessage;
+  } catch (error) {
+    console.error('获取最新消息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取单条消息
+ */
+export async function getMessage(messageId: string): Promise<ChatMessage | null> {
+  try {
+    const result = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, messageId))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0] as ChatMessage;
+  } catch (error) {
+    console.error('获取消息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取用户在群聊中的角色
+ */
+export async function getUserRole(groupId: string, userId: string): Promise<'owner' | 'admin' | 'member' | null> {
+  try {
+    const result = await db
+      .select({ role: chatGroupMembers.role })
+      .from(chatGroupMembers)
+      .where(and(
+        eq(chatGroupMembers.groupId, groupId),
+        eq(chatGroupMembers.userId, userId)
+      ))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0].role as 'owner' | 'admin' | 'member';
+  } catch (error) {
+    console.error('获取用户角色失败:', error);
+    return null;
+  }
+}
