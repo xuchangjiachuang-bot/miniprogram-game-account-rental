@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { db, platformSettings } from './db';
+import { sqlClient } from './db';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
 const DEFAULT_PROD_BASE_URL = 'https://hfb.yugioh.top';
@@ -69,7 +69,17 @@ export function resolveWechatRedirectUri(request?: MaybeRequest): string {
 
 export async function getWechatPlatformSettingsCompat(): Promise<WechatPlatformSettingsCompat | null> {
   try {
-    const [setting] = await db.select().from(platformSettings).limit(1);
+    const rows = await sqlClient<WechatPlatformSettingsCompat[]>`
+      select
+        wechat_mp_app_id as "wechatMpAppId",
+        wechat_mp_app_secret as "wechatMpAppSecret",
+        wechat_open_app_id as "wechatOpenAppId",
+        wechat_open_app_secret as "wechatOpenAppSecret"
+      from platform_settings
+      limit 1
+    `;
+
+    const setting = rows[0];
 
     if (!setting) {
       return null;
