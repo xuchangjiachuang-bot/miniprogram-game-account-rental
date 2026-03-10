@@ -148,24 +148,30 @@ export async function getPendingVerificationApplications(
   try {
     const offset = (page - 1) * pageSize;
 
-    // 获取总数
-    const totalCount = await db
-      .select()
-      .from(verificationApplications)
-      .where(eq(verificationApplications.status, 'pending'));
+    const pendingFilter = and(
+      eq(verificationApplications.status, 'pending'),
+      eq(users.isVerified, false)
+    );
 
-    // 获取列表
-    const result = await db
-      .select()
+    // 只返回仍未完成实名的待审核申请，避免后台和前台状态打架
+    const totalCount = await db
+      .select({ id: verificationApplications.id })
       .from(verificationApplications)
-      .where(eq(verificationApplications.status, 'pending'))
-      .orderBy(verificationApplications.createdAt)
+      .innerJoin(users, eq(users.id, verificationApplications.userId))
+      .where(pendingFilter);
+
+    const result = await db
+      .select({ application: verificationApplications })
+      .from(verificationApplications)
+      .innerJoin(users, eq(users.id, verificationApplications.userId))
+      .where(pendingFilter)
+      .orderBy(desc(verificationApplications.createdAt))
       .limit(pageSize)
       .offset(offset);
 
     return {
       success: true,
-      data: result as VerificationApplication[],
+      data: result.map(({ application }) => application as VerificationApplication),
       total: totalCount.length
     };
   } catch (error: any) {
