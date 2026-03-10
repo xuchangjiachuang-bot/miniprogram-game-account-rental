@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { getServerUserId } from '@/lib/server-auth';
 import { db, userBalances } from '@/lib/db';
+import { getUserBalance } from '@/lib/user-balance-service';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const userId = getServerUserId(request);
+    if (!userId) {
       return NextResponse.json(
         {
           success: false,
@@ -15,13 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = authHeader.substring(7);
-
-    const [balance] = await db
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, userId))
-      .limit(1);
+    let balance = await getUserBalance(userId);
 
     if (!balance) {
       await db.insert(userBalances).values({
@@ -33,21 +28,21 @@ export async function GET(request: NextRequest) {
         totalEarned: '0',
       });
 
-      return NextResponse.json({
-        success: true,
-        data: {
-          userId,
-          availableBalance: '0',
-          frozenBalance: '0',
-          totalWithdrawn: '0',
-          totalEarned: '0',
-        },
-      });
+      balance = await getUserBalance(userId);
     }
 
     return NextResponse.json({
       success: true,
-      data: balance,
+      data: {
+        user_id: userId,
+        available_balance: balance?.availableBalance || 0,
+        frozen_balance: balance?.frozenBalance || 0,
+        total_balance: (balance?.availableBalance || 0) + (balance?.frozenBalance || 0),
+        total_withdrawn: balance?.totalWithdrawn || 0,
+        total_recharged: 0,
+        total_income: balance?.totalEarned || 0,
+        total_refund: 0,
+      },
     });
   } catch (error: any) {
     console.error('[Wallet] 获取钱包信息失败:', error);

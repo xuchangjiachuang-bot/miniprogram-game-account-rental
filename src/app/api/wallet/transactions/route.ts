@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, balanceTransactions } from '@/lib/db';
 import { eq, desc } from 'drizzle-orm';
+import { getServerUserId } from '@/lib/server-auth';
+import { db, balanceTransactions } from '@/lib/db';
 
-/**
- * 获取交易记录
- * GET /api/wallet/transactions
- */
 export async function GET(request: NextRequest) {
   try {
-    // 验证用户登录
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({
-        success: false,
-        error: '请先登录',
-      }, { status: 401 });
+    const userId = getServerUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '请先登录',
+        },
+        { status: 401 }
+      );
     }
 
-    const token = authHeader.substring(7);
-    const userId = token; // 临时方案
-
-    // 获取分页参数
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
 
-    // 查询交易记录
-    const transactions = await db.select()
+    const transactions = await db
+      .select()
       .from(balanceTransactions)
       .where(eq(balanceTransactions.userId, userId))
       .orderBy(desc(balanceTransactions.createdAt))
@@ -36,17 +31,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        list: transactions,
+        list: transactions.map((transaction) => ({
+          id: transaction.id,
+          transaction_no: transaction.id,
+          user_id: transaction.userId,
+          transaction_type: transaction.transactionType,
+          amount: Number(transaction.amount) || 0,
+          balance_before: Number(transaction.balanceBefore) || 0,
+          balance_after: Number(transaction.balanceAfter) || 0,
+          remark: transaction.description || '',
+          created_at: transaction.createdAt,
+        })),
         page,
         pageSize,
       },
     });
-
   } catch (error: any) {
     console.error('[Wallet] 获取交易记录失败:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || '获取交易记录失败',
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || '获取交易记录失败',
+      },
+      { status: 500 }
+    );
   }
 }

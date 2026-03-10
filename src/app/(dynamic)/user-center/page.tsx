@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { User, FileText, Wallet, Shield, Upload, CheckCircle, Camera, Loader2, AlertCircle, MessageSquare, Send, Clock, Users, RefreshCw, Bell, Check, CheckCheck } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
-import { formatBalance, getUserBalance } from '@/lib/balance-service';
+import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
 import { getToken } from '@/lib/auth-token';
 
@@ -189,40 +189,42 @@ export default function UserCenterPage() {
   }, [user]);
 
   // 加载钱包数据
-  const loadWalletData = () => {
+  const loadWalletData = async () => {
     if (!user) return;
 
     // 加载余额
-    const userBalance = getUserBalance(user.id);
-    setBalance(userBalance);
+    try {
+      const token = getToken();
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-    // TODO: 实际项目中从API加载交易记录
-    // 模拟交易记录
-    const mockTransactions = [
-      {
-        id: '1',
-        transaction_no: 'TXN1704067200001',
-        user_id: user.id,
-        transaction_type: 'rent_income',
-        amount: 150,
-        balance_before: 1850,
-        balance_after: 2000,
-        remark: '订单租金收入',
-        created_at: new Date(Date.now() - 3600000).toISOString()
-      },
-      {
-        id: '2',
-        transaction_no: 'TXN1704063600001',
-        user_id: user.id,
-        transaction_type: 'withdraw',
-        amount: -500,
-        balance_before: 2350,
-        balance_after: 1850,
-        remark: '提现到支付宝',
-        created_at: new Date(Date.now() - 86400000).toISOString()
+      const [balanceResponse, transactionsResponse] = await Promise.all([
+        fetch('/api/wallet', {
+          headers,
+          cache: 'no-store'
+        }),
+        fetch('/api/wallet/transactions?page=1&pageSize=10', {
+          headers,
+          cache: 'no-store'
+        })
+      ]);
+
+      if (!balanceResponse.ok) {
+        throw new Error('加载钱包余额失败');
       }
-    ];
-    setTransactions(mockTransactions);
+
+      if (!transactionsResponse.ok) {
+        throw new Error('加载钱包流水失败');
+      }
+
+      const balanceResult = await balanceResponse.json();
+      const transactionsResult = await transactionsResponse.json();
+
+      setBalance(balanceResult.data || null);
+      setTransactions(transactionsResult.data?.list || []);
+    } catch (error) {
+      console.error('加载钱包数据失败:', error);
+      toast.error('加载钱包数据失败');
+    }
   };
 
   // 加载通知数据
