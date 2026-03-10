@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db, platformSettings } from './db';
+import { getWechatPlatformSettingsCompat, resolveWechatRedirectUri } from './wechat-runtime-config';
 
 export interface WechatOAuthConfig {
   appId: string;
@@ -29,13 +29,13 @@ export interface WechatAuthResult {
  */
 async function getWechatConfig(): Promise<WechatOAuthConfig> {
   try {
-    const [setting] = await db.select().from(platformSettings).limit(1);
+    const setting = await getWechatPlatformSettingsCompat();
 
     if (setting?.wechatMpAppId && setting?.wechatMpAppSecret) {
       return {
         appId: setting.wechatMpAppId,
         appSecret: setting.wechatMpAppSecret,
-        redirectUri: process.env.WECHAT_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000'}/api/auth/wechat/callback`
+        redirectUri: resolveWechatRedirectUri()
       };
     }
   } catch (error) {
@@ -46,7 +46,7 @@ async function getWechatConfig(): Promise<WechatOAuthConfig> {
   return {
     appId: process.env.WECHAT_MP_APPID || process.env.WECHAT_APPID || '',
     appSecret: process.env.WECHAT_MP_SECRET || process.env.WECHAT_APPSECRET || '',
-    redirectUri: process.env.WECHAT_REDIRECT_URI || 'http://localhost:5000/api/auth/wechat/callback'
+    redirectUri: resolveWechatRedirectUri()
   };
 }
 
@@ -55,7 +55,7 @@ async function getWechatConfig(): Promise<WechatOAuthConfig> {
  */
 export async function getWechatOpenConfig(): Promise<{ appId: string; appSecret: string; redirectUri: string }> {
   try {
-    const [setting] = await db.select().from(platformSettings).limit(1);
+    const setting = await getWechatPlatformSettingsCompat();
 
     console.log('[微信开放平台配置] 从数据库读取配置:', {
       hasSetting: !!setting,
@@ -69,7 +69,7 @@ export async function getWechatOpenConfig(): Promise<{ appId: string; appSecret:
       return {
         appId: setting.wechatOpenAppId,
         appSecret: setting.wechatOpenAppSecret,
-        redirectUri: process.env.WECHAT_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'https://hfb.yugioh.top'}/api/auth/wechat/callback`
+        redirectUri: resolveWechatRedirectUri()
       };
     }
   } catch (error) {

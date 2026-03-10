@@ -16,6 +16,8 @@ const client = postgres(DATABASE_URL, {
   connect_timeout: 10,
 });
 
+export const sqlClient = client;
+
 // 创建Drizzle实例
 export const db = drizzle(client);
 

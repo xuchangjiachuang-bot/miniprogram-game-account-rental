@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, platformSettings } from '@/lib/db';
+import { getWechatPlatformSettingsCompat, resolveWechatRedirectUri } from '@/lib/wechat-runtime-config';
 
 /**
  * 检查微信配置（调试用）
@@ -7,7 +7,7 @@ import { db, platformSettings } from '@/lib/db';
  */
 export async function GET(request: NextRequest) {
   try {
-    const [setting] = await db.select().from(platformSettings).limit(1);
+    const setting = await getWechatPlatformSettingsCompat();
 
     const config = {
       // 开放平台配置（PC扫码登录）
@@ -17,12 +17,17 @@ export async function GET(request: NextRequest) {
       // 公众号配置（微信浏览器授权）
       wechatMpAppId: setting?.wechatMpAppId || null,
       wechatMpAppSecret: setting?.wechatMpAppSecret ? setting.wechatMpAppSecret.substring(0, 8) + '...' : null,
+      resolvedRedirectUri: resolveWechatRedirectUri(request),
 
       // 环境变量配置（降级用）
       env: {
+        WECHAT_OPEN_APPID: process.env.WECHAT_OPEN_APPID || null,
+        WECHAT_OPEN_APPSECRET: process.env.WECHAT_OPEN_APPSECRET ? process.env.WECHAT_OPEN_APPSECRET.substring(0, 8) + '...' : null,
         WECHAT_MP_APPID: process.env.WECHAT_MP_APPID || null,
         WECHAT_MP_SECRET: process.env.WECHAT_MP_SECRET ? process.env.WECHAT_MP_SECRET.substring(0, 8) + '...' : null,
         NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || null,
+        INTERNAL_API_URL: process.env.INTERNAL_API_URL || null,
+        WECHAT_REDIRECT_URI: process.env.WECHAT_REDIRECT_URI || null,
       }
     };
 
