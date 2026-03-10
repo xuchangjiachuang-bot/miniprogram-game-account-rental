@@ -238,7 +238,7 @@ export default function UserCenterPage() {
       // 获取 token
       const token = getToken();
 
-      const response = await fetch(`/api/notifications/list?limit=50`, {
+      const response = await fetch(`/api/notifications?userId=${user.id}&includeRead=true`, {
         signal: controller.signal,
         headers: token ? {
           'Authorization': `Bearer ${token}`
@@ -248,7 +248,20 @@ export default function UserCenterPage() {
         throw new Error('加载通知失败');
       }
       const data = await response.json();
-      setNotifications(data.notifications || []);
+      const rawNotifications = Array.isArray(data.notifications)
+        ? data.notifications
+        : Array.isArray(data.data)
+          ? data.data
+          : [];
+
+      setNotifications(rawNotifications.map((notification: any) => ({
+        ...notification,
+        user_id: notification.user_id ?? notification.userId,
+        order_id: notification.order_id ?? notification.orderId,
+        is_read: notification.is_read ?? notification.isRead ?? false,
+        created_at: notification.created_at ?? notification.createdAt,
+        read_at: notification.read_at ?? notification.readAt ?? null,
+      })));
     } catch (error) {
       if (isInterruptedRequestError(error, controller)) {
         return;
