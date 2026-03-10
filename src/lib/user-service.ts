@@ -752,9 +752,15 @@ export async function loginUser(params: LoginParams): Promise<LoginResult> {
       createUserBalance(user.id).catch(err => console.error('创建用户余额失败:', err));
     }
 
-    // 生成Token
+    // 以数据库中的手机号用户为准，避免返回临时内存用户导致登录态前后不一致
     saveUsers(mockUsers);
     await syncUserToDatabase(user);
+    const canonicalUser = await getUserByPhone(params.phone);
+    if (canonicalUser) {
+      user = canonicalUser;
+      mockUsers.set(user.id, user);
+      saveUsers(mockUsers);
+    }
     await createUserBalance(user.id);
 
     const token = generateToken();
@@ -920,6 +926,14 @@ export async function wechatBindPhone(
 
       // 创建用户余额记录
       createUserBalance(user.id).catch(err => console.error('创建用户余额失败:', err));
+    }
+
+    // 绑定手机号后同样收口到数据库中的真实用户，保持回调和鉴权一致
+    const canonicalUser = await getUserByPhone(phone);
+    if (canonicalUser) {
+      user = canonicalUser;
+      mockUsers.set(user.id, user);
+      saveUsers(mockUsers);
     }
 
     // 生成Token
