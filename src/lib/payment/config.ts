@@ -2,7 +2,7 @@
  * 支付配置数据库访问函数
  */
 
-import { db, paymentConfigs } from '../db';
+import { db, paymentConfigs, sqlClient } from '../db';
 import { eq, and } from 'drizzle-orm';
 
 export interface PaymentConfig {
@@ -17,21 +17,33 @@ export interface PaymentConfig {
   updatedAt: string;
 }
 
+async function selectPaymentConfigs(whereClause = '', params: Array<string | boolean> = []): Promise<PaymentConfig[]> {
+  const query = `
+    select
+      id,
+      config_type as "configType",
+      config_key as "configKey",
+      config_value as "configValue",
+      is_encrypted as "isEncrypted",
+      description,
+      enabled,
+      created_at as "createdAt",
+      updated_at as "updatedAt"
+    from payment_configs
+    ${whereClause}
+  `;
+
+  return sqlClient.unsafe<PaymentConfig[]>(query, params as any[]);
+}
+
 /**
  * 获取支付配置
  */
 export async function getPaymentConfig(configType: string, configKey: string): Promise<PaymentConfig | null> {
-  const result = await db
-    .select()
-    .from(paymentConfigs)
-    .where(
-      and(
-        eq(paymentConfigs.configType, configType),
-        eq(paymentConfigs.configKey, configKey),
-        eq(paymentConfigs.enabled, true)
-      )
-    )
-    .limit(1);
+  const result = await selectPaymentConfigs(
+    'where config_type = $1 and config_key = $2 and enabled = $3 limit 1',
+    [configType, configKey, true]
+  );
 
   return result[0] || null;
 }
@@ -40,12 +52,7 @@ export async function getPaymentConfig(configType: string, configKey: string): P
  * 获取所有支付配置（按类型）
  */
 export async function getPaymentConfigsByType(configType: string): Promise<PaymentConfig[]> {
-  const results = await db
-    .select()
-    .from(paymentConfigs)
-    .where(eq(paymentConfigs.configType, configType));
-
-  return results;
+  return selectPaymentConfigs('where config_type = $1 order by config_key asc', [configType]);
 }
 
 /**
