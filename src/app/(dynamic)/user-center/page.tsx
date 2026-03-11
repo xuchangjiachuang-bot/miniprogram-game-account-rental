@@ -363,10 +363,34 @@ export default function UserCenterPage() {
 
   // 获取交易类型颜色
   const getTransactionTypeColor = (type: string): string => {
-    if (type === 'withdraw' || type === 'penalty' || type === 'deposit_freeze') {
+    if (type === 'withdraw' || type === 'penalty' || type === 'deposit_freeze' || type === 'listing_deposit_freeze') {
       return 'text-red-500';
     }
     return 'text-green-500';
+  };
+
+  const getTransactionDisplayAmount = (transaction: any): number => {
+    if (transaction.transaction_type === 'deposit_freeze' || transaction.transaction_type === 'listing_deposit_freeze') {
+      return -Math.abs(Number(transaction.amount) || 0);
+    }
+
+    if (transaction.transaction_type === 'deposit_unfreeze' || transaction.transaction_type === 'listing_deposit_unfreeze') {
+      return Math.abs(Number(transaction.amount) || 0);
+    }
+
+    return Number(transaction.amount) || 0;
+  };
+
+  const getTransactionBadgeText = (type: string): string => {
+    if (type === 'listing_deposit_freeze') {
+      return '上架保证金冻结';
+    }
+
+    if (type === 'listing_deposit_unfreeze') {
+      return '上架保证金解冻';
+    }
+
+    return getTransactionTypeText(type);
   };
 
   // 充值
@@ -1233,7 +1257,7 @@ export default function UserCenterPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline">
-                                  {getTransactionTypeText(transaction.transaction_type)}
+                                  {getTransactionBadgeText(transaction.transaction_type)}
                                 </Badge>
                               </div>
                               {transaction.remark && (
@@ -1244,8 +1268,8 @@ export default function UserCenterPage() {
                               </p>
                             </div>
                             <div className={`text-lg font-semibold ${getTransactionTypeColor(transaction.transaction_type)}`}>
-                              {transaction.amount >= 0 ? '+' : ''}
-                              {formatBalance(transaction.amount)}
+                              {getTransactionDisplayAmount(transaction) >= 0 ? '+' : ''}
+                              {formatBalance(getTransactionDisplayAmount(transaction))}
                             </div>
                           </div>
                         ))

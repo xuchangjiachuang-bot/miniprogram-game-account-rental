@@ -613,6 +613,37 @@ async function createUserBalance(userId: string): Promise<void> {
   }
 }
 
+async function getCanonicalUserByPhone(phone: string): Promise<User | null> {
+  try {
+    const dbUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.phone, phone))
+      .limit(1);
+
+    if (dbUsers.length === 0) {
+      return null;
+    }
+
+    const dbUser = dbUsers[0];
+    return {
+      id: dbUser.id,
+      user_no: dbUser.id.substring(0, 8),
+      phone: dbUser.phone,
+      username: dbUser.nickname,
+      avatar: dbUser.avatar || undefined,
+      user_type: dbUser.userType as UserType,
+      isRealNameVerified: dbUser.isVerified || false,
+      realName: dbUser.realName || undefined,
+      created_at: new Date(dbUser.createdAt!),
+      updated_at: new Date(dbUser.updatedAt!)
+    };
+  } catch (error) {
+    console.error('获取数据库标准用户失败:', error);
+    return null;
+  }
+}
+
 /**
  * 注册用户
  * @param params 注册参数
@@ -755,7 +786,7 @@ export async function loginUser(params: LoginParams): Promise<LoginResult> {
     // 以数据库中的手机号用户为准，避免返回临时内存用户导致登录态前后不一致
     saveUsers(mockUsers);
     await syncUserToDatabase(user);
-    const canonicalUser = await getUserByPhone(params.phone);
+    const canonicalUser = await getCanonicalUserByPhone(params.phone);
     if (canonicalUser) {
       user = canonicalUser;
       mockUsers.set(user.id, user);
@@ -929,7 +960,7 @@ export async function wechatBindPhone(
     }
 
     // 绑定手机号后同样收口到数据库中的真实用户，保持回调和鉴权一致
-    const canonicalUser = await getUserByPhone(phone);
+    const canonicalUser = await getCanonicalUserByPhone(phone);
     if (canonicalUser) {
       user = canonicalUser;
       mockUsers.set(user.id, user);
