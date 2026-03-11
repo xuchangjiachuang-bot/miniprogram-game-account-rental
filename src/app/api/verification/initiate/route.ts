@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/server-auth';
-import { getUserById } from '@/lib/user-service';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
 import { createVerificationApplication } from '@/lib/verification-manual-service';
 
-/**
- * 提交实名认证申请（人工审核）
- * POST /api/verification/initiate
- *
- * 请求体：
- * - realName: 真实姓名
- * - idCard: 身份证号
- * - idCardFrontUrl: 身份证正面照片URL
- * - idCardBackUrl: 身份证反面照片URL
- * - verificationService: 认证服务（manual, aliyun, tencent）
- */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getServerUserId(request);
-    if (!userId) {
-      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    const token = getServerToken(request);
+    if (!token) {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
     }
 
-    const user = await getUserById(userId);
+    const user = await verifyToken(token);
     if (!user) {
-      return NextResponse.json({ success: false, error: '用户不存在' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: '登录状态已失效，请重新登录' },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();
@@ -32,7 +24,7 @@ export async function POST(request: NextRequest) {
       idCard,
       idCardFrontUrl,
       idCardBackUrl,
-      verificationService = 'manual'
+      verificationService = 'manual',
     } = body;
 
     if (!realName || !idCard || !idCardFrontUrl || !idCardBackUrl) {
@@ -42,15 +34,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 简单验证姓名和身份证格式
-    if (!realName || realName.length < 2 || realName.length > 20) {
+    if (realName.length < 2 || realName.length > 20) {
       return NextResponse.json(
         { success: false, error: '姓名格式不正确' },
         { status: 400 }
       );
     }
 
-    // 验证身份证格式（18位）
     if (!/^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(idCard)) {
       return NextResponse.json(
         { success: false, error: '身份证号码格式不正确' },
@@ -58,14 +48,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 创建实名认证申请
     const result = await createVerificationApplication({
       userId: user.id,
       realName,
       idCard,
       idCardFrontUrl,
       idCardBackUrl,
-      verificationService
+      verificationService,
     });
 
     if (!result.success) {
@@ -75,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: '实名认证申请已提交，请等待人工审核',
-      data: result.data
+      data: result.data,
     });
   } catch (error: any) {
     console.error('提交实名认证失败:', error);

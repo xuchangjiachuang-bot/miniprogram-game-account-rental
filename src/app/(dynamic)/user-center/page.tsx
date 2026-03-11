@@ -129,6 +129,10 @@ export default function UserCenterPage() {
     idCardFront: '',
     idCardBack: ''
   });
+  const [verificationPreview, setVerificationPreview] = useState({
+    front: '',
+    back: ''
+  });
 
   // 文件上传输入框引用
   const idCardFrontRef = useRef<HTMLInputElement>(null);
@@ -166,6 +170,19 @@ export default function UserCenterPage() {
       ordersAbortRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    const frontPreview = verificationPreview.front;
+    const backPreview = verificationPreview.back;
+
+    return () => {
+      [frontPreview, backPreview].forEach((url) => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [verificationPreview.front, verificationPreview.back]);
 
   // 加载用户资料
   useEffect(() => {
@@ -649,10 +666,14 @@ export default function UserCenterPage() {
       toast.success('上传成功');
 
       // 更新表单
+      const previewUrl = URL.createObjectURL(file);
+
       if (side === 'front') {
         setVerificationForm(prev => ({ ...prev, idCardFront: result.url }));
+        setVerificationPreview(prev => ({ ...prev, front: previewUrl }));
       } else {
         setVerificationForm(prev => ({ ...prev, idCardBack: result.url }));
+        setVerificationPreview(prev => ({ ...prev, back: previewUrl }));
       }
     } catch (error) {
       console.error('上传失败:', error);
@@ -1392,7 +1413,7 @@ export default function UserCenterPage() {
                     </div>
                   ) : verificationForm.idCardFront ? (
                     <img
-                      src={verificationForm.idCardFront}
+                      src={verificationPreview.front || verificationForm.idCardFront}
                       alt="身份证正面"
                       className="w-full h-32 object-contain"
                     />
@@ -1427,7 +1448,7 @@ export default function UserCenterPage() {
                     </div>
                   ) : verificationForm.idCardBack ? (
                     <img
-                      src={verificationForm.idCardBack}
+                      src={verificationPreview.back || verificationForm.idCardBack}
                       alt="身份证反面"
                       className="w-full h-32 object-contain"
                     />
