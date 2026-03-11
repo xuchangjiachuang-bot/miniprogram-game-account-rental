@@ -3,6 +3,16 @@ import { db, admins, platformSettings } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { broadcastConfigUpdate } from '@/lib/sse-broadcaster';
 
+function sanitizePlatformSetting<T extends Record<string, any>>(setting: T) {
+  return {
+    ...setting,
+    wechatMpAppSecret: '',
+    wechatOpenAppSecret: '',
+    wechatToken: '',
+    wechatEncodingAESKey: '',
+  };
+}
+
 /**
  * 获取平台设置
  * GET /api/admin/platform-settings
@@ -43,13 +53,13 @@ export async function GET() {
 
       return NextResponse.json({
         success: true,
-        data: defaultSettings
+        data: sanitizePlatformSetting(defaultSettings)
       });
     }
 
     return NextResponse.json({
       success: true,
-      data: setting
+      data: sanitizePlatformSetting(setting)
     });
   } catch (error: any) {
     console.error('获取平台设置失败:', error);
