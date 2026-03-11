@@ -34,6 +34,15 @@ function getRequestToken(request: NextRequest) {
   return request.cookies.get('auth_token')?.value ?? null;
 }
 
+async function resolveResponseUser(token: string | undefined, fallbackUser: unknown) {
+  if (!token) {
+    return fallbackUser;
+  }
+
+  const resolvedUser = await verifyToken(token);
+  return resolvedUser || fallbackUser;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -62,7 +71,7 @@ export async function POST(request: NextRequest) {
       return buildAuthResponse(result.token, {
         success: result.success,
         message: result.message,
-        user: result.user,
+        user: await resolveResponseUser(result.token, result.user),
         token: result.token,
       });
     }
@@ -81,7 +90,7 @@ export async function POST(request: NextRequest) {
       return buildAuthResponse(result.token, {
         success: result.success,
         message: result.message,
-        user: result.user,
+        user: await resolveResponseUser(result.token, result.user),
         token: result.token,
       });
     }
@@ -99,7 +108,7 @@ export async function POST(request: NextRequest) {
       return buildAuthResponse(result.token, {
         success: result.success,
         message: result.message,
-        user: result.user,
+        user: await resolveResponseUser(result.token, result.user),
         token: result.token,
       });
     }
