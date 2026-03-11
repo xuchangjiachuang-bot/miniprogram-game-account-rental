@@ -74,7 +74,6 @@ export default function Home() {
   const [showAccountDetail, setShowAccountDetail] = useState(false);
   const [skinList, setSkinList] = useState<string[]>([]);
   const [carousels, setCarousels] = useState<any[]>([]);
-  const [configLoaded, setConfigLoaded] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [showWechatBindDialog, setShowWechatBindDialog] = useState(false);
 
@@ -160,7 +159,6 @@ export default function Home() {
       // 2. 异步从服务器加载最新配置
       const res = await fetch('/api/homepage-config', { cache: 'no-store' });
       const result = await res.json();
-      setConfigLoaded(true);
       if (result.success) {
         // 加载皮肤列表
         if (result.data?.skinOptions) {
@@ -413,13 +411,7 @@ export default function Home() {
       <section className="relative overflow-hidden bg-gradient-to-b from-indigo-50 via-purple-50/50 to-white dark:from-indigo-950 dark:via-purple-950/50 dark:to-background py-12">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="container mx-auto px-4 relative">
-          {!configLoaded ? (
-            <div className="max-w-6xl mx-auto">
-              <div className="relative overflow-hidden rounded-xl bg-gray-900/80 aspect-[21/9] md:aspect-[16/9]">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 animate-pulse" />
-              </div>
-            </div>
-          ) : carousels.length > 0 ? (
+          {carousels.length > 0 ? (
             <div className="max-w-6xl mx-auto">
               {/* 轮播图 */}
               <div className="relative overflow-hidden rounded-xl bg-gray-900 aspect-[21/9] md:aspect-[16/9]">
