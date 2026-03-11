@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { accounts, db, orders, users } from '@/lib/db';
-import { unifiedOrder, generateJSAPIPayParams } from '@/lib/wechat/api';
-import { checkWechatPayConfig, getWechatPayConfig } from '@/lib/wechat/config';
+import { checkWechatPayConfig } from '@/lib/wechat/config';
+import { buildJsapiPaymentParams, createJsapiTransaction } from '@/lib/wechat/v3';
 import { yuanToFen } from '@/lib/wechat/utils';
 import { generateOrderNo } from '@/lib/utils/order';
 import {
@@ -15,30 +15,27 @@ export async function POST(request: NextRequest) {
   try {
     const configCheck = await checkWechatPayConfig();
     if (!configCheck.valid) {
-      return NextResponse.json({
-        success: false,
-        error: '微信支付配置不完整',
-        missing: configCheck.missing,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: '微信支付配置不完整',
+          missing: configCheck.missing,
+        },
+        { status: 500 }
+      );
     }
 
     const user = await getAuthenticatedPaymentUser(request);
     if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: '请先登录',
-      }, { status: 401 });
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
     }
 
     const body = await request.json();
-    const accountId = body.accountId as string | undefined;
+    const accountId = typeof body.accountId === 'string' ? body.accountId : '';
     const rentalHours = Number(body.rentalHours || 0);
 
     if (!accountId || rentalHours <= 0) {
-      return NextResponse.json({
-        success: false,
-        error: '缺少必要参数',
-      }, { status: 400 });
+      return NextResponse.json({ success: false, error: '缺少必要参数' }, { status: 400 });
     }
 
     const accountList = await db
@@ -52,18 +49,12 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (accountList.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '账号不存在',
-      }, { status: 404 });
+      return NextResponse.json({ success: false, error: '账号不存在' }, { status: 404 });
     }
 
     const { account } = accountList[0];
     if (account.status !== 'available') {
-      return NextResponse.json({
-        success: false,
-        error: '账号不可用',
-      }, { status: 400 });
+      return NextResponse.json({ success: false, error: '账号不可用' }, { status: 400 });
     }
 
     const dbUserList = await db
@@ -77,10 +68,7 @@ export async function POST(request: NextRequest) {
 
     const dbUser = dbUserList[0];
     if (!dbUser?.wechatOpenid) {
-      return NextResponse.json({
-        success: false,
-        error: '用户未绑定微信 openid',
-      }, { status: 400 });
+      return NextResponse.json({ success: false, error: '用户未绑定微信 openid' }, { status: 400 });
     }
 
     const rentalPrice = Number(account.recommendedRental || 0) * (rentalHours / 24);
@@ -101,21 +89,20 @@ export async function POST(request: NextRequest) {
       paymentMethod: 'wechat',
     }).returning();
 
-    const unifiedOrderResult = await unifiedOrder({
-      openid: dbUser.wechatOpenid,
-      body: `账号租赁 - ${account.title}`,
-      outTradeNo: newOrder.id,
-      totalFee: yuanToFen(totalPrice),
-      spbillCreateIp: getRequestClientIp(request),
+    const payment = await createJsapiTransaction({
+      description: `账号租赁 - ${account.title}`,
+      outTradeNo: newOrder.id.replace(/-/g, ''),
+      totalFeeFen: yuanToFen(totalPrice),
+      payerOpenid: dbUser.wechatOpenid,
       notifyUrl: `${getWechatNotifyBaseUrl(request)}/api/payment/wechat/minip/callback`,
-      tradeType: 'JSAPI',
+      attach: JSON.stringify({
+        kind: 'order',
+        orderId: newOrder.id,
+      }),
+      payerClientIp: getRequestClientIp(request),
     });
 
-    const config = await getWechatPayConfig();
-    const jsapiParams = await generateJSAPIPayParams(
-      unifiedOrderResult.prepayId!,
-      config.apiKey,
-    );
+    const jsapiParams = await buildJsapiPaymentParams(payment.prepay_id);
 
     return NextResponse.json({
       success: true,
@@ -128,9 +115,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[WeChat Pay] 创建小程序支付订单失败:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || '创建小程序支付订单失败',
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || '创建小程序支付订单失败',
+      },
+      { status: 500 }
+    );
   }
 }

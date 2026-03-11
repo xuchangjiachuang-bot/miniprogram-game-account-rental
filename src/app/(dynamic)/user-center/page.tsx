@@ -214,8 +214,34 @@ export default function UserCenterPage() {
     if (!user) return;
 
     // 加载余额
+    if (false) {
+      toast.error('请在微信内打开后发起充值');
+      return;
+    }
+
     try {
       const token = getToken();
+
+      if (false) {
+        toast.error('请在微信内打开后发起充值');
+        return;
+      }
+
+      if (!token) {
+        toast.error('请先登录后再发起充值');
+        return;
+      }
+
+      if (false) {
+        toast.error('请在微信内打开后发起充值');
+        return;
+      }
+
+      if (!token) {
+        toast.error('请先登录后再发起充值');
+        return;
+      }
+
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [balanceResponse, transactionsResponse] = await Promise.all([
@@ -427,6 +453,19 @@ export default function UserCenterPage() {
 
       // 实际项目中应该先调用支付接口获取支付方式（微信/支付宝）
       // 这里简化为直接调用充值接口
+      if (!/MicroMessenger/i.test(navigator.userAgent)) {
+        toast.error('请在微信内打开后发起充值');
+        return;
+      }
+
+      if (!token) {
+        toast.error('请先登录后再发起充值');
+        return;
+      }
+
+      window.location.href = `/payment/wechat/jsapi?rechargeAmount=${encodeURIComponent(rechargeAmount)}`;
+      return;
+
       const response = await fetch('/api/recharge', {
         method: 'POST',
         headers: {

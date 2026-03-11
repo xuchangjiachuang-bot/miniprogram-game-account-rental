@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, CheckCircle, CreditCard, Loader2, RefreshCw, Smartphone, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Loader2, RefreshCw, Smartphone, XCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +15,12 @@ interface OrderInfo {
   status: string;
   accountId: string;
   accountTitle?: string;
-  coinsM?: number;
-  rentalDays?: number;
+}
+
+interface RechargeInfo {
+  id: string;
+  amount: number;
+  status: string;
 }
 
 interface CurrentUserInfo {
@@ -24,16 +28,22 @@ interface CurrentUserInfo {
   wechatOpenid: string | null;
 }
 
+type PaymentMode = 'order' | 'recharge';
+
 function WechatJSAPIPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
+  const rechargeId = searchParams.get('rechargeId');
+  const rechargeAmount = searchParams.get('rechargeAmount');
+  const mode: PaymentMode = orderId ? 'order' : 'recharge';
   const { loaded, loading: sdkLoading, error: sdkError, isWechat, configWechatSDK } = useWechatJSAPI();
 
   const [loading, setLoading] = useState(true);
   const [configuringSdk, setConfiguringSdk] = useState(false);
   const [creatingPayment, setCreatingPayment] = useState(false);
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
+  const [rechargeInfo, setRechargeInfo] = useState<RechargeInfo | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
@@ -41,22 +51,36 @@ function WechatJSAPIPaymentContent() {
   const [polling, setPolling] = useState(false);
 
   useEffect(() => {
-    if (!orderId) {
+    if (mode === 'order' && !orderId) {
       setError('订单号不存在');
       setLoading(false);
       return;
     }
 
+    if (mode === 'recharge' && !rechargeId && !rechargeAmount) {
+      setError('缺少充值参数');
+      setLoading(false);
+      return;
+    }
+
     void loadInitialData();
-  }, [orderId]);
+  }, [mode, orderId, rechargeId, rechargeAmount]);
 
   useEffect(() => {
-    if (!isWechat || !loaded || !orderInfo || paymentStatus !== 'idle') {
+    if (!isWechat || !loaded || paymentStatus !== 'idle') {
+      return;
+    }
+
+    if (mode === 'order' && !orderInfo) {
+      return;
+    }
+
+    if (mode === 'recharge' && !rechargeInfo && !rechargeAmount) {
       return;
     }
 
     void setupWechatSdk();
-  }, [isWechat, loaded, orderInfo, paymentStatus]);
+  }, [isWechat, loaded, paymentStatus, mode, orderInfo, rechargeInfo, rechargeAmount]);
 
   useEffect(() => {
     if (paymentStatus !== 'success' || !polling) {
@@ -64,11 +88,11 @@ function WechatJSAPIPaymentContent() {
     }
 
     const interval = window.setInterval(() => {
-      void checkOrderStatus();
+      void checkPaymentStatus();
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [paymentStatus, polling]);
+  }, [paymentStatus, polling, mode, orderId, rechargeId]);
 
   async function loadInitialData() {
     try {
@@ -86,53 +110,68 @@ function WechatJSAPIPaymentContent() {
         'Content-Type': 'application/json',
       };
 
-      const [orderResponse, userResponse] = await Promise.all([
-        fetch(`/api/orders/${orderId}`, { headers: authHeaders, cache: 'no-store' }),
-        fetch('/api/auth/me', { headers: authHeaders, cache: 'no-store' }),
-      ]);
-
-      const orderResult = await orderResponse.json();
+      const userResponse = await fetch('/api/auth/me', { headers: authHeaders, cache: 'no-store' });
       const userResult = await userResponse.json();
-
-      if (!orderResult.success) {
-        setError(orderResult.error || '加载订单失败');
-        return;
-      }
-
       if (!userResult.success) {
         setError(userResult.error || '加载用户信息失败');
         return;
       }
-
-      const order = orderResult.data;
-      const accountResponse = await fetch(`/api/accounts/${order.accountId}`, {
-        headers: authHeaders,
-        cache: 'no-store',
-      });
-      const accountResult = await accountResponse.json();
 
       setCurrentUser({
         id: userResult.data.id,
         wechatOpenid: userResult.data.wechatOpenid,
       });
 
-      if (order.status === 'paid') {
-        setPaymentStatus('success');
-        setPolling(true);
-      } else if (order.status === 'completed') {
-        router.push(`/orders/${orderId}`);
-        return;
+      if (mode === 'order' && orderId) {
+        const orderResponse = await fetch(`/api/orders/${orderId}`, { headers: authHeaders, cache: 'no-store' });
+        const orderResult = await orderResponse.json();
+
+        if (!orderResult.success) {
+          setError(orderResult.error || '加载订单失败');
+          return;
+        }
+
+        const order = orderResult.data;
+        setOrderInfo({
+          id: order.id,
+          totalPrice: Number(order.totalPrice || 0),
+          status: order.status,
+          accountId: order.accountId,
+        });
+
+        if (order.status === 'paid' || order.status === 'completed') {
+          setPaymentStatus('success');
+          setPolling(true);
+        }
       }
 
-      setOrderInfo({
-        id: order.id,
-        totalPrice: Number(order.totalPrice || 0),
-        status: order.status,
-        accountId: order.accountId,
-        accountTitle: accountResult.data?.title,
-        coinsM: accountResult.data?.coinsM,
-        rentalDays: order.rentalDays,
-      });
+      if (mode === 'recharge') {
+        if (rechargeId) {
+          const rechargeResponse = await fetch(`/api/payment/recharge/${rechargeId}`, {
+            headers: authHeaders,
+            cache: 'no-store',
+          });
+          const rechargeResult = await rechargeResponse.json();
+
+          if (!rechargeResult.success) {
+            setError(rechargeResult.error || '加载充值单失败');
+            return;
+          }
+
+          setRechargeInfo(rechargeResult.data);
+
+          if (rechargeResult.data.status === 'success') {
+            setPaymentStatus('success');
+            setPolling(true);
+          }
+        } else if (rechargeAmount) {
+          setRechargeInfo({
+            id: '',
+            amount: Number(rechargeAmount || 0),
+            status: 'draft',
+          });
+        }
+      }
     } catch (requestError: any) {
       setError(requestError.message || '加载支付页面失败');
     } finally {
@@ -159,21 +198,40 @@ function WechatJSAPIPaymentContent() {
     }
   }
 
-  async function checkOrderStatus() {
+  async function checkPaymentStatus() {
     try {
       const token = getToken();
-      const response = await fetch(`/api/orders/${orderId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        cache: 'no-store',
-      });
-      const result = await response.json();
+      if (!token) {
+        return;
+      }
 
-      if (result.success && (result.data.status === 'paid' || result.data.status === 'completed')) {
-        setPolling(false);
-        router.push(`/orders/${orderId}`);
+      if (mode === 'order' && orderId) {
+        const response = await fetch(`/api/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        const result = await response.json();
+
+        if (result.success && (result.data.status === 'paid' || result.data.status === 'completed')) {
+          setPolling(false);
+          router.push(`/orders/${orderId}`);
+        }
+      }
+
+      if (mode === 'recharge' && rechargeId) {
+        const response = await fetch(`/api/payment/recharge/${rechargeId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        const result = await response.json();
+
+        if (result.success && result.data.status === 'success') {
+          setPolling(false);
+          router.push('/user-center');
+        }
       }
     } catch (statusError) {
-      console.error('检查订单状态失败:', statusError);
+      console.error('检查支付状态失败:', statusError);
     }
   }
 
@@ -186,7 +244,7 @@ function WechatJSAPIPaymentContent() {
       }
 
       if (!currentUser?.wechatOpenid) {
-        setError('当前账号未绑定微信 openid，暂时无法发起公众号支付');
+        setError('当前账号未绑定微信 openid，无法发起微信支付');
         return;
       }
 
@@ -198,22 +256,41 @@ function WechatJSAPIPaymentContent() {
       setCreatingPayment(true);
       setError(null);
 
-      const createResponse = await fetch('/api/payment/wechat/jsapi/create', {
+      const endpoint = mode === 'order'
+        ? '/api/payment/wechat/jsapi/create'
+        : '/api/payment/wechat/jsapi/recharge/create';
+      const payload = mode === 'order'
+        ? {
+            orderId,
+            openid: currentUser.wechatOpenid,
+          }
+        : {
+            amount: Number(rechargeInfo?.amount || rechargeAmount || 0),
+            openid: currentUser.wechatOpenid,
+          };
+
+      const createResponse = await fetch(endpoint, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          orderId,
-          openid: currentUser.wechatOpenid,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const createResult = await createResponse.json();
       if (!createResult.success) {
         setError(createResult.error || '创建支付失败');
         return;
+      }
+
+      if (mode === 'recharge' && createResult.data.rechargeId) {
+        setRechargeInfo((current) => ({
+          id: createResult.data.rechargeId,
+          amount: Number(createResult.data.amount || current?.amount || 0),
+          status: 'pending',
+        }));
+        window.history.replaceState({}, '', `/payment/wechat/jsapi?rechargeId=${createResult.data.rechargeId}`);
       }
 
       const paymentParams = createResult.data;
@@ -251,6 +328,11 @@ function WechatJSAPIPaymentContent() {
     }
   }
 
+  const title = mode === 'order' ? '微信订单支付' : '微信钱包充值';
+  const amount = mode === 'order'
+    ? Number(orderInfo?.totalPrice || 0)
+    : Number(rechargeInfo?.amount || rechargeAmount || 0);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -264,7 +346,7 @@ function WechatJSAPIPaymentContent() {
     );
   }
 
-  if (error && !orderInfo) {
+  if (error && !orderInfo && !rechargeInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <Card className="w-full max-w-md">
@@ -285,16 +367,16 @@ function WechatJSAPIPaymentContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-12 px-4">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-md mx-auto space-y-6">
         {paymentStatus === 'success' && (
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
                 <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">支付请求已提交</h2>
-                <p className="text-slate-600 mb-6">正在确认订单状态，稍后会自动跳转到订单详情。</p>
-                <Button onClick={() => router.push(`/orders/${orderId}`)} className="w-full">
-                  查看订单
+                <p className="text-slate-600 mb-6">正在确认支付状态，稍后会自动跳转。</p>
+                <Button onClick={() => router.push(mode === 'order' && orderId ? `/orders/${orderId}` : '/user-center')} className="w-full">
+                  {mode === 'order' ? '查看订单' : '返回钱包'}
                 </Button>
               </div>
             </CardContent>
@@ -325,105 +407,60 @@ function WechatJSAPIPaymentContent() {
           </Card>
         )}
 
-        {paymentStatus === 'idle' && orderInfo && (
-          <>
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Smartphone className="w-5 h-5" />
-                  微信支付
-                </CardTitle>
-                <CardDescription>请在微信内完成本次订单支付</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-slate-50 rounded-lg p-4">
-                  <div className="text-sm text-slate-600 mb-2">订单信息</div>
-                  <div className="font-bold text-slate-900 mb-1">
-                    {orderInfo.accountTitle || '数字资产托管服务'}
-                  </div>
-                  <div className="text-sm text-slate-600">
-                    {orderInfo.coinsM ?? '--'}M · {orderInfo.rentalDays ?? '--'} 天
-                  </div>
-                </div>
-
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">订单号</span>
-                  <span className="text-slate-900 font-mono">{orderInfo.id.slice(0, 16)}...</span>
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-900">支付金额</span>
-                    <span className="text-2xl font-bold text-red-600">¥{orderInfo.totalPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {!isWechat && (
-              <Alert className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>当前不是微信内置浏览器</AlertTitle>
-                <AlertDescription>JSAPI 支付只能在微信内打开当前页面后发起。</AlertDescription>
-              </Alert>
-            )}
-
-            {currentUser && !currentUser.wechatOpenid && (
-              <Alert className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>当前账号未绑定微信</AlertTitle>
-                <AlertDescription>请先用微信授权登录同一账号，或在测试域名环境中完成公众号授权后再发起支付。</AlertDescription>
-              </Alert>
-            )}
-
-            {(sdkError || configuringSdk || sdkLoading) && isWechat && (
-              <Alert className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>微信支付环境</AlertTitle>
-                <AlertDescription>
-                  {sdkError || (configuringSdk ? '正在初始化微信支付环境...' : '正在加载微信 SDK...')}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>支付提示</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Alert className="mb-6">
-              <CreditCard className="h-4 w-4" />
-              <AlertTitle>联调说明</AlertTitle>
-              <AlertDescription>
-                当前页面已经接到真实支付创建接口。正式联调时，需要在微信内用已绑定 openid 的账号打开，并保证测试域名已完成公众号支付配置。
-              </AlertDescription>
-            </Alert>
-
-            <Button
-              onClick={() => void handlePayment()}
-              disabled={creatingPayment || paying || !isWechat || !currentUser?.wechatOpenid || configuringSdk || sdkLoading}
-              className="w-full h-12 text-lg"
-              size="lg"
-            >
-              {creatingPayment || paying ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  正在发起支付...
-                </>
-              ) : (
-                '立即支付'
+        {paymentStatus === 'idle' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{title}</CardTitle>
+              <CardDescription>请在微信内完成支付确认</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!isWechat && (
+                <Alert>
+                  <Smartphone className="h-4 w-4" />
+                  <AlertTitle>请在微信内打开</AlertTitle>
+                  <AlertDescription>JSAPI 支付只能在微信内打开当前页面后发起。</AlertDescription>
+                </Alert>
               )}
-            </Button>
 
-            <div className="mt-4">
-              <Button variant="outline" onClick={() => router.back()} className="w-full">
-                返回
+              {currentUser && !currentUser.wechatOpenid && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>缺少微信身份</AlertTitle>
+                  <AlertDescription>当前账号未绑定微信 openid，无法发起微信支付。</AlertDescription>
+                </Alert>
+              )}
+
+              {(sdkError || configuringSdk || sdkLoading) && isWechat && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertTitle>正在准备支付环境</AlertTitle>
+                  <AlertDescription>{sdkError || '正在初始化微信支付环境...'}</AlertDescription>
+                </Alert>
+              )}
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>支付提示</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm text-slate-500 mb-2">{mode === 'order' ? '订单金额' : '充值金额'}</div>
+                <div className="text-3xl font-bold text-slate-900">¥{amount.toFixed(2)}</div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handlePayment}
+                disabled={creatingPayment || paying || !isWechat || !currentUser?.wechatOpenid || configuringSdk || sdkLoading}
+              >
+                {(creatingPayment || paying) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                立即微信支付
               </Button>
-            </div>
-          </>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
@@ -432,18 +469,7 @@ function WechatJSAPIPaymentContent() {
 
 export default function WechatJSAPIPaymentPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6 flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-              <p className="text-slate-600">正在加载支付页面...</p>
-            </CardContent>
-          </Card>
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <WechatJSAPIPaymentContent />
     </Suspense>
   );

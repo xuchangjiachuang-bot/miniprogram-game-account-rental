@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { and, eq, sql } from 'drizzle-orm';
-import { accounts, db, orders, paymentRecords } from '@/lib/db';
+import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
 import { fenToYuan } from '@/lib/wechat/utils';
@@ -87,7 +87,7 @@ export async function markWechatOrderPaid(params: {
         type: 'payment',
         method: 'wechat',
         transactionId: transactionId || order.transactionId || '',
-        thirdPartyOrderId: order.id,
+        thirdPartyOrderId: order.id.replace(/-/g, ''),
         status: 'success',
         createdAt: now,
         updatedAt: now,
@@ -107,5 +107,90 @@ export async function markWechatOrderPaid(params: {
       ));
 
     return { order, alreadyPaid: false };
+  });
+}
+
+export async function markWechatWalletRechargePaid(params: {
+  outTradeNo: string;
+  transactionId?: string | null;
+  totalFeeFen?: number | null;
+}) {
+  const { outTradeNo, transactionId, totalFeeFen } = params;
+  const now = new Date().toISOString();
+
+  return db.transaction(async (tx) => {
+    const paymentRecordList = await tx
+      .select()
+      .from(paymentRecords)
+      .where(and(
+        eq(paymentRecords.thirdPartyOrderId, outTradeNo),
+        eq(paymentRecords.type, 'recharge'),
+        eq(paymentRecords.method, 'wechat'),
+      ))
+      .limit(1);
+
+    if (paymentRecordList.length === 0) {
+      throw new Error('RECHARGE_RECORD_NOT_FOUND');
+    }
+
+    const paymentRecord = paymentRecordList[0];
+    if (paymentRecord.status === 'success') {
+      return { paymentRecord, alreadyPaid: true };
+    }
+
+    const expectedAmount = Number(paymentRecord.amount || 0);
+    if (typeof totalFeeFen === 'number') {
+      const actualAmount = Number(fenToYuan(totalFeeFen));
+      if (Math.abs(expectedAmount - actualAmount) > 0.01) {
+        throw new Error('PAYMENT_AMOUNT_MISMATCH');
+      }
+    }
+
+    const balanceList = await tx
+      .select()
+      .from(userBalances)
+      .where(eq(userBalances.userId, paymentRecord.userId))
+      .limit(1);
+
+    if (balanceList.length === 0) {
+      throw new Error('USER_BALANCE_NOT_FOUND');
+    }
+
+    const balance = balanceList[0];
+    const oldBalance = Number(balance.availableBalance) || 0;
+    const amount = Number(paymentRecord.amount) || 0;
+    const newBalance = oldBalance + amount;
+    const oldEarned = Number(balance.totalEarned) || 0;
+
+    await tx
+      .update(userBalances)
+      .set({
+        availableBalance: newBalance.toFixed(2),
+        totalEarned: (oldEarned + amount).toFixed(2),
+        updatedAt: now,
+      })
+      .where(eq(userBalances.userId, paymentRecord.userId));
+
+    await tx.insert(balanceTransactions).values({
+      id: crypto.randomUUID(),
+      userId: paymentRecord.userId,
+      transactionType: 'deposit',
+      amount: amount.toFixed(2),
+      balanceBefore: oldBalance.toFixed(2),
+      balanceAfter: newBalance.toFixed(2),
+      description: `微信充值 ${amount.toFixed(2)} 元`,
+      createdAt: now,
+    });
+
+    await tx
+      .update(paymentRecords)
+      .set({
+        status: 'success',
+        transactionId: transactionId || paymentRecord.transactionId || '',
+        updatedAt: now,
+      })
+      .where(eq(paymentRecords.id, paymentRecord.id));
+
+    return { paymentRecord, alreadyPaid: false };
   });
 }
