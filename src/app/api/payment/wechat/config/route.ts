@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkWechatPayConfig, getWechatPayConfigStatus } from '@/lib/wechat/config';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * 获取微信支付配置状态
  * GET /api/payment/wechat/config

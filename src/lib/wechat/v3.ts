@@ -88,6 +88,10 @@ let platformCertificateCache:
   | { cert: WechatPlatformCertificate; cachedAt: number }
   | null = null;
 
+function getRuntimeEnv(key: string) {
+  return process.env[key];
+}
+
 function normalizeMultilineSecret(value: string) {
   return value.replace(/\r/g, '').replace(/\\n/g, '\n').trim();
 }
@@ -120,37 +124,37 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     transferSceneInfoContent,
   ] = await Promise.all([
     getConfiguredValue([
-      process.env.WECHAT_PAY_MCHID,
+      getRuntimeEnv('WECHAT_PAY_MCHID'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_APPID,
+      getRuntimeEnv('WECHAT_PAY_APPID'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_MP_APPID,
+      getRuntimeEnv('WECHAT_MP_APPID'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_MP_SECRET,
+      getRuntimeEnv('WECHAT_MP_SECRET'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_NOTIFY_URL,
+      getRuntimeEnv('WECHAT_PAY_NOTIFY_URL'),
     ], 'https://hfb.yugioh.top/api/payment/wechat/jsapi/callback'),
     getConfiguredValue([
-      process.env.WECHAT_PAY_API_V3_KEY,
+      getRuntimeEnv('WECHAT_PAY_API_V3_KEY'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_SERIAL_NO,
+      getRuntimeEnv('WECHAT_PAY_SERIAL_NO'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_PRIVATE_KEY,
+      getRuntimeEnv('WECHAT_PAY_PRIVATE_KEY'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_TRANSFER_SCENE_ID,
+      getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_ID'),
     ]),
     getConfiguredValue([
-      process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE,
+      getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE'),
     ], '活动名称'),
     getConfiguredValue([
-      process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT,
+      getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT'),
     ], '平台提现'),
   ]);
 
