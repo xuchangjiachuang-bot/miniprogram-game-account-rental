@@ -347,6 +347,25 @@ export async function generateFileUrl(
   }
 }
 
+export async function resolveStoredFileReference(
+  reference: string | null | undefined,
+  expireTime: number = 86400
+): Promise<string | null> {
+  if (!reference) {
+    return null;
+  }
+
+  if (
+    reference.startsWith('http://') ||
+    reference.startsWith('https://') ||
+    reference.startsWith('/')
+  ) {
+    return reference;
+  }
+
+  return generateFileUrl(reference, expireTime);
+}
+
 export async function listFiles(
   prefix: string,
   maxKeys: number = 100

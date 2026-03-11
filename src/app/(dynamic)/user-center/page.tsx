@@ -129,6 +129,10 @@ export default function UserCenterPage() {
     idCardFront: '',
     idCardBack: ''
   });
+  const [verificationKeys, setVerificationKeys] = useState({
+    front: '',
+    back: ''
+  });
   const [verificationPreview, setVerificationPreview] = useState({
     front: '',
     back: ''
@@ -670,9 +674,11 @@ export default function UserCenterPage() {
 
       if (side === 'front') {
         setVerificationForm(prev => ({ ...prev, idCardFront: result.url }));
+        setVerificationKeys(prev => ({ ...prev, front: result.key || '' }));
         setVerificationPreview(prev => ({ ...prev, front: previewUrl }));
       } else {
         setVerificationForm(prev => ({ ...prev, idCardBack: result.url }));
+        setVerificationKeys(prev => ({ ...prev, back: result.key || '' }));
         setVerificationPreview(prev => ({ ...prev, back: previewUrl }));
       }
     } catch (error) {
@@ -715,8 +721,8 @@ export default function UserCenterPage() {
         body: JSON.stringify({
           realName: verificationForm.realName,
           idCard: verificationForm.idCard,
-          idCardFrontUrl: verificationForm.idCardFront,
-          idCardBackUrl: verificationForm.idCardBack,
+          idCardFrontUrl: verificationKeys.front || verificationForm.idCardFront,
+          idCardBackUrl: verificationKeys.back || verificationForm.idCardBack,
           verificationService: 'manual'
         })
       });

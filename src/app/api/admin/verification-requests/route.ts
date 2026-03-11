@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, admins, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { getPendingVerificationApplications, reviewVerificationApplication } from '@/lib/verification-manual-service';
+import { resolveStoredFileReference } from '@/lib/storage-service';
 
 /**
  * 获取待审核的实名认证申请列表
@@ -60,8 +61,15 @@ export async function GET(request: NextRequest) {
           .where(eq(users.id, app.userId))
           .limit(1);
         const appUser = appUserList[0];
+        const [frontUrl, backUrl] = await Promise.all([
+          resolveStoredFileReference(app.idCardFrontUrl, 30 * 24 * 3600),
+          resolveStoredFileReference(app.idCardBackUrl, 30 * 24 * 3600),
+        ]);
+
         return {
           ...app,
+          idCardFrontUrl: frontUrl || '',
+          idCardBackUrl: backUrl || '',
           userPhone: appUser?.phone || '',
           userName: appUser?.nickname || ''
         };
