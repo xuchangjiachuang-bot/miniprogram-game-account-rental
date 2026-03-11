@@ -240,9 +240,9 @@ export function AdminHeader({
                   )}
                   <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>平台设置</span>
+                    <span>配置中心</span>
                   </DropdownMenuItem>
-                  {showWechatConfig && (
+                  {false && showWechatConfig && (
                     <Dialog open={wechatConfigOpen} onOpenChange={handleWechatConfigOpen}>
                       <DialogTrigger asChild>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -363,7 +363,7 @@ export function AdminHeader({
                       </DialogContent>
                     </Dialog>
                   )}
-                  {showWechatStatus && (
+                  {false && showWechatStatus && (
                     <DropdownMenuItem onClick={() => router.push('/admin/wechat-status')}>
                       <Shield className="mr-2 h-4 w-4" />
                       <span>微信配置状态</span>

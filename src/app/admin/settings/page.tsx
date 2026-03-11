@@ -394,7 +394,7 @@ export default function AdminSettingsPage() {
                 <div className="space-y-2"><Label>服务器地址</Label><div className="flex gap-2"><Input value={serverVerifyUrl} readOnly /><Button variant="outline" size="icon" onClick={() => copyText(serverVerifyUrl, '服务器地址')}><Copy className="h-4 w-4" /></Button></div></div>
                 <div className="space-y-2"><Label>Token</Label><Input value={settings.wechatToken} onChange={(e) => setSettings((prev) => ({ ...prev, wechatToken: e.target.value }))} placeholder="3-32 位自定义字符串" /></div>
                 <div className="space-y-2"><Label>EncodingAESKey</Label><div className="flex gap-2"><Input value={settings.wechatEncodingAESKey} onChange={(e) => setSettings((prev) => ({ ...prev, wechatEncodingAESKey: e.target.value }))} placeholder="43 位随机字符串" /><Button variant="outline" onClick={() => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; let text = ''; for (let i = 0; i < 43; i += 1) text += chars[Math.floor(Math.random() * chars.length)]; setSettings((prev) => ({ ...prev, wechatEncodingAESKey: text })); }}>生成</Button></div></div>
-                <div className="flex flex-wrap gap-2"><Link href="/admin/wechat/verify-file"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />域名校验文件</Button></Link><Link href="/admin/wechat-status"><Button variant="outline"><Shield className="mr-2 h-4 w-4" />查看微信状态</Button></Link></div>
+                <div className="flex flex-wrap gap-2"><Link href="/admin/wechat/verify-file"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />域名校验文件</Button></Link><Link href="/admin/wechat-debug"><Button variant="outline"><Shield className="mr-2 h-4 w-4" />微信登录调试</Button></Link></div>
               </CardContent>
             </Card>
           </div>
@@ -453,7 +453,8 @@ export default function AdminSettingsPage() {
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Link href="/admin/payments"><Button variant="outline">旧支付配置页</Button></Link>
+                  <Link href="/admin/payment/wechat"><Button variant="outline">支付概览</Button></Link>
+                  <Link href="/admin/payments"><Button variant="outline">支付管理</Button></Link>
                   <Link href="/admin/payment/wechat/check"><Button variant="outline">深度检查</Button></Link>
                   <a href="https://railway.com" target="_blank" rel="noreferrer"><Button variant="outline"><ExternalLink className="mr-2 h-4 w-4" />打开 Railway</Button></a>
                 </div>

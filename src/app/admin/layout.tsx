@@ -109,7 +109,7 @@ const defaultMenuItems = [
   },
   {
     id: 'settings',
-    title: '平台配置',
+    title: '配置中心',
     href: '/admin/settings',
     icon: Settings
   }
@@ -651,6 +651,11 @@ export default function AdminLayout({
                         <Key className="mr-2 h-4 w-4" />
                         <span>修改账户信息</span>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>配置中心</span>
+                      </DropdownMenuItem>
+                      {false && (
                       <Dialog open={wechatConfigOpen} onOpenChange={handleWechatConfigOpen}>
                         <DialogTrigger asChild>
                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -767,6 +772,7 @@ export default function AdminLayout({
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                         <LogOut className="mr-2 h-4 w-4" />
