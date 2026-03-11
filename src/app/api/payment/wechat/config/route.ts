@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkWechatPayConfig, getWechatPayConfigStatus } from '@/lib/wechat/config';
+import { getWechatPayV3Config } from '@/lib/wechat/v3';
 
 export const dynamic = 'force-dynamic';
+
+function maskValue(value: string) {
+  if (!value) return '';
+  if (value.length <= 8) return `${value.slice(0, 2)}***`;
+  return `${value.slice(0, 6)}***${value.slice(-2)}`;
+}
 
 /**
  * 获取微信支付配置状态
@@ -9,11 +16,27 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   try {
-    const status = await getWechatPayConfigStatus();
+    const [status, runtimeConfig] = await Promise.all([
+      getWechatPayConfigStatus(),
+      getWechatPayV3Config(),
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: status,
+      data: {
+        ...status,
+        diagnostics: {
+          runtimeReadAt: new Date().toISOString(),
+          mode: 'runtime-env',
+          appIdMask: maskValue(runtimeConfig.appid),
+          mchIdMask: maskValue(runtimeConfig.mchid),
+          notifyUrlMask: runtimeConfig.notifyUrl || '',
+          apiV3KeyLength: runtimeConfig.apiV3Key?.length || 0,
+          serialNoLength: runtimeConfig.serialNo?.length || 0,
+          privateKeyLength: runtimeConfig.privateKey?.length || 0,
+          transferSceneIdMask: maskValue(runtimeConfig.transferSceneId),
+        },
+      },
     });
   } catch (error: any) {
     console.error('[payment/wechat/config] Failed to read config status:', error);
