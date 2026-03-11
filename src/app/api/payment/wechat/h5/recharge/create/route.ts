@@ -30,33 +30,25 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const amount = Number(body.amount || 0);
-    const openid = typeof body.openid === 'string' ? body.openid : user.wechat_openid;
 
     const paymentData = await createWechatRechargePayment({
       request,
       user,
       amount,
-      channel: 'jsapi',
-      openid,
+      channel: 'h5',
     });
 
-    return NextResponse.json({
-      success: true,
-      data: paymentData,
-    });
+    return NextResponse.json({ success: true, data: paymentData });
   } catch (error: any) {
     if (error.message === 'INVALID_RECHARGE_AMOUNT') {
       return NextResponse.json({ success: false, error: '充值金额必须大于 0' }, { status: 400 });
     }
-    if (error.message === 'MISSING_OPENID') {
-      return NextResponse.json({ success: false, error: '当前账号未绑定微信 openid' }, { status: 400 });
-    }
 
-    console.error('[WeChat Pay] 创建钱包充值订单失败:', error);
+    console.error('[WeChat Pay] 创建 H5 充值订单失败:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '创建钱包充值订单失败',
+        error: error.message || '创建 H5 充值订单失败',
       },
       { status: 500 }
     );

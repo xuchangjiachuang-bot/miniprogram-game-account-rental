@@ -17,6 +17,7 @@ import { useUser } from '@/contexts/UserContext';
 import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
 import { getToken } from '@/lib/auth-token';
+import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
 
 interface GroupChat {
   id: string;
@@ -451,45 +452,18 @@ export default function UserCenterPage() {
       // 获取 token
       const token = getToken();
 
-      // 实际项目中应该先调用支付接口获取支付方式（微信/支付宝）
-      // 这里简化为直接调用充值接口
-      if (!/MicroMessenger/i.test(navigator.userAgent)) {
-        toast.error('请在微信内打开后发起充值');
-        return;
-      }
-
       if (!token) {
         toast.error('请先登录后再发起充值');
         return;
       }
 
-      window.location.href = `/payment/wechat/jsapi?rechargeAmount=${encodeURIComponent(rechargeAmount)}`;
-      return;
-
-      const response = await fetch('/api/recharge', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          amount: parseFloat(rechargeAmount),
-          payment_method: '支付宝' // 默认使用支付宝
-        })
+      window.location.href = buildWechatPaymentHrefForCurrentEnv({
+        rechargeAmount,
       });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`充值 ¥${rechargeAmount} 成功！`);
-        setRechargeAmount('');
-        loadWalletData();
-      } else {
-        toast.error(result.error || '充值失败');
-      }
+      return;
     } catch (error) {
       console.error('充值失败:', error);
-      toast.error('充值失败，请重试');
+      toast.error('充值跳转失败，请重试');
     }
   };
 

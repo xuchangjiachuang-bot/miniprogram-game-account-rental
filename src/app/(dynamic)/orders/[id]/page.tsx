@@ -12,6 +12,7 @@ import { Shield, Clock, ArrowLeft, ArrowRight, Calendar, Package, CheckCircle, A
 import Link from 'next/link';
 import { useState, useEffect, use } from 'react';
 import { toast } from 'sonner';
+import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -70,6 +71,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     } catch (error) {
       toast.error('复制失败');
     }
+  };
+
+  const handlePayNow = () => {
+    window.location.href = buildWechatPaymentHrefForCurrentEnv({
+      orderId: order.id,
+    });
   };
 
   // 归还账号
@@ -601,11 +608,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <CardContent className="space-y-2">
                 {order.status === 'pending' && (
                   <>
-                    <Link href={`/payment/wechat/jsapi?orderId=${order.id}`}>
-                      <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                        去支付
-                      </Button>
-                    </Link>
+                    <Button
+                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                      onClick={handlePayNow}
+                    >
+                      去支付
+                    </Button>
                     <Button
                       variant="outline"
                       className="w-full"

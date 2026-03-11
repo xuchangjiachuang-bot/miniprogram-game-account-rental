@@ -33,6 +33,28 @@ export interface CreateJsapiTransactionParams {
   payerClientIp?: string;
 }
 
+export interface CreateH5TransactionParams {
+  appid?: string;
+  description: string;
+  outTradeNo: string;
+  totalFeeFen: number;
+  notifyUrl?: string;
+  attach?: string;
+  payerClientIp?: string;
+  h5Type?: 'Wap' | 'iOS' | 'Android';
+  appName?: string;
+  appUrl?: string;
+}
+
+export interface CreateNativeTransactionParams {
+  appid?: string;
+  description: string;
+  outTradeNo: string;
+  totalFeeFen: number;
+  notifyUrl?: string;
+  attach?: string;
+}
+
 export interface CreateTransferBillParams {
   appid?: string;
   outBillNo: string;
@@ -368,6 +390,54 @@ export async function createJsapiTransaction(params: CreateJsapiTransactionParam
       },
       scene_info: {
         payer_client_ip: params.payerClientIp || '127.0.0.1',
+      },
+    },
+  });
+}
+
+export async function createH5Transaction(params: CreateH5TransactionParams) {
+  const config = await getWechatPayV3Config();
+  return sendWechatPayRequest<{
+    h5_url: string;
+  }>('POST', '/v3/pay/transactions/h5', {
+    body: {
+      appid: params.appid || config.appid,
+      mchid: config.mchid,
+      description: params.description,
+      out_trade_no: params.outTradeNo,
+      notify_url: params.notifyUrl || config.notifyUrl,
+      attach: params.attach,
+      amount: {
+        total: params.totalFeeFen,
+        currency: 'CNY',
+      },
+      scene_info: {
+        payer_client_ip: params.payerClientIp || '127.0.0.1',
+        h5_info: {
+          type: params.h5Type || 'Wap',
+          app_name: params.appName || 'YuGiOh',
+          app_url: params.appUrl || 'https://hfb.yugioh.top',
+        },
+      },
+    },
+  });
+}
+
+export async function createNativeTransaction(params: CreateNativeTransactionParams) {
+  const config = await getWechatPayV3Config();
+  return sendWechatPayRequest<{
+    code_url: string;
+  }>('POST', '/v3/pay/transactions/native', {
+    body: {
+      appid: params.appid || config.appid,
+      mchid: config.mchid,
+      description: params.description,
+      out_trade_no: params.outTradeNo,
+      notify_url: params.notifyUrl || config.notifyUrl,
+      attach: params.attach,
+      amount: {
+        total: params.totalFeeFen,
+        currency: 'CNY',
       },
     },
   });

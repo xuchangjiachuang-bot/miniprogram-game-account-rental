@@ -24,36 +24,22 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const orderId = typeof body.orderId === 'string' ? body.orderId : '';
-    const openid = typeof body.openid === 'string' ? body.openid : user.wechat_openid;
 
     if (!orderId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '缺少必要参数: orderId',
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: '缺少必要参数: orderId' }, { status: 400 });
     }
 
     const paymentData = await createWechatOrderPayment({
       request,
       user,
       orderId,
-      channel: 'jsapi',
-      openid,
+      channel: 'native',
     });
 
-    return NextResponse.json({
-      success: true,
-      data: paymentData,
-    });
+    return NextResponse.json({ success: true, data: paymentData });
   } catch (error: any) {
     if (error.message === 'ORDER_NOT_FOUND') {
       return NextResponse.json({ success: false, error: '订单不存在或无权限' }, { status: 404 });
-    }
-    if (error.message === 'MISSING_OPENID') {
-      return NextResponse.json({ success: false, error: '当前账号未绑定微信 openid，无法发起微信支付' }, { status: 400 });
     }
     if (error.message === 'ORDER_ALREADY_PAID') {
       return NextResponse.json({ success: false, error: '订单已支付' }, { status: 400 });
@@ -62,11 +48,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '订单已取消' }, { status: 400 });
     }
 
-    console.error('[WeChat Pay] 创建 JSAPI 支付订单失败:', error);
+    console.error('[WeChat Pay] 创建 Native 支付订单失败:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '创建 JSAPI 支付订单失败',
+        error: error.message || '创建 Native 支付订单失败',
       },
       { status: 500 }
     );
