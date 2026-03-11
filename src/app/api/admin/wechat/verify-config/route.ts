@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       checks.wechatEncodingAESKey.length === 43;
 
     const environmentConfig = {
-      wechatAppId: !!process.env.WECHAT_APPID,
-      wechatAppSecret: !!process.env.WECHAT_APPSECRET,
+      wechatMpAppId: !!process.env.WECHAT_MP_APPID,
+      wechatMpAppSecret: !!process.env.WECHAT_MP_SECRET,
       wechatOpenAppId: !!process.env.WECHAT_OPEN_APPID,
       wechatOpenAppSecret: !!process.env.WECHAT_OPEN_APPSECRET,
       wechatToken: !!process.env.WECHAT_TOKEN,

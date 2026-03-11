@@ -181,25 +181,25 @@ export async function initDefaultPaymentConfigs() {
     {
       configType: 'wechat',
       configKey: 'appid',
-      configValue: process.env.WECHAT_APPID || '',
+      configValue: process.env.WECHAT_PAY_APPID || '',
       description: '微信应用ID',
     },
     {
       configType: 'wechat',
       configKey: 'mch_id',
-      configValue: process.env.WECHAT_MCH_ID || '',
+      configValue: process.env.WECHAT_PAY_MCHID || '',
       description: '微信商户号',
     },
     {
       configType: 'wechat',
       configKey: 'api_key',
-      configValue: process.env.WECHAT_API_KEY || '',
+      configValue: process.env.WECHAT_PAY_API_V3_KEY || '',
       description: '微信支付API密钥',
     },
     {
       configType: 'wechat',
       configKey: 'notify_url',
-      configValue: process.env.WECHAT_NOTIFY_URL || '',
+      configValue: process.env.WECHAT_PAY_NOTIFY_URL || '',
       description: '支付回调地址',
     },
     {

@@ -99,43 +99,30 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
   ] = await Promise.all([
     getConfiguredValue([
       process.env.WECHAT_PAY_MCHID,
-      process.env.WECHAT_MCH_ID,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_APPID,
-      process.env.WECHAT_APPID,
-      process.env.WECHAT_MP_APPID,
     ]),
     getConfiguredValue([
       process.env.WECHAT_MP_APPID,
-      process.env.WECHAT_PAY_APPID,
-      process.env.WECHAT_APPID,
     ]),
     getConfiguredValue([
       process.env.WECHAT_MP_SECRET,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_NOTIFY_URL,
-      process.env.WECHAT_NOTIFY_URL,
     ], 'https://hfb.yugioh.top/api/payment/wechat/jsapi/callback'),
     getConfiguredValue([
       process.env.WECHAT_PAY_API_V3_KEY,
-      process.env.WECHAT_PAY_APIV3_KEY,
-      process.env.WECHAT_API_V3_KEY,
-      process.env.WECHAT_API_KEY,
-      process.env.WECHAT_API_KEY_V3,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_SERIAL_NO,
-      process.env.WECHAT_CERT_SERIAL_NO,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_PRIVATE_KEY,
-      process.env.WECHAT_PRIVATE_KEY,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_TRANSFER_SCENE_ID,
-      process.env.WECHAT_TRANSFER_SCENE_ID,
     ]),
     getConfiguredValue([
       process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE,

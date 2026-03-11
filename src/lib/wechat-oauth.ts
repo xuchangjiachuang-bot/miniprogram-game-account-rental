@@ -62,10 +62,10 @@ async function getWechatConfig(): Promise<WechatOAuthConfig> {
   try {
     const setting = await getWechatPlatformSettingsCompat();
 
-    if (isLikelyWechatAppId(setting?.wechatMpAppId) && isLikelyWechatSecret(setting?.wechatMpAppSecret)) {
+    if (setting) {
       return {
-        appId: setting.wechatMpAppId.trim(),
-        appSecret: setting.wechatMpAppSecret.trim(),
+        appId: isLikelyWechatAppId(setting.wechatMpAppId) ? setting.wechatMpAppId.trim() : '',
+        appSecret: isLikelyWechatSecret(setting.wechatMpAppSecret) ? setting.wechatMpAppSecret.trim() : '',
         redirectUri: resolveWechatRedirectUri(),
       };
     }
@@ -75,9 +75,7 @@ async function getWechatConfig(): Promise<WechatOAuthConfig> {
 
   const fallback = resolveValidatedWechatConfig(
     process.env.WECHAT_MP_APPID,
-    process.env.WECHAT_MP_SECRET,
-    process.env.WECHAT_APPID,
-    process.env.WECHAT_APPSECRET
+    process.env.WECHAT_MP_SECRET
   );
 
   return {
@@ -91,13 +89,10 @@ export async function getWechatOpenConfig(): Promise<WechatOAuthConfig> {
   try {
     const setting = await getWechatPlatformSettingsCompat();
 
-    if (
-      isLikelyWechatAppId(setting?.wechatOpenAppId) &&
-      isLikelyWechatSecret(setting?.wechatOpenAppSecret)
-    ) {
+    if (setting) {
       return {
-        appId: setting.wechatOpenAppId.trim(),
-        appSecret: setting.wechatOpenAppSecret.trim(),
+        appId: isLikelyWechatAppId(setting.wechatOpenAppId) ? setting.wechatOpenAppId.trim() : '',
+        appSecret: isLikelyWechatSecret(setting.wechatOpenAppSecret) ? setting.wechatOpenAppSecret.trim() : '',
         redirectUri: resolveWechatRedirectUri(),
       };
     }

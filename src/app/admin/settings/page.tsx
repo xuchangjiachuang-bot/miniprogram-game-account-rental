@@ -323,7 +323,7 @@ export default function AdminSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">配置中心</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            平台业务参数、微信登录、微信服务器和微信支付状态都集中在这里管理。
+            业务参数和微信登录配置保存在数据库，可随时修改；微信支付密钥只读 Railway 环境变量，避免互相覆盖。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -405,7 +405,7 @@ export default function AdminSettingsPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>微信支付运行时只认 Railway 环境变量</AlertTitle>
             <AlertDescription>
-              这个页面负责把真实运行状态、缺失项和旧入口整理到一起，避免再被旧后台配置互相干扰。
+              支付商户号、APIv3 密钥、私钥、证书序列号和转账场景只从 Railway 读取。后台这里只展示运行状态和缺失项，不会覆盖线上支付配置。
             </AlertDescription>
           </Alert>
 
