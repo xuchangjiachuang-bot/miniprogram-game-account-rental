@@ -44,7 +44,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const requiredKeys = ['appid', 'mch_id', 'api_key', 'notify_url'];
+    const requiredKeys = ['appid', 'mch_id', 'notify_url'];
     const configKeys = configs.map((config: any) => config.configKey);
     const missingKeys = requiredKeys.filter((key) => !configKeys.includes(key));
 
@@ -61,6 +61,7 @@ export async function PUT(request: NextRequest) {
       success: true,
       data: results,
       message: 'Payment configs updated successfully',
+      warning: '真实微信支付运行时已优先使用 Railway 环境变量；后台此处仅作为遗留配置兼容',
     });
   } catch (error: any) {
     console.error('Failed to update payment configs:', error);

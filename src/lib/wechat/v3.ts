@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { getPaymentConfig } from '@/lib/payment/config';
 
 const WECHAT_PAY_API_HOST = 'https://api.mch.weixin.qq.com';
 const WECHAT_PAY_SCHEMA = 'WECHATPAY2-SHA256-RSA2048';
@@ -72,16 +71,16 @@ function normalizeMultilineSecret(value: string) {
 }
 
 async function getConfiguredValue(
-  envValue: string | undefined,
-  configKey: string,
+  envValues: Array<string | undefined>,
   fallback = ''
 ) {
-  if (envValue && envValue.trim()) {
-    return envValue.trim();
+  for (const envValue of envValues) {
+    if (envValue && envValue.trim()) {
+      return envValue.trim();
+    }
   }
 
-  const record = await getPaymentConfig('wechat', configKey);
-  return record?.configValue?.trim() || fallback;
+  return fallback;
 }
 
 export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
@@ -98,27 +97,52 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     transferSceneInfoType,
     transferSceneInfoContent,
   ] = await Promise.all([
-    getConfiguredValue(process.env.WECHAT_PAY_MCHID || process.env.WECHAT_MCH_ID, 'mch_id'),
-    getConfiguredValue(process.env.WECHAT_PAY_APPID || process.env.WECHAT_APPID, 'appid'),
-    getConfiguredValue(process.env.WECHAT_MP_APPID, 'mp_appid'),
-    getConfiguredValue(process.env.WECHAT_MP_SECRET, 'mp_secret'),
-    getConfiguredValue(
-      process.env.WECHAT_PAY_NOTIFY_URL || process.env.WECHAT_NOTIFY_URL,
-      'notify_url',
-      'https://hfb.yugioh.top/api/payment/wechat/jsapi/callback'
-    ),
-    getConfiguredValue(process.env.WECHAT_PAY_API_V3_KEY, 'api_v3_key'),
-    getConfiguredValue(
-      process.env.WECHAT_PAY_SERIAL_NO || process.env.WECHAT_CERT_SERIAL_NO,
-      'cert_serial_no'
-    ),
-    getConfiguredValue(
+    getConfiguredValue([
+      process.env.WECHAT_PAY_MCHID,
+      process.env.WECHAT_MCH_ID,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_APPID,
+      process.env.WECHAT_APPID,
+      process.env.WECHAT_MP_APPID,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_MP_APPID,
+      process.env.WECHAT_PAY_APPID,
+      process.env.WECHAT_APPID,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_MP_SECRET,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_NOTIFY_URL,
+      process.env.WECHAT_NOTIFY_URL,
+    ], 'https://hfb.yugioh.top/api/payment/wechat/jsapi/callback'),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_API_V3_KEY,
+      process.env.WECHAT_PAY_APIV3_KEY,
+      process.env.WECHAT_API_V3_KEY,
+      process.env.WECHAT_API_KEY,
+      process.env.WECHAT_API_KEY_V3,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_SERIAL_NO,
+      process.env.WECHAT_CERT_SERIAL_NO,
+    ]),
+    getConfiguredValue([
       process.env.WECHAT_PAY_PRIVATE_KEY,
-      'private_key'
-    ),
-    getConfiguredValue(process.env.WECHAT_PAY_TRANSFER_SCENE_ID, 'transfer_scene_id'),
-    getConfiguredValue(process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE, 'transfer_scene_info_type', '活动名称'),
-    getConfiguredValue(process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT, 'transfer_scene_info_content', '平台提现吗'),
+      process.env.WECHAT_PRIVATE_KEY,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_TRANSFER_SCENE_ID,
+      process.env.WECHAT_TRANSFER_SCENE_ID,
+    ]),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE,
+    ], '活动名称'),
+    getConfiguredValue([
+      process.env.WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT,
+    ], '平台提现'),
   ]);
 
   return {
@@ -207,7 +231,7 @@ async function sendWechatPayRequest<T>(
   const parsed = responseText ? JSON.parse(responseText) : {};
 
   if (!response.ok) {
-    const message = parsed.message || parsed.code || `Wechat Pay request failed with status ${response.status}`;
+    const message = (parsed as any).message || (parsed as any).code || `Wechat Pay request failed with status ${response.status}`;
     throw new Error(message);
   }
 
