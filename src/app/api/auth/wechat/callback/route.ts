@@ -5,6 +5,10 @@ import { db } from '@/lib/db';
 import { systemConfig } from '@/storage/database/shared/schema';
 import { eq } from 'drizzle-orm';
 
+function isWechatQrLoginState(state: string | null) {
+  return typeof state === 'string' && /^login_\d+_[a-z0-9]+$/i.test(state);
+}
+
 function attachAuthCookie(response: NextResponse, token: string) {
   response.cookies.set('auth_token', token, {
     maxAge: 60 * 60 * 24 * 7,
@@ -167,7 +171,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 判断是公众号登录还是开放平台扫码登录
-    const isQrLogin = state && state.startsWith('login_');
+    const isQrLogin = isWechatQrLoginState(state);
     console.log('[微信回调] 登录类型:', isQrLogin ? '开放平台扫码登录' : '公众号OAuth登录');
 
     let wechatUser: WechatUserInfo;
