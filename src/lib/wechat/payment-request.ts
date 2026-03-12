@@ -44,6 +44,14 @@ function getRechargeOrderNoPrefix(channel: WechatPaymentChannel) {
   }
 }
 
+function buildOrderAttach(orderId: string) {
+  return `o:${orderId}`;
+}
+
+function buildRechargeAttach(paymentRecordId: string) {
+  return `r:${paymentRecordId}`;
+}
+
 export async function createWechatOrderPayment(options: CreateOrderPaymentOptions) {
   const { request, user, orderId, channel, openid } = options;
   const orderList = await db
@@ -75,10 +83,7 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
   const description = `订单支付 - ${order.orderNo}`;
   const totalFeeFen = yuanToFen(Number(order.totalPrice || 0));
   const notifyUrl = getNotifyUrl(request, channel);
-  const attach = JSON.stringify({
-    kind: 'order',
-    orderId: order.id,
-  });
+  const attach = buildOrderAttach(order.id);
 
   if (channel === 'jsapi') {
     if (!resolvedOpenid) {
@@ -189,11 +194,7 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
   const description = `钱包充值 ${resolvedAmount.toFixed(2)} 元`;
   const totalFeeFen = yuanToFen(resolvedAmount);
   const notifyUrl = getNotifyUrl(request, channel);
-  const attach = JSON.stringify({
-    kind: 'wallet_recharge',
-    paymentRecordId,
-    userId: user.id,
-  });
+  const attach = buildRechargeAttach(paymentRecordId);
 
   if (channel === 'jsapi') {
     const payment = await createJsapiTransaction({

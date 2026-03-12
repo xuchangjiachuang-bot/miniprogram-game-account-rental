@@ -15,6 +15,32 @@ function createFailResponse(message: string, status = 500) {
   return NextResponse.json({ code: 'FAIL', message }, { status });
 }
 
+function parseWechatAttach(rawAttach?: string) {
+  if (!rawAttach) {
+    return {};
+  }
+
+  if (rawAttach.startsWith('r:')) {
+    return {
+      kind: 'wallet_recharge',
+      paymentRecordId: rawAttach.slice(2),
+    };
+  }
+
+  if (rawAttach.startsWith('o:')) {
+    return {
+      kind: 'order',
+      orderId: rawAttach.slice(2),
+    };
+  }
+
+  try {
+    return JSON.parse(rawAttach);
+  } catch {
+    return {};
+  }
+}
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
@@ -38,14 +64,7 @@ export async function POST(request: NextRequest) {
       return createSuccessResponse();
     }
 
-    let attach: Record<string, any> = {};
-    if (resource.attach) {
-      try {
-        attach = JSON.parse(resource.attach);
-      } catch {
-        attach = {};
-      }
-    }
+    const attach = parseWechatAttach(resource.attach);
 
     if (attach.kind === 'wallet_recharge') {
       await markWechatWalletRechargePaid({
