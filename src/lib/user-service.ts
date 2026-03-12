@@ -644,6 +644,39 @@ async function getCanonicalUserByPhone(phone: string): Promise<User | null> {
   }
 }
 
+async function getCanonicalUserByWechatOpenid(openid: string): Promise<User | null> {
+  try {
+    const dbUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.wechatOpenid, openid))
+      .limit(1);
+
+    if (dbUsers.length === 0) {
+      return null;
+    }
+
+    const dbUser = dbUsers[0];
+    return {
+      id: dbUser.id,
+      user_no: dbUser.id.substring(0, 8),
+      phone: dbUser.phone,
+      username: dbUser.nickname,
+      avatar: dbUser.avatar || undefined,
+      wechat_openid: dbUser.wechatOpenid || undefined,
+      wechat_unionid: dbUser.wechatUnionid || undefined,
+      user_type: dbUser.userType as UserType,
+      isRealNameVerified: dbUser.isVerified || false,
+      realName: dbUser.realName || undefined,
+      created_at: new Date(dbUser.createdAt!),
+      updated_at: new Date(dbUser.updatedAt!),
+    };
+  } catch (error) {
+    console.error('获取微信用户真实记录失败:', error);
+    return null;
+  }
+}
+
 /**
  * 注册用户
  * @param params 注册参数
@@ -851,7 +884,7 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
       mockUsers.set(user.id, user);
       
       // 同步到数据库
-      syncUserToDatabase(user).catch(err => console.error('同步用户数据失败:', err));
+      await syncUserToDatabase(user);
     } else {
       // 更新现有用户的昵称和头像
       if (params.nickname) {
@@ -867,7 +900,14 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
       mockUsers.set(user.id, user);
       
       // 同步到数据库
-      syncUserToDatabase(user).catch(err => console.error('同步用户数据失败:', err));
+      await syncUserToDatabase(user);
+    }
+
+    const canonicalUser = await getCanonicalUserByWechatOpenid(params.openid);
+    if (canonicalUser) {
+      user = canonicalUser;
+      mockUsers.set(user.id, user);
+      saveUsers(mockUsers);
     }
 
     // 生成Token
