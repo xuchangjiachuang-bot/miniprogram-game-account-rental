@@ -23,6 +23,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
+  const isWechatBrowser = typeof navigator !== 'undefined' && /MicroMessenger/i.test(navigator.userAgent);
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'sms' | 'wechat'>('wechat');
@@ -36,6 +37,12 @@ function LoginForm() {
       toast.error(decodeURIComponent(error));
     }
   }, [error]);
+
+  useEffect(() => {
+    if (isWechatBrowser && activeTab !== 'wechat') {
+      setActiveTab('wechat');
+    }
+  }, [activeTab, isWechatBrowser]);
 
   const clearPolling = () => {
     if (pollingInterval) {
@@ -188,6 +195,10 @@ function LoginForm() {
     }
   };
 
+  const handleWechatAuthorizeLogin = () => {
+    window.location.href = '/api/auth/wechat/authorize?state=login_wechat&returnTo=%2F';
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md shadow-xl">
@@ -198,6 +209,29 @@ function LoginForm() {
           <CardDescription>欢迎回来，请登录你的账户</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {isWechatBrowser ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                当前为微信内访问，请直接使用微信授权登录。登录后会同时绑定微信身份，后续可以直接发起 JSAPI 支付。
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+                <div className="text-center space-y-2">
+                  <QrCode className="mx-auto h-10 w-10 text-emerald-600" />
+                  <p className="text-sm text-gray-600">
+                    微信内不再显示短信登录，避免登录成功后还要再补一次微信授权。
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="w-full cursor-pointer bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700"
+                  onClick={handleWechatAuthorizeLogin}
+                  disabled={loading}
+                >
+                  微信授权登录
+                </Button>
+              </div>
+            </div>
+          ) : (
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'sms' | 'wechat')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="wechat">
@@ -316,11 +350,14 @@ function LoginForm() {
               </Button>
             </TabsContent>
           </Tabs>
+          )}
 
+          {!isWechatBrowser && (
           <div className="text-center text-sm text-gray-500">
             还没有账户？
             <span className="ml-1 text-blue-600 font-medium">短信登录即注册</span>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>

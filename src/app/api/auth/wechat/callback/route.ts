@@ -17,11 +17,29 @@ function attachAuthCookie(response: NextResponse, token: string) {
   return response;
 }
 
+function getSafeReturnTo(request: NextRequest) {
+  const returnTo = request.cookies.get('wechat_auth_return_to')?.value || '';
+  return returnTo.startsWith('/') ? returnTo : '';
+}
+
+function clearWechatReturnToCookie(response: NextResponse) {
+  response.cookies.set('wechat_auth_return_to', '', {
+    maxAge: 0,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+
+  return response;
+}
+
 /**
  * 微信OAuth回调 - 处理微信授权回调
  * GET /api/auth/wechat/callback?code=xxx&state=xxx
  */
 export async function GET(request: NextRequest) {
+  const returnTo = getSafeReturnTo(request);
   // 获取正确的基础URL（用于重定向）- 必须在函数开头定义
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://hfb.yugioh.top';
 
@@ -350,12 +368,14 @@ export async function GET(request: NextRequest) {
           }), loginResult.token);
         } else {
           // 普通登录：跳转到首页
-          const redirectUrl = new URL('/?login_success=true', baseUrl);
+          const redirectUrl = new URL(returnTo || '/?login_success=true', baseUrl);
           redirectUrl.searchParams.set('token', loginResult.token);
 
           console.log('[微信回调] 微信登录成功，跳转到首页:', redirectUrl.toString());
           console.log('[微信回调] Token长度:', loginResult.token.length);
-          return attachAuthCookie(NextResponse.redirect(redirectUrl), loginResult.token);
+          return clearWechatReturnToCookie(
+            attachAuthCookie(NextResponse.redirect(redirectUrl), loginResult.token)
+          );
         }
       } else {
         console.error('[微信回调] ❌ 微信登录失败:', loginResult.message);

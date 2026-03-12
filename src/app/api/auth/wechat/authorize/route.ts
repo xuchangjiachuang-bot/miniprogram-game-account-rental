@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const state = searchParams.get('state') || 'login';
+    const returnTo = searchParams.get('returnTo') || '';
     const requestHost = request.headers.get('host')?.toLowerCase() || '';
     const requestHostname = requestHost.split(':')[0];
 
@@ -22,7 +23,19 @@ export async function GET(request: NextRequest) {
     }
 
     const authUrl = await generateWechatAuthUrl(state);
-    return NextResponse.redirect(authUrl);
+    const response = NextResponse.redirect(authUrl);
+
+    if (returnTo.startsWith('/')) {
+      response.cookies.set('wechat_auth_return_to', returnTo, {
+        maxAge: 60 * 10,
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
+
+    return response;
   } catch (error: any) {
     console.error('微信 OAuth 授权失败:', error);
     return NextResponse.json(

@@ -338,6 +338,9 @@ function WechatJSAPIPaymentContent() {
   const amount = mode === 'order'
     ? Number(orderInfo?.totalPrice || 0)
     : Number(rechargeInfo?.amount || rechargeAmount || 0);
+  const bindWechatUrl = typeof window === 'undefined'
+    ? '/api/auth/wechat/authorize?state=payment_bind'
+    : `/api/auth/wechat/authorize?state=payment_bind&returnTo=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
 
   if (loading) {
     return (
@@ -429,10 +432,21 @@ function WechatJSAPIPaymentContent() {
               )}
 
               {currentUser && !currentUser.wechatOpenid && (
-                <Alert variant="destructive">
+                <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>缺少微信身份</AlertTitle>
-                  <AlertDescription>当前账号未绑定微信 openid，无法发起微信支付。</AlertDescription>
+                  <AlertTitle>请先完成微信授权绑定</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>当前账号虽然已登录，但还没有绑定微信 `openid`，暂时无法发起 JSAPI 支付。</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = bindWechatUrl;
+                      }}
+                    >
+                      去微信授权
+                    </Button>
+                  </AlertDescription>
                 </Alert>
               )}
 
