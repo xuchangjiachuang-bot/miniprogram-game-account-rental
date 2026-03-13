@@ -60,6 +60,8 @@ export default function AdminPayments() {
   const [configCheck, setConfigCheck] = useState<ConfigCheckData | null>(null);
   const [uploadingCert, setUploadingCert] = useState(false);
   const [reconcilingPayments, setReconcilingPayments] = useState(false);
+  const [reconcilePhone, setReconcilePhone] = useState('');
+  const [reconcileDiagnostics, setReconcileDiagnostics] = useState<any | null>(null);
 
   const [formData, setFormData] = useState<WechatFormData>({
     appid: '',
@@ -298,7 +300,10 @@ export default function AdminPayments() {
       const response = await fetch('/api/admin/payments/reconcile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 30 }),
+        body: JSON.stringify({
+          limit: 30,
+          phone: reconcilePhone.trim() || undefined,
+        }),
       });
       const result = await response.json();
 
@@ -307,6 +312,7 @@ export default function AdminPayments() {
         return;
       }
 
+      setReconcileDiagnostics(result.data?.diagnostics || null);
       const { total, successCount, failedCount } = result.data;
       toast.success(`支付对账完成：共 ${total} 笔，成功 ${successCount} 笔，失败 ${failedCount} 笔`);
     } catch (error) {
@@ -407,22 +413,40 @@ export default function AdminPayments() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-600">
-            会对最近待处理的微信充值记录执行一次后台查单补偿。
-          </p>
-          <Button onClick={handleReconcileRechargePayments} disabled={reconcilingPayments}>
-            {reconcilingPayments ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                对账中...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                立即对账
-              </>
+          <div className="flex-1 space-y-3">
+            <p className="text-sm text-gray-600">
+              会对最近待处理的微信充值记录执行一次后台查单补偿。可选填手机号，顺便查看该用户的充值记录、余额和流水诊断。
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input
+                value={reconcilePhone}
+                onChange={(e) => setReconcilePhone(e.target.value)}
+                placeholder="可选：输入手机号做诊断，例如 15837455229"
+                className="sm:max-w-sm"
+              />
+              <Button onClick={handleReconcileRechargePayments} disabled={reconcilingPayments}>
+                {reconcilingPayments ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    对账中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    立即对账
+                  </>
+                )}
+              </Button>
+            </div>
+            {reconcileDiagnostics && (
+              <div className="rounded-lg border bg-slate-50 p-4 text-xs text-slate-700">
+                <div className="font-medium mb-2">诊断结果</div>
+                <pre className="overflow-auto whitespace-pre-wrap break-all">
+                  {JSON.stringify(reconcileDiagnostics, null, 2)}
+                </pre>
+              </div>
             )}
-          </Button>
+          </div>
         </CardContent>
       </Card>
 

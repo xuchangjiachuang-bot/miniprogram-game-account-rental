@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/server-auth';
+import { eq } from 'drizzle-orm';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
 import {
   createOrder,
   getUserOrdersWithCounts,
@@ -7,7 +9,6 @@ import {
 } from '@/lib/order-service';
 import { syncExpiredOrders } from '@/lib/order-lifecycle-service';
 import { accounts, ensureDatabaseInitialized, db } from '@/lib/db';
-import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +16,23 @@ export async function GET(request: NextRequest) {
   try {
     await ensureDatabaseInitialized();
 
-    const userId = getServerUserId(request);
-    if (!userId) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
           error: '未登录',
+        },
+        { status: 401 }
+      );
+    }
+
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '登录状态已失效，请重新登录',
         },
         { status: 401 }
       );
@@ -34,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
-    const result = await getUserOrdersWithCounts(userId, status as any);
+    const result = await getUserOrdersWithCounts(user.id, status as any);
 
     return NextResponse.json({
       success: true,
@@ -44,11 +56,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[GET /api/orders] 错误:', error);
+    console.error('[GET /api/orders] Error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: error.message || '加载订单失败',
       },
       { status: 500 }
     );
@@ -59,12 +71,23 @@ export async function POST(request: NextRequest) {
   try {
     await ensureDatabaseInitialized();
 
-    const userId = getServerUserId(request);
-    if (!userId) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
           error: '未登录',
+        },
+        { status: 401 }
+      );
+    }
+
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '登录状态已失效，请重新登录',
         },
         { status: 401 }
       );
@@ -111,13 +134,15 @@ export async function POST(request: NextRequest) {
 
     const params: CreateOrderParams = {
       account_id: account.id,
-      buyer_id: userId,
+      buyer_id: user.id,
       seller_id: account.sellerId,
       coins_million: Number(account.coinsM || 0),
       price_ratio: Number(account.rentalRatio || 0),
       rent_amount: Number(account.accountValue || account.recommendedRental || 0),
       deposit_amount: Number(account.deposit || 0),
-      total_amount: Number(account.totalPrice || Number(account.accountValue || account.recommendedRental || 0) + Number(account.deposit || 0)),
+      total_amount: Number(
+        account.totalPrice || Number(account.accountValue || account.recommendedRental || 0) + Number(account.deposit || 0)
+      ),
       rent_hours: Number(body.rent_hours || account.rentalHours || 24),
     };
 
@@ -139,10 +164,11 @@ export async function POST(request: NextRequest) {
       data: order,
     });
   } catch (error: any) {
+    console.error('[POST /api/orders] Error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: error.message || '创建订单失败',
       },
       { status: 500 }
     );
