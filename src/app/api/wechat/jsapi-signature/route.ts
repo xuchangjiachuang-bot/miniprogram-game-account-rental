@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWechatPayV3Config } from '@/lib/wechat/v3';
+import { fetchWechatJson } from '@/lib/wechat-http';
 
 type JsapiTicketCache = {
   accessToken: string;
@@ -62,10 +63,10 @@ async function getWechatAccessToken() {
     secret: appSecret,
   });
 
-  const response = await fetch(`https://api.weixin.qq.com/cgi-bin/token?${params.toString()}`, {
+  const response = await fetchWechatJson<{ access_token?: string; expires_in?: number; errcode?: number; errmsg?: string }>(`https://api.weixin.qq.com/cgi-bin/token?${params.toString()}`, {
     cache: 'no-store',
   });
-  const data = await response.json();
+  const data = response.data;
 
   if (!response.ok || data.errcode || !data.access_token) {
     throw new Error(data.errmsg || '获取微信公众号 access_token 失败');
@@ -90,10 +91,10 @@ async function getJsapiTicket() {
     type: 'jsapi',
   });
 
-  const response = await fetch(`https://api.weixin.qq.com/cgi-bin/ticket/getticket?${params.toString()}`, {
+  const response = await fetchWechatJson<{ ticket?: string; expires_in?: number; errcode?: number; errmsg?: string }>(`https://api.weixin.qq.com/cgi-bin/ticket/getticket?${params.toString()}`, {
     cache: 'no-store',
   });
-  const data = await response.json();
+  const data = response.data;
 
   if (!response.ok || data.errcode !== 0 || !data.ticket) {
     throw new Error(data.errmsg || '获取 jsapi_ticket 失败');

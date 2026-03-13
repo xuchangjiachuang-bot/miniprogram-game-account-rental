@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 interface WechatQrLoginProps {
   appId: string;
@@ -10,6 +10,55 @@ interface WechatQrLoginProps {
   height?: number;
 }
 
+declare global {
+  interface Window {
+    WxLogin?: new (options: {
+      self_redirect?: boolean;
+      id: string;
+      appid: string;
+      scope: string;
+      redirect_uri: string;
+      state: string;
+      style?: string;
+      href?: string;
+    }) => unknown;
+    __wechatWxLoginScriptPromise?: Promise<void>;
+  }
+}
+
+function loadWxLoginScript() {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('window unavailable'));
+  }
+
+  if (window.WxLogin) {
+    return Promise.resolve();
+  }
+
+  if (window.__wechatWxLoginScriptPromise) {
+    return window.__wechatWxLoginScriptPromise;
+  }
+
+  window.__wechatWxLoginScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-wechat-wxlogin="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('load wxLogin script failed')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js';
+    script.async = true;
+    script.dataset.wechatWxlogin = 'true';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('load wxLogin script failed'));
+    document.head.appendChild(script);
+  });
+
+  return window.__wechatWxLoginScriptPromise;
+}
+
 export default function WechatQrLogin({
   appId,
   redirectUri,
@@ -17,27 +66,70 @@ export default function WechatQrLogin({
   width = 300,
   height = 400,
 }: WechatQrLoginProps) {
-  const qrLoginUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      appid: appId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'snsapi_login',
-      state,
-    });
+  const rawId = useId();
+  const containerId = `wechat-qr-login-${rawId.replace(/[:]/g, '-')}`;
+  const [error, setError] = useState('');
 
-    return `https://open.weixin.qq.com/connect/qrconnect?${params.toString()}#wechat_redirect`;
-  }, [appId, redirectUri, state]);
+  useEffect(() => {
+    let cancelled = false;
+    const target = document.getElementById(containerId);
+    if (target) {
+      target.innerHTML = '';
+    }
+
+    void loadWxLoginScript()
+      .then(() => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!window.WxLogin) {
+          throw new Error('wxLogin unavailable');
+        }
+
+        const container = document.getElementById(containerId);
+        if (!container) {
+          throw new Error('wx login container missing');
+        }
+
+        container.innerHTML = '';
+        setError('');
+
+        new window.WxLogin({
+          self_redirect: false,
+          id: containerId,
+          appid: appId,
+          scope: 'snsapi_login',
+          redirect_uri: encodeURIComponent(redirectUri),
+          state,
+          style: 'black',
+          href: '',
+        });
+      })
+      .catch((scriptError: unknown) => {
+        console.error('[wechat-qr-login] render failed:', scriptError);
+        if (!cancelled) {
+          setError('微信扫码登录加载失败，请刷新二维码重试');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
+  }, [appId, containerId, redirectUri, state]);
 
   return (
-    <iframe
-      src={qrLoginUrl}
-      title="微信扫码登录"
-      width={width}
-      height={height}
-      className="max-w-full overflow-hidden rounded-md border-0 bg-white"
-      style={{ display: 'block', margin: '0 auto' }}
-      scrolling="no"
-    />
+    <div className="space-y-3">
+      <div
+        id={containerId}
+        className="mx-auto overflow-hidden rounded-md bg-white"
+        style={{ width, minHeight: height }}
+      />
+      {error ? <p className="text-center text-sm text-red-500">{error}</p> : null}
+    </div>
   );
 }

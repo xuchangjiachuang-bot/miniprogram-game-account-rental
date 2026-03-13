@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getWechatPlatformSettingsCompat, resolveWechatRedirectUri } from './wechat-runtime-config';
+import { fetchWechatJson } from './wechat-http';
 
 export interface WechatOAuthConfig {
   appId: string;
@@ -146,8 +147,10 @@ async function getAccessToken(
   const config = await getWechatConfig();
   const url = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${config.appId}&secret=${config.appSecret}&code=${code}&grant_type=authorization_code`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  const response = await fetchWechatJson<{ access_token: string; openid: string; errcode?: number; errmsg?: string }>(url, {
+    cache: 'no-store',
+  });
+  const data = response.data;
 
   if (data.errcode) {
     throw new Error(data.errmsg);
@@ -183,8 +186,10 @@ async function getOpenAccessToken(
     grant_type: 'authorization_code',
   });
 
-  const response = await fetch(`https://api.weixin.qq.com/sns/oauth2/access_token?${params.toString()}`);
-  const data = await response.json();
+  const response = await fetchWechatJson<{ access_token: string; openid: string; unionid: string; errcode?: number; errmsg?: string }>(`https://api.weixin.qq.com/sns/oauth2/access_token?${params.toString()}`, {
+    cache: 'no-store',
+  });
+  const data = response.data;
 
   if (data.errcode) {
     throw new Error(data.errmsg);
@@ -199,8 +204,10 @@ async function getOpenAccessToken(
 
 async function getUserInfo(accessToken: string, openid: string): Promise<WechatUserInfo> {
   const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${accessToken}&openid=${openid}&lang=zh_CN`;
-  const response = await fetch(url);
-  const data = await response.json();
+  const response = await fetchWechatJson<WechatUserInfo & { errcode?: number; errmsg?: string }>(url, {
+    cache: 'no-store',
+  });
+  const data = response.data;
 
   if (data.errcode) {
     throw new Error(data.errmsg);

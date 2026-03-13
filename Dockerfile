@@ -2,8 +2,13 @@ FROM node:22-bookworm-slim AS base
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+ENV NODE_OPTIONS=--use-openssl-ca
 
-RUN corepack enable
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable
 
 WORKDIR /app
 
