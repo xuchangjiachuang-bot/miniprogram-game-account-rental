@@ -5,6 +5,7 @@
 
 import { balanceTransactions, db, paymentRecords, users, userBalances } from '@/lib/db';
 import { eq, sql } from 'drizzle-orm';
+import crypto from 'crypto';
 
 // ==================== 类型定义 ====================
 
@@ -69,6 +70,65 @@ export interface WechatLoginParams {
   source?: 'mp' | 'open';
 }
 
+interface AuthTokenPayload {
+  userId: string;
+  iat: number;
+  exp: number;
+}
+
+const AUTH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+function getAuthTokenSecret(): string {
+  return (
+    process.env.AUTH_TOKEN_SECRET ||
+    process.env.PGDATABASE_URL ||
+    process.env.DATABASE_URL ||
+    process.env.WECHAT_PAY_API_V3_KEY ||
+    'codex-dev-auth-secret'
+  );
+}
+
+function toBase64Url(input: Buffer | string): string {
+  const value = Buffer.isBuffer(input) ? input.toString('base64') : Buffer.from(input).toString('base64');
+  return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(input: string): string {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = (4 - (normalized.length % 4)) % 4;
+  return Buffer.from(normalized + '='.repeat(padding), 'base64').toString('utf8');
+}
+
+function signAuthTokenSegment(segment: string): string {
+  return toBase64Url(crypto.createHmac('sha256', getAuthTokenSecret()).update(segment).digest());
+}
+
+function parseAuthToken(token: string): AuthTokenPayload | null {
+  try {
+    const [payloadSegment, signature] = token.split('.');
+    if (!payloadSegment || !signature) {
+      return null;
+    }
+
+    const expectedSignature = signAuthTokenSegment(payloadSegment);
+    const actual = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
+      return null;
+    }
+
+    const payload = JSON.parse(fromBase64Url(payloadSegment)) as AuthTokenPayload;
+    if (!payload.userId || !payload.exp || payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return payload;
+  } catch (error) {
+    console.error('Failed to parse auth token:', error);
+    return null;
+  }
+}
+
 // ==================== 工具函数 ====================
 
 /**
@@ -77,6 +137,10 @@ export interface WechatLoginParams {
  */
 export function getServerUserIdInternal(token: string): string | null {
   try {
+    const payload = parseAuthToken(token);
+    if (payload?.userId) {
+      return payload.userId;
+    }
     // 在开发环境中，每次都从文件重新加载，确保数据是最新的
     // 这样可以避免HMR导致的数据不一致问题
     const reloadedTokens = loadTokens();
@@ -237,10 +301,15 @@ export function generateUserNo(): string {
  * 生成Token
  * @returns Token
  */
-export function generateToken(): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 16);
-  return Buffer.from(`${timestamp}:${random}`).toString('base64');
+export function generateToken(userId?: string): string {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload: AuthTokenPayload = {
+    userId: userId || crypto.randomUUID(),
+    iat: issuedAt,
+    exp: issuedAt + AUTH_TOKEN_TTL_SECONDS,
+  };
+  const payloadSegment = toBase64Url(JSON.stringify(payload));
+  return `${payloadSegment}.${signAuthTokenSegment(payloadSegment)}`;
 }
 
 /**
@@ -884,7 +953,7 @@ export async function registerUser(params: RegisterParams): Promise<LoginResult>
     await syncUserToDatabase(user);
     await createUserBalance(user.id);
 
-    const token = generateToken();
+    const token = generateToken(user.id);
     mockTokens.set(token, { userId: user.id, user, timestamp: Date.now() });
     saveTokens(mockTokens);
 
@@ -974,7 +1043,7 @@ export async function loginUser(params: LoginParams): Promise<LoginResult> {
     }
     await createUserBalance(user.id);
 
-    const token = generateToken();
+    const token = generateToken(user.id);
     mockTokens.set(token, { userId: user.id, user, timestamp: Date.now() });
     saveTokens(mockTokens);
 
@@ -1071,7 +1140,7 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
     }
 
     // 生成Token
-    const token = generateToken();
+    const token = generateToken(user.id);
     mockTokens.set(token, { userId: user.id, user, timestamp: Date.now() });
     saveTokens(mockTokens);
 
@@ -1168,7 +1237,7 @@ export async function wechatBindPhone(
     }
 
     // 生成Token
-    const token = generateToken();
+    const token = generateToken(user.id);
     mockTokens.set(token, { userId: user.id, user, timestamp: Date.now() });
     saveTokens(mockTokens);
 
@@ -1196,6 +1265,16 @@ export async function wechatBindPhone(
  * @returns 用户信息
  */
 export async function verifyToken(token: string): Promise<User | null> {
+  const payload = parseAuthToken(token);
+  if (payload?.userId) {
+    try {
+      return await getUserById(payload.userId);
+    } catch (error) {
+      console.error('Stateless token verification failed:', error);
+      return null;
+    }
+  }
+
   const tokenData = mockTokens.get(token);
 
   if (!tokenData) {
