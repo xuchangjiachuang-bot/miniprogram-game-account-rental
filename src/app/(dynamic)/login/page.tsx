@@ -144,16 +144,21 @@ function LoginForm() {
   };
 
   useEffect(() => {
-    if (activeTab === 'wechat') {
-      void generateWechatQrCode();
-    } else {
+    if (isWechatBrowser || activeTab !== 'wechat') {
       clearPolling();
+      setWechatConfig(null);
+      setWechatUnavailableMessage('');
+      return () => {
+        clearPolling();
+      };
     }
+
+    void generateWechatQrCode();
 
     return () => {
       clearPolling();
     };
-  }, [activeTab]);
+  }, [activeTab, isWechatBrowser]);
 
   const handleLogin = async () => {
     if (!formData.phone) {
