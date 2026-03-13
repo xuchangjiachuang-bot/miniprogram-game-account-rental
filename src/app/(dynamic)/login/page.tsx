@@ -6,6 +6,7 @@ import { Loader2, Lock, QrCode, RefreshCw, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import WechatQrLogin from '@/components/WechatQrLogin';
 import { setToken } from '@/lib/auth-token';
+import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,8 +23,10 @@ interface WechatLoginConfig {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading: userLoading } = useUser();
   const error = searchParams.get('error');
   const reason = searchParams.get('reason');
+  const returnTo = searchParams.get('returnTo');
   const isWechatBrowser = typeof navigator !== 'undefined' && /MicroMessenger/i.test(navigator.userAgent);
 
   const [loading, setLoading] = useState(false);
@@ -43,6 +46,19 @@ function LoginForm() {
       toast.error(decodeURIComponent(error));
     }
   }, [error, reason]);
+
+  useEffect(() => {
+    if (userLoading || !user) {
+      return;
+    }
+
+    const safeReturnTo =
+      returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+        ? returnTo
+        : '/';
+
+    router.replace(safeReturnTo);
+  }, [returnTo, router, user, userLoading]);
 
   useEffect(() => {
     if (isWechatBrowser && activeTab !== 'wechat') {
@@ -202,8 +218,21 @@ function LoginForm() {
   };
 
   const handleWechatAuthorizeLogin = () => {
-    window.location.href = '/api/auth/wechat/authorize?state=wechat_oauth&returnTo=%2F';
+    const safeReturnTo =
+      returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+        ? returnTo
+        : '/';
+
+    window.location.href = `/api/auth/wechat/authorize?state=wechat_oauth&returnTo=${encodeURIComponent(safeReturnTo)}`;
   };
+
+  if (userLoading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">

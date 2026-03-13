@@ -20,9 +20,10 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   // 在服务器端或未挂载时，默认显示完整布局
   const isAdmin = isMounted && pathname?.startsWith('/admin');
+  const isStandaloneAuthPage = pathname === '/login';
 
   // Admin 页面不显示 Header 和 Footer
-  if (isAdmin) {
+  if (isAdmin || isStandaloneAuthPage) {
     return <>{children}</>;
   }
 
