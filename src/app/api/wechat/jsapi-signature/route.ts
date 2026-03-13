@@ -1,51 +1,142 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWechatPayConfig } from '@/lib/wechat/config';
-import { generateSign, generateNonceStr } from '@/lib/wechat/utils';
+import { getWechatPlatformSettingsCompat } from '@/lib/wechat-runtime-config';
 
-/**
- * 获取微信 JS-SDK 签名
- * GET /api/wechat/jsapi-signature?url=xxx
- */
+type JsapiTicketCache = {
+  accessToken: string;
+  accessTokenExpiresAt: number;
+  jsapiTicket: string;
+  jsapiTicketExpiresAt: number;
+};
+
+const JSAPI_CACHE_KEY = '__wechat_jsapi_ticket_cache__';
+
+function getCache(): JsapiTicketCache {
+  const globalCache = globalThis as typeof globalThis & {
+    [JSAPI_CACHE_KEY]?: JsapiTicketCache;
+  };
+
+  if (!globalCache[JSAPI_CACHE_KEY]) {
+    globalCache[JSAPI_CACHE_KEY] = {
+      accessToken: '',
+      accessTokenExpiresAt: 0,
+      jsapiTicket: '',
+      jsapiTicketExpiresAt: 0,
+    };
+  }
+
+  return globalCache[JSAPI_CACHE_KEY] as JsapiTicketCache;
+}
+
+function isLikelyWechatAppId(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^wx[a-zA-Z0-9]{16}$/.test(value.trim());
+}
+
+function isLikelyWechatSecret(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9]{32}$/.test(value.trim());
+}
+
+async function getWechatMpConfig() {
+  const setting = await getWechatPlatformSettingsCompat();
+  const appId = setting?.wechatMpAppId?.trim() || process.env.WECHAT_MP_APPID?.trim() || '';
+  const appSecret = setting?.wechatMpAppSecret?.trim() || process.env.WECHAT_MP_SECRET?.trim() || '';
+
+  if (!isLikelyWechatAppId(appId) || !isLikelyWechatSecret(appSecret)) {
+    throw new Error('公众号配置不完整，无法生成 JS-SDK 签名');
+  }
+
+  return { appId, appSecret };
+}
+
+async function getWechatAccessToken() {
+  const cache = getCache();
+  const now = Date.now();
+
+  if (cache.accessToken && cache.accessTokenExpiresAt > now) {
+    return cache.accessToken;
+  }
+
+  const { appId, appSecret } = await getWechatMpConfig();
+  const params = new URLSearchParams({
+    grant_type: 'client_credential',
+    appid: appId,
+    secret: appSecret,
+  });
+
+  const response = await fetch(`https://api.weixin.qq.com/cgi-bin/token?${params.toString()}`, {
+    cache: 'no-store',
+  });
+  const data = await response.json();
+
+  if (!response.ok || data.errcode || !data.access_token) {
+    throw new Error(data.errmsg || '获取微信公众号 access_token 失败');
+  }
+
+  cache.accessToken = data.access_token;
+  cache.accessTokenExpiresAt = now + Math.max((Number(data.expires_in) || 7200) - 300, 300) * 1000;
+  return cache.accessToken;
+}
+
+async function getJsapiTicket() {
+  const cache = getCache();
+  const now = Date.now();
+
+  if (cache.jsapiTicket && cache.jsapiTicketExpiresAt > now) {
+    return cache.jsapiTicket;
+  }
+
+  const accessToken = await getWechatAccessToken();
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    type: 'jsapi',
+  });
+
+  const response = await fetch(`https://api.weixin.qq.com/cgi-bin/ticket/getticket?${params.toString()}`, {
+    cache: 'no-store',
+  });
+  const data = await response.json();
+
+  if (!response.ok || data.errcode !== 0 || !data.ticket) {
+    throw new Error(data.errmsg || '获取 jsapi_ticket 失败');
+  }
+
+  cache.jsapiTicket = data.ticket;
+  cache.jsapiTicketExpiresAt = now + Math.max((Number(data.expires_in) || 7200) - 300, 300) * 1000;
+  return cache.jsapiTicket;
+}
+
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
-    // 1. 获取 URL
-    const url = request.nextUrl.searchParams.get('url');
+    const rawUrl = request.nextUrl.searchParams.get('url');
 
-    if (!url) {
+    if (!rawUrl) {
       return NextResponse.json({
         success: false,
         error: '缺少 url 参数',
       }, { status: 400 });
     }
 
-    // 2. 获取配置
-    const config = await getWechatPayConfig();
-
-    // 3. 生成签名参数
-    const nonceStr = generateNonceStr();
+    const normalizedUrl = rawUrl.split('#')[0];
+    const ticket = await getJsapiTicket();
+    const { appId } = await getWechatMpConfig();
+    const nonceStr = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     const timestamp = Math.floor(Date.now() / 1000);
-    const ticket = 'temp_jsapi_ticket'; // TODO: 需要从微信服务器获取 jsapi_ticket
-
-    // 4. 构建签名字符串
-    const stringToSign = `jsapi_ticket=${ticket}&noncestr=${nonceStr}&timestamp=${timestamp}&url=${url}`;
-
-    // 5. 生成签名
+    const stringToSign = `jsapi_ticket=${ticket}&noncestr=${nonceStr}&timestamp=${timestamp}&url=${normalizedUrl}`;
     const signature = require('crypto')
       .createHash('sha1')
       .update(stringToSign, 'utf8')
       .digest('hex');
 
-    // 6. 返回签名参数
     return NextResponse.json({
       success: true,
       data: {
-        appId: config.appId,
+        appId,
         timestamp,
         nonceStr,
         signature,
       },
     });
-
   } catch (error: any) {
     console.error('[WeChat JSAPI] 获取签名失败:', error);
     return NextResponse.json({

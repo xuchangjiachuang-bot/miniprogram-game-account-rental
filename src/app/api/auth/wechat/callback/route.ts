@@ -228,7 +228,8 @@ export async function GET(request: NextRequest) {
         openid: wechatUser.openid,
         nickname: wechatUser.nickname,
         avatar: wechatUser.headimgurl,
-        unionid: wechatUser.unionid
+        unionid: wechatUser.unionid,
+        source: isQrLogin ? 'open' : 'mp',
       });
 
       console.log('[微信回调] 微信登录结果:', {

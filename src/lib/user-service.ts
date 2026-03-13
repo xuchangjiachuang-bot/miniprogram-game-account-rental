@@ -56,6 +56,7 @@ export interface WechatLoginParams {
   nickname?: string;
   avatar?: string;
   unionid?: string;
+  source?: 'mp' | 'open';
 }
 
 // 微信登录参数
@@ -64,6 +65,8 @@ export interface WechatLoginParams {
   username?: string;
   nickname?: string;
   avatar?: string;
+  unionid?: string;
+  source?: 'mp' | 'open';
 }
 
 // ==================== 工具函数 ====================
@@ -476,10 +479,39 @@ async function syncUserToDatabase(user: User): Promise<void> {
           avatar = ${user.avatar || null},
           user_type = ${user.user_type},
           wechat_openid = ${user.wechat_openid || null},
+          wechat_unionid = ${user.wechat_unionid || null},
           updated_at = ${new Date().toISOString()}
         where id = ${user.id}
       `);
     } else {
+      if (user.wechat_unionid) {
+        const existingUnionUser = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.wechatUnionid, user.wechat_unionid))
+          .limit(1);
+
+        if (existingUnionUser.length > 0) {
+          await db.execute(sql`
+            update users
+            set
+              phone = case
+                when (${user.phone || ''} <> '' and phone like 'wechat_%') then ${user.phone}
+                else phone
+              end,
+              nickname = ${user.username},
+              avatar = ${user.avatar || null},
+              user_type = ${user.user_type},
+              wechat_openid = coalesce(${user.wechat_openid || null}, wechat_openid),
+              wechat_unionid = ${user.wechat_unionid},
+              updated_at = ${new Date().toISOString()}
+            where wechat_unionid = ${user.wechat_unionid}
+          `);
+          console.log('微信用户数据已更新(按 unionid 收口):', user.wechat_unionid);
+          return;
+        }
+      }
+
       // 检查是否已通过微信 openid 存在
       if (user.wechat_openid) {
           const existingWechatUser = await db
@@ -495,6 +527,7 @@ async function syncUserToDatabase(user: User): Promise<void> {
             set
               nickname = ${user.username},
               avatar = ${user.avatar || null},
+              wechat_unionid = coalesce(${user.wechat_unionid || null}, wechat_unionid),
               updated_at = ${new Date().toISOString()}
             where wechat_openid = ${user.wechat_openid}
           `);
@@ -520,6 +553,7 @@ async function syncUserToDatabase(user: User): Promise<void> {
               avatar = ${user.avatar || null},
               user_type = ${user.user_type},
               wechat_openid = ${user.wechat_openid || null},
+              wechat_unionid = ${user.wechat_unionid || null},
               updated_at = ${new Date().toISOString()}
             where phone = ${user.phone}
           `);
@@ -544,6 +578,7 @@ async function syncUserToDatabase(user: User): Promise<void> {
           real_name,
           id_card,
           wechat_openid,
+          wechat_unionid,
           created_at,
           updated_at
         ) values (
@@ -556,6 +591,7 @@ async function syncUserToDatabase(user: User): Promise<void> {
           ${user.realName || null},
           ${user.realName || null},
           ${user.wechat_openid || null},
+          ${user.wechat_unionid || null},
           ${user.created_at.toISOString()},
           ${user.updated_at.toISOString()}
         )
@@ -708,6 +744,8 @@ async function getCanonicalUserByPhone(phone: string): Promise<User | null> {
       phone: dbUser.phone,
       username: dbUser.nickname,
       avatar: dbUser.avatar || undefined,
+      wechat_openid: dbUser.wechatOpenid || undefined,
+      wechat_unionid: dbUser.wechatUnionid || undefined,
       user_type: dbUser.userType as UserType,
       isRealNameVerified: dbUser.isVerified || false,
       realName: dbUser.realName || undefined,
@@ -749,6 +787,39 @@ async function getCanonicalUserByWechatOpenid(openid: string): Promise<User | nu
     };
   } catch (error) {
     console.error('获取微信用户真实记录失败:', error);
+    return null;
+  }
+}
+
+async function getCanonicalUserByWechatUnionid(unionid: string): Promise<User | null> {
+  try {
+    const dbUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.wechatUnionid, unionid))
+      .limit(1);
+
+    if (dbUsers.length === 0) {
+      return null;
+    }
+
+    const dbUser = dbUsers[0];
+    return {
+      id: dbUser.id,
+      user_no: dbUser.id.substring(0, 8),
+      phone: dbUser.phone,
+      username: dbUser.nickname,
+      avatar: dbUser.avatar || undefined,
+      wechat_openid: dbUser.wechatOpenid || undefined,
+      wechat_unionid: dbUser.wechatUnionid || undefined,
+      user_type: dbUser.userType as UserType,
+      isRealNameVerified: dbUser.isVerified || false,
+      realName: dbUser.realName || undefined,
+      created_at: new Date(dbUser.createdAt!),
+      updated_at: new Date(dbUser.updatedAt!),
+    };
+  } catch (error) {
+    console.error('获取微信 unionid 真实用户失败:', error);
     return null;
   }
 }
@@ -935,10 +1006,18 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
     let user: User | null = null;
 
     for (const u of mockUsers.values()) {
-      if (u.wechat_openid === params.openid) {
+      if (u.wechat_openid === params.openid || (params.unionid && u.wechat_unionid === params.unionid)) {
         user = u;
         break;
       }
+    }
+
+    if (!user && params.unionid) {
+      user = await getCanonicalUserByWechatUnionid(params.unionid);
+    }
+
+    if (!user) {
+      user = await getCanonicalUserByWechatOpenid(params.openid);
     }
 
     if (!user) {
@@ -972,6 +1051,9 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
       if (params.unionid) {
         user.wechat_unionid = params.unionid;
       }
+      if (!user.wechat_openid || params.source === 'mp' || user.wechat_openid === params.openid) {
+        user.wechat_openid = params.openid;
+      }
       user.updated_at = new Date();
       mockUsers.set(user.id, user);
       
@@ -979,7 +1061,9 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
       await syncUserToDatabase(user);
     }
 
-    const canonicalUser = await getCanonicalUserByWechatOpenid(params.openid);
+    const canonicalUser = params.unionid
+      ? await getCanonicalUserByWechatUnionid(params.unionid) || await getCanonicalUserByWechatOpenid(params.openid)
+      : await getCanonicalUserByWechatOpenid(params.openid);
     if (canonicalUser) {
       user = canonicalUser;
       mockUsers.set(user.id, user);
@@ -1141,7 +1225,11 @@ export async function verifyToken(token: string): Promise<User | null> {
 
       let canonicalUser: User | null = null;
 
-      if (user.wechat_openid) {
+      if (user.wechat_unionid) {
+        canonicalUser = await getCanonicalUserByWechatUnionid(user.wechat_unionid);
+      }
+
+      if (!canonicalUser && user.wechat_openid) {
         canonicalUser = await getCanonicalUserByWechatOpenid(user.wechat_openid);
       }
 

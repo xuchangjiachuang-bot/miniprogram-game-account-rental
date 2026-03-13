@@ -99,6 +99,24 @@ function WechatJSAPIPaymentContent() {
     return () => window.clearInterval(interval);
   }, [paymentStatus, polling, mode, orderId, currentRechargeId]);
 
+  function getWechatPayFailMessage(payError: any) {
+    const errMsg = String(payError?.errMsg || payError?.message || '').toLowerCase();
+
+    if (errMsg.includes('cancel')) {
+      return '你已取消支付';
+    }
+
+    if (errMsg.includes('config:invalid') || errMsg.includes('config fail')) {
+      return '微信支付环境初始化失败，请稍后重试';
+    }
+
+    if (errMsg.includes('choosewxpay:fail')) {
+      return `微信支付调起失败：${payError?.errMsg || '未知错误'}`;
+    }
+
+    return payError?.errMsg || payError?.message || '支付未完成，请重试';
+  }
+
   async function loadInitialData() {
     try {
       setLoading(true);
@@ -207,7 +225,7 @@ function WechatJSAPIPaymentContent() {
     try {
       const token = getToken();
       if (!token) {
-        return;
+        return false;
       }
 
       if (mode === 'order' && orderId) {
@@ -220,6 +238,7 @@ function WechatJSAPIPaymentContent() {
         if (result.success && (result.data.status === 'paid' || result.data.status === 'completed')) {
           setPolling(false);
           router.push(`/orders/${orderId}`);
+          return true;
         }
       }
 
@@ -233,11 +252,14 @@ function WechatJSAPIPaymentContent() {
         if (result.success && result.data.status === 'success') {
           setPolling(false);
           router.push('/user-center');
+          return true;
         }
       }
     } catch (statusError) {
       console.error('检查支付状态失败:', statusError);
     }
+
+    return false;
   }
 
   async function handlePayment() {
@@ -316,11 +338,15 @@ function WechatJSAPIPaymentContent() {
         success: () => {
           setPaymentStatus('success');
           setPolling(true);
+          void checkPaymentStatus();
         },
         fail: (payError: any) => {
           console.error('微信支付失败:', payError);
           setPaymentStatus('failed');
-          setError('支付未完成，请重试');
+          setError(getWechatPayFailMessage(payError));
+          window.setTimeout(() => {
+            void checkPaymentStatus();
+          }, 1500);
         },
         complete: () => {
           setPaying(false);

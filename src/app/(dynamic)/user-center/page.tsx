@@ -457,18 +457,27 @@ export default function UserCenterPage() {
 
   // 获取交易类型颜色
   const getTransactionTypeColor = (type: string): string => {
-    if (type === 'withdraw' || type === 'penalty' || type === 'deposit_freeze' || type === 'listing_deposit_freeze') {
+    if (type === 'withdraw' || type === 'freeze' || type === 'penalty' || type === 'deposit_freeze' || type === 'listing_deposit_freeze') {
       return 'text-red-500';
     }
     return 'text-green-500';
   };
 
   const getTransactionDisplayAmount = (transaction: any): number => {
-    if (transaction.transaction_type === 'deposit_freeze' || transaction.transaction_type === 'listing_deposit_freeze') {
+    if (
+      transaction.transaction_type === 'withdraw' ||
+      transaction.transaction_type === 'freeze' ||
+      transaction.transaction_type === 'deposit_freeze' ||
+      transaction.transaction_type === 'listing_deposit_freeze'
+    ) {
       return -Math.abs(Number(transaction.amount) || 0);
     }
 
-    if (transaction.transaction_type === 'deposit_unfreeze' || transaction.transaction_type === 'listing_deposit_unfreeze') {
+    if (
+      transaction.transaction_type === 'unfreeze' ||
+      transaction.transaction_type === 'deposit_unfreeze' ||
+      transaction.transaction_type === 'listing_deposit_unfreeze'
+    ) {
       return Math.abs(Number(transaction.amount) || 0);
     }
 
@@ -476,6 +485,14 @@ export default function UserCenterPage() {
   };
 
   const getTransactionBadgeText = (type: string): string => {
+    if (type === 'freeze') {
+      return '提现申请';
+    }
+
+    if (type === 'unfreeze') {
+      return '提现退回';
+    }
+
     if (type === 'listing_deposit_freeze') {
       return '上架保证金冻结';
     }
@@ -605,7 +622,7 @@ export default function UserCenterPage() {
 
       toast.success(`微信提现 ¥${withdrawAmount} 已提交`);
       setWithdrawAmount('');
-      setWithdrawAccount('');
+      setWithdrawAccount(user?.wechat_openid || '');
       loadWalletData();
     } catch (error) {
       console.error('提现失败:', error);
@@ -1350,8 +1367,8 @@ export default function UserCenterPage() {
                             <div className="space-y-2">
                               <Label>提现账户</Label>
                               <Input
-                                placeholder="请输入支付宝/微信账号"
-                                value={withdrawAccount}
+                                placeholder="提现将直接打款到当前绑定微信"
+                                value={user?.wechat_openid || withdrawAccount}
                                 disabled={Boolean(user?.wechat_openid)}
                                 onChange={(e) => setWithdrawAccount(e.target.value)}
                               />

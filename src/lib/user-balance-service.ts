@@ -333,8 +333,17 @@ export async function requestWithdrawal(
     const withdrawalFeeRate = Number(settings.withdrawalFee) || 1;
 
     // 2. 计算手续费
-    const fee = amount * (withdrawalFeeRate / 100);
+    const fee = withdrawalFeeRate > 0
+      ? Math.max(amount * (withdrawalFeeRate / 100), 1)
+      : 0;
     const actualAmount = amount - fee;
+
+    if (actualAmount <= 0) {
+      return {
+        success: false,
+        message: '提现金额必须大于手续费，当前手续费最低 1 元'
+      };
+    }
 
     // 3. 检查用户余额
     const balance = await getUserBalance(userId);
