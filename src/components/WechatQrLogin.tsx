@@ -108,5 +108,16 @@ export default function WechatQrLogin({
     };
   }, [appId, containerId, redirectUri, state]);
 
-  return <div id={containerId} ref={containerRef} style={{ width, height }} />;
+  return (
+    <div
+      id={containerId}
+      ref={containerRef}
+      style={{
+        width,
+        maxWidth: '100%',
+        margin: '0 auto',
+      }}
+      data-expected-height={height}
+    />
+  );
 }

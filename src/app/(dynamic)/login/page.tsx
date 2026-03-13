@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Lock, QrCode, RefreshCw, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import WechatQrLogin from '@/components/WechatQrLogin';
@@ -21,6 +21,7 @@ interface WechatLoginConfig {
 }
 
 function LoginForm() {
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: userLoading } = useUser();
@@ -37,15 +38,22 @@ function LoginForm() {
   const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (error) {
-      if (error === 'wechat_auth_failed') {
-        toast.error(reason ? decodeURIComponent(reason) : '微信授权登录失败，请重试');
-        return;
-      }
+    if (!error) {
+      return;
+    }
 
+    if (error === 'wechat_auth_failed') {
+      toast.error(reason ? decodeURIComponent(reason) : '微信授权登录失败，请重试');
+    } else {
       toast.error(decodeURIComponent(error));
     }
-  }, [error, reason]);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('error');
+    nextParams.delete('reason');
+    const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [error, pathname, reason, router, searchParams]);
 
   useEffect(() => {
     if (userLoading || !user) {
@@ -93,7 +101,7 @@ function LoginForm() {
           router.push('/');
         }
       } catch (pollError) {
-        console.error('[微信登录] 检查登录状态失败:', pollError);
+        console.error('[微信登录] 检查扫码登录状态失败:', pollError);
       }
     }, 2000);
 
@@ -111,9 +119,7 @@ function LoginForm() {
       const configResult = await configResponse.json();
 
       if (!configResult.success) {
-        setWechatUnavailableMessage(
-          configResult.error || '当前环境暂时无法使用微信登录，请稍后再试。'
-        );
+        setWechatUnavailableMessage(configResult.error || '当前环境暂时无法使用微信登录，请稍后再试。');
         return;
       }
 
@@ -139,7 +145,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (activeTab === 'wechat') {
-      generateWechatQrCode();
+      void generateWechatQrCode();
     } else {
       clearPolling();
     }
@@ -246,9 +252,9 @@ function LoginForm() {
         <CardContent className="space-y-6">
           {isWechatBrowser ? (
             <div className="space-y-4">
-              <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+              <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
                 <div className="text-center">
-                  <QrCode className="mx-auto h-10 w-10 text-emerald-600 mb-3" />
+                  <QrCode className="mx-auto mb-3 h-10 w-10 text-emerald-600" />
                 </div>
                 <Button
                   type="button"
@@ -261,131 +267,128 @@ function LoginForm() {
               </div>
             </div>
           ) : (
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'sms' | 'wechat')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="wechat">
-                <QrCode className="mr-2 h-4 w-4" />
-                微信扫码
-              </TabsTrigger>
-              <TabsTrigger value="sms">
-                <Smartphone className="mr-2 h-4 w-4" />
-                短信登录
-              </TabsTrigger>
-            </TabsList>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'sms' | 'wechat')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="wechat">
+                  <QrCode className="mr-2 h-4 w-4" />
+                  微信扫码
+                </TabsTrigger>
+                <TabsTrigger value="sms">
+                  <Smartphone className="mr-2 h-4 w-4" />
+                  短信登录
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="wechat" className="space-y-4 pt-4">
-              <div className="rounded-lg border border-gray-200 bg-white p-6">
-                {wechatUnavailableMessage ? (
-                  <div className="space-y-4">
-                    <Alert>
-                      <AlertDescription>{wechatUnavailableMessage}</AlertDescription>
-                    </Alert>
-                    <p className="text-center text-sm text-gray-500">
-                      你现在可以先用短信登录；等我们把公网测试域名和微信回调都配好后，再测微信授权。
-                    </p>
-                  </div>
-                ) : wechatConfig ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-center">
-                      <WechatQrLogin
-                        appId={wechatConfig.appId}
-                        redirectUri={wechatConfig.redirectUri}
-                        state={wechatConfig.state}
-                        width={300}
-                        height={400}
-                      />
+              <TabsContent value="wechat" className="space-y-4 pt-4">
+                <div className="rounded-lg border border-gray-200 bg-white p-6">
+                  {wechatUnavailableMessage ? (
+                    <div className="space-y-4">
+                      <Alert>
+                        <AlertDescription>{wechatUnavailableMessage}</AlertDescription>
+                      </Alert>
                     </div>
-                    <p className="text-center text-sm text-gray-600">请使用微信扫描二维码登录</p>
-                    <div className="flex justify-center">
+                  ) : wechatConfig ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-center">
+                        <WechatQrLogin
+                          appId={wechatConfig.appId}
+                          redirectUri={wechatConfig.redirectUri}
+                          state={wechatConfig.state}
+                          width={300}
+                          height={400}
+                        />
+                      </div>
+                      <p className="text-center text-sm text-gray-600">请使用微信扫描二维码登录</p>
+                      <div className="flex justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void generateWechatQrCode()}
+                          disabled={loading}
+                          className="flex items-center gap-2"
+                        >
+                          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                          刷新二维码
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center">
+                      <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-gray-400" />
+                      <p className="text-gray-500">正在加载二维码...</p>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={generateWechatQrCode}
+                        onClick={() => void generateWechatQrCode()}
                         disabled={loading}
-                        className="flex items-center gap-2"
+                        variant="outline"
+                        className="mt-4"
                       >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                        刷新二维码
+                        重试
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="py-8 text-center">
-                    <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-gray-400" />
-                    <p className="text-gray-500">正在加载二维码...</p>
-                    <Button
-                      onClick={generateWechatQrCode}
-                      disabled={loading}
-                      variant="outline"
-                      className="mt-4"
-                    >
-                      重试
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="sms" className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">手机号</Label>
-                <div className="relative">
-                  <Smartphone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="请输入手机号"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="pl-10"
-                    disabled={loading}
-                  />
+                  )}
                 </div>
-              </div>
+              </TabsContent>
 
-              <div className="space-y-2">
-                <Label htmlFor="code">验证码</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <TabsContent value="sms" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">手机号</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                     <Input
-                      id="code"
-                      type="text"
-                      placeholder="请输入验证码"
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      id="phone"
+                      type="tel"
+                      placeholder="请输入手机号"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="pl-10"
                       disabled={loading}
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSendCode}
-                    disabled={loading || !formData.phone}
-                  >
-                    发送验证码
-                  </Button>
                 </div>
-              </div>
 
-              <Button
-                type="button"
-                className="w-full cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
-                onClick={handleLogin}
-                disabled={loading}
-              >
-                {loading ? '登录中...' : '登录 / 注册'}
-              </Button>
-            </TabsContent>
-          </Tabs>
+                <div className="space-y-2">
+                  <Label htmlFor="code">验证码</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="code"
+                        type="text"
+                        placeholder="请输入验证码"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        className="pl-10"
+                        disabled={loading}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendCode}
+                      disabled={loading || !formData.phone}
+                    >
+                      发送验证码
+                    </Button>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  className="w-full cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+                  onClick={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? '登录中...' : '登录 / 注册'}
+                </Button>
+              </TabsContent>
+            </Tabs>
           )}
 
           {!isWechatBrowser && (
-          <div className="text-center text-sm text-gray-500">
-            还没有账户？
-            <span className="ml-1 text-blue-600 font-medium">短信登录即注册</span>
-          </div>
+            <div className="text-center text-sm text-gray-500">
+              还没有账户？
+              <span className="ml-1 font-medium text-blue-600">短信登录即注册</span>
+            </div>
           )}
         </CardContent>
       </Card>
