@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, orders } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { db, orders } from '@/lib/db';
 import { transformDbOrderToApiFormat } from '@/lib/order-service';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
+import { getServerUserId } from '@/lib/server-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getServerUserId(request);
+    if (!userId) {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
+    }
+
     const { id } = await params;
 
     let orderList = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
@@ -25,9 +31,14 @@ export async function GET(
       }
     }
 
+    const order = orderList[0];
+    if (![order.buyerId, order.sellerId].includes(userId)) {
+      return NextResponse.json({ success: false, error: '无权查看该订单' }, { status: 403 });
+    }
+
     return NextResponse.json({
       success: true,
-      data: transformDbOrderToApiFormat(orderList[0]),
+      data: transformDbOrderToApiFormat(order),
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -45,6 +56,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getServerUserId(request);
+    if (!userId) {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const action = body.action;
@@ -63,6 +79,10 @@ export async function POST(
     }
 
     const order = orderList[0];
+    if (order.buyerId !== userId) {
+      return NextResponse.json({ success: false, error: '只有买家可以归还账号' }, { status: 403 });
+    }
+
     if (order.status !== 'active') {
       return NextResponse.json(
         {

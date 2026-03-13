@@ -235,7 +235,20 @@ export function transformDbOrderToApiFormat(dbOrder: any): any {
     isSettled: dbOrder.isSettled || false,
     is_settled: dbOrder.isSettled || false,
     settledAt: dbOrder.settledAt,
-    settled_at: dbOrder.settledAt
+    settled_at: dbOrder.settledAt,
+
+    verificationRequestTime: dbOrder.verificationRequestTime,
+    verification_request_time: dbOrder.verificationRequestTime,
+    verificationDeadline: dbOrder.verificationDeadline,
+    verification_deadline: dbOrder.verificationDeadline,
+    verificationResult: dbOrder.verificationResult,
+    verification_result: dbOrder.verificationResult,
+    verificationRemark: dbOrder.verificationRemark,
+    verification_remark: dbOrder.verificationRemark,
+    disputeReason: dbOrder.disputeReason,
+    dispute_reason: dbOrder.disputeReason,
+    disputeEvidence: dbOrder.disputeEvidence,
+    dispute_evidence: dbOrder.disputeEvidence
   };
 }
 

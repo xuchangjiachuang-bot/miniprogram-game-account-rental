@@ -28,6 +28,10 @@ interface Order {
   paymentTime?: string;
   startTime?: string;
   endTime?: string;
+  verificationDeadline?: string;
+  verificationResult?: string;
+  verificationRemark?: string;
+  disputeReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -300,8 +304,20 @@ export default function AdminOrders() {
                   {selectedOrder.paymentTime && <p><span className="text-gray-500">支付时间：</span>{new Date(selectedOrder.paymentTime).toLocaleString('zh-CN')}</p>}
                   {selectedOrder.startTime && <p><span className="text-gray-500">开始时间：</span>{new Date(selectedOrder.startTime).toLocaleString('zh-CN')}</p>}
                   {selectedOrder.endTime && <p><span className="text-gray-500">结束时间：</span>{new Date(selectedOrder.endTime).toLocaleString('zh-CN')}</p>}
+                  {selectedOrder.verificationDeadline && <p><span className="text-gray-500">验收截止：</span>{new Date(selectedOrder.verificationDeadline).toLocaleString('zh-CN')}</p>}
                 </div>
               </div>
+
+              {(selectedOrder.verificationResult || selectedOrder.verificationRemark || selectedOrder.disputeReason) && (
+                <div>
+                  <h3 className="mb-2 font-semibold">验收 / 纠纷信息</h3>
+                  <div className="space-y-1 text-sm">
+                    {selectedOrder.verificationResult && <p><span className="text-gray-500">验收结果：</span>{selectedOrder.verificationResult}</p>}
+                    {selectedOrder.verificationRemark && <p><span className="text-gray-500">验收备注：</span>{selectedOrder.verificationRemark}</p>}
+                    {selectedOrder.disputeReason && <p><span className="text-gray-500">纠纷原因：</span>{selectedOrder.disputeReason}</p>}
+                  </div>
+                </div>
+              )}
 
               <Button onClick={() => setSelectedOrder(null)} className="w-full">
                 关闭
