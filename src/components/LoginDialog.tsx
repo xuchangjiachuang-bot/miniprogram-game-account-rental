@@ -53,6 +53,7 @@ export function LoginDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isBrowserReady, setIsBrowserReady] = useState(false);
   const [isWechatBrowser, setIsWechatBrowser] = useState(false);
   const [wechatConfig, setWechatConfig] = useState<WechatLoginConfig | null>(null);
   const [wechatUnavailableMessage, setWechatUnavailableMessage] = useState('');
@@ -61,6 +62,7 @@ export function LoginDialog({
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     setIsWechatBrowser(ua.includes('micromessenger'));
+    setIsBrowserReady(true);
   }, []);
 
   useEffect(() => {
@@ -181,6 +183,10 @@ export function LoginDialog({
       return;
     }
 
+    if (!isBrowserReady) {
+      return;
+    }
+
     if (isWechatBrowser || activeTab !== 'wechat') {
       clearPolling();
       setWechatConfig(null);
@@ -193,7 +199,7 @@ export function LoginDialog({
     return () => {
       clearPolling();
     };
-  }, [activeTab, isWechatBrowser, open]);
+  }, [activeTab, isBrowserReady, isWechatBrowser, open]);
 
   const handleSendCode = async () => {
     if (!validatePhone(phone)) {
@@ -308,12 +314,16 @@ export function LoginDialog({
 
   const smsTabDisabled = isWechatBrowser;
   const dialogDescription = useMemo(() => {
+    if (!isBrowserReady) {
+      return null;
+    }
+
     if (isWechatBrowser) {
       return null;
     }
 
     return '你可以使用手机号验证码登录；新用户会自动完成注册。';
-  }, [isWechatBrowser]);
+  }, [isBrowserReady, isWechatBrowser]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -337,7 +347,13 @@ export function LoginDialog({
           </Alert>
         ) : null}
 
-        {isWechatBrowser ? (
+        {!isBrowserReady ? (
+          <div className="w-full py-8">
+            <div className="flex flex-col items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          </div>
+        ) : isWechatBrowser ? (
           <div className="w-full py-8">
             <div className="flex flex-col items-center justify-center">
               <QrCode className="mb-4 h-16 w-16 text-green-600" />
