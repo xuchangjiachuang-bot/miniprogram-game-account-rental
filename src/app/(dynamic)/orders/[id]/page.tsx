@@ -55,6 +55,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       }
       const data = await response.json();
       setLoginInfo(data.data);
+      await loadOrderDetail();
     } catch (error) {
       console.error('加载登录信息失败:', error);
       toast.error('加载登录信息失败');
@@ -378,8 +379,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </CardContent>
             </Card>
 
-            {/* Login Credentials (For Active Orders) */}
-            {order.status === 'active' && (
+            {/* Login Credentials */}
+            {['paid', 'active'].includes(order.status) && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -630,6 +631,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 )}
                 {order.status === 'paid' && (
                   <>
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      onClick={loadLoginInfo}
+                      disabled={loadingQr}
+                    >
+                      {loadingQr ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          处理中...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="w-4 h-4 mr-2" />
+                          开始使用
+                        </>
+                      )}
+                    </Button>
                     <Link href={`/payment/refund?orderId=${order.id}`}>
                       <Button variant="outline" className="w-full">
                         <RefreshCw className="w-4 h-4 mr-2" />

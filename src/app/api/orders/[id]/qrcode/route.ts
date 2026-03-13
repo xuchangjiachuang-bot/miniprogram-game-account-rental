@@ -4,8 +4,8 @@ import { accounts, db, orders } from '@/lib/db';
 import { getServerUserId } from '@/lib/server-auth';
 
 /**
- * Return account login credentials for an active order.
- * Only the buyer who owns the order can access it.
+ * Return account login credentials for a paid or active order.
+ * The first successful fetch after payment activates the rental window.
  */
 export async function GET(
   request: NextRequest,
@@ -30,6 +30,7 @@ export async function GET(
     }
 
     const order = orderList[0];
+    const orderStatus = order.status ?? '';
     if (order.buyerId !== userId) {
       return NextResponse.json({
         success: false,
@@ -37,14 +38,37 @@ export async function GET(
       }, { status: 403 });
     }
 
-    if (order.status !== 'active') {
+    if (!['paid', 'active'].includes(orderStatus)) {
       return NextResponse.json({
         success: false,
-        error: '仅进行中的订单可查看登录信息',
+        error: '仅已支付或进行中的订单可查看登录信息',
       }, { status: 400 });
     }
 
-    const accountList = await db.select().from(accounts).where(eq(accounts.id, order.accountId)).limit(1);
+    let effectiveOrder = order;
+
+    if (orderStatus === 'paid') {
+      const now = new Date();
+      const rentalHours = Number(order.rentalDuration) || 24;
+      const endTime = new Date(now.getTime() + rentalHours * 60 * 60 * 1000);
+
+      const [updatedOrder] = await db
+        .update(orders)
+        .set({
+          status: 'active',
+          startTime: now.toISOString(),
+          endTime: endTime.toISOString(),
+          updatedAt: now.toISOString(),
+        })
+        .where(eq(orders.id, order.id))
+        .returning();
+
+      if (updatedOrder) {
+        effectiveOrder = updatedOrder;
+      }
+    }
+
+    const accountList = await db.select().from(accounts).where(eq(accounts.id, effectiveOrder.accountId)).limit(1);
     if (accountList.length === 0) {
       return NextResponse.json({
         success: false,
@@ -70,8 +94,8 @@ export async function GET(
     }
 
     const loginInfo = {
-      orderId: order.id,
-      orderNo: order.orderNo,
+      orderId: effectiveOrder.id,
+      orderNo: effectiveOrder.orderNo,
       accountId: account.id,
       accountTitle: account.title,
       loginMethod: customAttributes.loginMethod,
@@ -83,7 +107,7 @@ export async function GET(
       province: customAttributes.province,
       city: customAttributes.city,
       loginTime: new Date().toISOString(),
-      expiryTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      expiryTime: effectiveOrder.endTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
     return NextResponse.json({
@@ -94,9 +118,15 @@ export async function GET(
         loginInfo,
         qrCodeContent: JSON.stringify({
           type: 'account_login',
-          orderId: order.id,
+          orderId: effectiveOrder.id,
           timestamp: Date.now(),
         }),
+        order: {
+          id: effectiveOrder.id,
+          status: effectiveOrder.status,
+          startTime: effectiveOrder.startTime,
+          endTime: effectiveOrder.endTime,
+        },
       },
     });
   } catch (error: any) {

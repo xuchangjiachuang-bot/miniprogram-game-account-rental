@@ -144,7 +144,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
       if (buyerBalances.length > 0) {
         const oldFrozen = Number(buyerBalances[0].frozenBalance) || 0;
         const oldAvailable = Number(buyerBalances[0].availableBalance) || 0;
-        const newFrozen = oldFrozen - buyerRefund;
+        const releasedFrozen = Math.min(oldFrozen, buyerRefund);
+        const newFrozen = Math.max(0, oldFrozen - releasedFrozen);
         const newAvailable = oldAvailable + buyerRefund;
 
         await tx
