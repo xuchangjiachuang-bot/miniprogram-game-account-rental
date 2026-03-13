@@ -198,26 +198,40 @@ export default function UserCenterPage() {
 
   // 加载用户资料
   useEffect(() => {
-    if (user) {
-      setProfileForm({
-        username: user.username || '',
-        phone: user.phone || '',
-        avatar: user.avatar || '',
-        avatarKey: '',
-        email: user.email || ''
-      });
-      setWithdrawAccount(user.wechat_openid || '');
-      // 加载群聊列表
-      loadGroupChats();
-      // 加载钱包数据
-      loadWalletData();
-      loadPublicPlatformSettings();
-      // 加载通知数据
-      loadNotifications();
-      // 加载订单列表
-      loadUserOrders();
-    }
+    if (!user) return;
+
+    setProfileForm({
+      username: user.username || '',
+      phone: user.phone || '',
+      avatar: user.avatar || '',
+      avatarKey: '',
+      email: user.email || ''
+    });
+    setWithdrawAccount(user.wechat_openid || '');
+    loadPublicPlatformSettings();
   }, [user]);
+
+  // 按当前 tab 懒加载数据，避免个人资料/钱包页被不相关请求拖垮
+  useEffect(() => {
+    if (!user) return;
+
+    switch (activeTab) {
+      case 'chats':
+        loadGroupChats();
+        break;
+      case 'orders':
+        loadUserOrders();
+        break;
+      case 'wallet':
+        loadWalletData();
+        break;
+      case 'notifications':
+        loadNotifications();
+        break;
+      default:
+        break;
+    }
+  }, [user, activeTab]);
 
   // 加载钱包数据
   const loadPublicPlatformSettings = async () => {
@@ -370,7 +384,7 @@ export default function UserCenterPage() {
     setOrdersLoading(true);
     try {
       const token = getToken();
-      const response = await fetch(`/api/orders?user_id=${user.id}`, {
+      const response = await fetch('/api/orders', {
         signal: controller.signal,
         headers: token ? {
           'Authorization': `Bearer ${token}`
