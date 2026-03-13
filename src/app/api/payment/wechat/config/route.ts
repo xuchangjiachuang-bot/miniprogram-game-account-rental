@@ -29,6 +29,7 @@ export async function GET() {
           runtimeReadAt: new Date().toISOString(),
           mode: 'runtime-env',
           appIdMask: maskValue(runtimeConfig.appid),
+          mpAppIdMask: maskValue(runtimeConfig.mpAppId),
           mchIdMask: maskValue(runtimeConfig.mchid),
           notifyUrlMask: runtimeConfig.notifyUrl || '',
           apiV3KeyLength: runtimeConfig.apiV3Key?.length || 0,

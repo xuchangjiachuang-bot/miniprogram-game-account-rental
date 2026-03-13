@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWechatPlatformSettingsCompat } from '@/lib/wechat-runtime-config';
+import { getWechatPayV3Config } from '@/lib/wechat/v3';
 
 type JsapiTicketCache = {
   accessToken: string;
@@ -36,9 +36,9 @@ function isLikelyWechatSecret(value: string | null | undefined): value is string
 }
 
 async function getWechatMpConfig() {
-  const setting = await getWechatPlatformSettingsCompat();
-  const appId = setting?.wechatMpAppId?.trim() || process.env.WECHAT_MP_APPID?.trim() || '';
-  const appSecret = setting?.wechatMpAppSecret?.trim() || process.env.WECHAT_MP_SECRET?.trim() || '';
+  const config = await getWechatPayV3Config();
+  const appId = config.mpAppId?.trim() || '';
+  const appSecret = config.mpSecret?.trim() || '';
 
   if (!isLikelyWechatAppId(appId) || !isLikelyWechatSecret(appSecret)) {
     throw new Error('公众号配置不完整，无法生成 JS-SDK 签名');
