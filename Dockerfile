@@ -12,14 +12,10 @@ RUN apt-get update \
 
 WORKDIR /app
 
-FROM base AS deps
+FROM base AS builder
 
 COPY package.json pnpm-lock.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
-
-FROM base AS builder
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NODE_ENV=production
