@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, Phone, QrCode, RefreshCw } from 'lucide-react';
 import WechatQrLogin from '@/components/WechatQrLogin';
 import { useUser } from '@/contexts/UserContext';
@@ -32,8 +32,8 @@ interface WechatLoginConfig {
   state: string;
 }
 
-const validatePhone = (phone: string): boolean => /^1[3-9]\d{9}$/.test(phone);
-const validateCode = (code: string): boolean => /^\d{6}$/.test(code);
+const validatePhone = (phone: string) => /^1[3-9]\d{9}$/.test(phone);
+const validateCode = (code: string) => /^\d{6}$/.test(code);
 
 export function LoginDialog({
   trigger,
@@ -46,6 +46,7 @@ export function LoginDialog({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
+  const [activeTab, setActiveTab] = useState<'wechat' | 'phone'>('wechat');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -62,11 +63,26 @@ export function LoginDialog({
     setIsWechatBrowser(ua.includes('micromessenger'));
   }, []);
 
+  useEffect(() => {
+    if (isWechatBrowser && activeTab !== 'wechat') {
+      setActiveTab('wechat');
+    }
+  }, [activeTab, isWechatBrowser]);
+
   const clearPolling = () => {
     if (pollingInterval) {
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }
+  };
+
+  const resetLoginState = () => {
+    clearPolling();
+    setWechatConfig(null);
+    setWechatUnavailableMessage('');
+    setError('');
+    setSuccess('');
+    setLoading(false);
   };
 
   const startPolling = (state: string) => {
@@ -90,7 +106,7 @@ export function LoginDialog({
           onSuccess?.();
         }
       } catch (pollError) {
-        console.error('[微信登录] 检查登录状态失败:', pollError);
+        console.error('[微信登录] 检查扫码登录状态失败:', pollError);
       }
     }, 1000);
 
@@ -98,6 +114,10 @@ export function LoginDialog({
   };
 
   const generateWechatQrCode = async () => {
+    if (isWechatBrowser) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -109,9 +129,7 @@ export function LoginDialog({
       const configResult = await configResponse.json();
 
       if (!configResult.success) {
-        setWechatUnavailableMessage(
-          configResult.error || '当前环境暂时无法使用微信扫码登录，请稍后再试。'
-        );
+        setWechatUnavailableMessage(configResult.error || '当前环境暂时无法使用微信扫码登录，请稍后再试。');
         return;
       }
 
@@ -137,45 +155,45 @@ export function LoginDialog({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'wechat_login_success') {
-        clearPolling();
-
-        if (event.data.token) {
-          setToken(event.data.token);
-        }
-
-        refreshUser().then(() => {
-          setOpen(false);
-          onSuccess?.();
-        });
+      if (event.data?.type !== 'wechat_login_success') {
+        return;
       }
+
+      clearPolling();
+
+      if (event.data.token) {
+        setToken(event.data.token);
+      }
+
+      void refreshUser().then(() => {
+        setOpen(false);
+        onSuccess?.();
+      });
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onSuccess, refreshUser, setOpen, pollingInterval]);
+  }, [onSuccess, refreshUser, setOpen]);
 
   useEffect(() => {
-    if (open) {
-      if (isWechatBrowser) {
-        clearPolling();
-        setWechatConfig(null);
-        setWechatUnavailableMessage('');
-      } else {
-        void generateWechatQrCode();
-      }
-    } else {
+    if (!open) {
+      resetLoginState();
+      return;
+    }
+
+    if (isWechatBrowser || activeTab !== 'wechat') {
       clearPolling();
       setWechatConfig(null);
       setWechatUnavailableMessage('');
-      setError('');
-      setSuccess('');
+      return;
     }
+
+    void generateWechatQrCode();
 
     return () => {
       clearPolling();
     };
-  }, [open, isWechatBrowser]);
+  }, [activeTab, isWechatBrowser, open]);
 
   const handleSendCode = async () => {
     if (!validatePhone(phone)) {
@@ -195,22 +213,24 @@ export function LoginDialog({
 
       const data = await response.json();
 
-      if (data.success) {
-        setSuccess('验证码已发送');
-        setCountdown(60);
-
-        const timer = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
+      if (!data.success) {
         setError(data.error || '发送验证码失败');
+        return;
       }
+
+      setSuccess('验证码已发送');
+      setCountdown(60);
+
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+
+          return prev - 1;
+        });
+      }, 1000);
     } catch {
       setError('发送验证码失败，请稍后重试');
     } finally {
@@ -241,22 +261,23 @@ export function LoginDialog({
 
       const data = await response.json();
 
-      if (data.success) {
-        if (data.token) {
-          setToken(data.token);
-        }
-
-        setSuccess('登录成功');
-
-        setTimeout(async () => {
-          await refreshUser();
-          setOpen(false);
-          onSuccess?.();
-          setSuccess('');
-        }, 500);
-      } else {
+      if (!data.success) {
         setError(data.error || '登录失败');
+        return;
       }
+
+      if (data.token) {
+        setToken(data.token);
+      }
+
+      setSuccess('登录成功');
+
+      setTimeout(async () => {
+        await refreshUser();
+        setOpen(false);
+        onSuccess?.();
+        setSuccess('');
+      }, 500);
     } catch {
       setError('登录失败，请稍后重试');
     } finally {
@@ -270,9 +291,8 @@ export function LoginDialog({
       return;
     }
 
-    const returnTo = typeof window === 'undefined'
-      ? '/'
-      : `${window.location.pathname}${window.location.search}`;
+    const returnTo =
+      typeof window === 'undefined' ? '/' : `${window.location.pathname}${window.location.search}`;
     window.location.href = `/api/auth/wechat/authorize?state=wechat_oauth&returnTo=${encodeURIComponent(returnTo)}`;
   };
 
@@ -280,11 +300,20 @@ export function LoginDialog({
     <Button
       variant="default"
       size="sm"
-      className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 font-medium"
+      className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 font-medium transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-700 hover:to-purple-700 hover:shadow-lg"
     >
       登录 / 注册
     </Button>
   );
+
+  const smsTabDisabled = isWechatBrowser;
+  const dialogDescription = useMemo(() => {
+    if (isWechatBrowser) {
+      return null;
+    }
+
+    return '你可以使用手机号验证码登录；新用户会自动完成注册。';
+  }, [isWechatBrowser]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -292,36 +321,26 @@ export function LoginDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-2xl">登录</DialogTitle>
-          {!isWechatBrowser && (
-            <DialogDescription>
-              你可以使用手机号验证码登录；新用户会自动完成注册。
-            </DialogDescription>
-          )}
+          {dialogDescription ? <DialogDescription>{dialogDescription}</DialogDescription> : null}
         </DialogHeader>
 
-        {error && (
+        {error ? (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        )}
+        ) : null}
 
-        {success && (
+        {success ? (
           <Alert>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
-        )}
+        ) : null}
 
         {isWechatBrowser ? (
           <div className="w-full py-8">
             <div className="flex flex-col items-center justify-center">
               <QrCode className="mb-4 h-16 w-16 text-green-600" />
-              {wechatUnavailableMessage && (
-                <Alert className="mb-4 w-full text-left">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{wechatUnavailableMessage}</AlertDescription>
-                </Alert>
-              )}
               <Button
                 type="button"
                 className="mt-2 w-full cursor-pointer bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800"
@@ -333,13 +352,13 @@ export function LoginDialog({
             </div>
           </div>
         ) : (
-          <Tabs defaultValue="wechat" className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'wechat' | 'phone')} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="wechat">
                 <QrCode className="mr-2 h-4 w-4" />
                 微信扫码
               </TabsTrigger>
-              <TabsTrigger value="phone">
+              <TabsTrigger value="phone" disabled={smsTabDisabled}>
                 <Phone className="mr-2 h-4 w-4" />
                 手机号登录
               </TabsTrigger>
@@ -369,25 +388,14 @@ export function LoginDialog({
                     onChange={(e) => setCode(e.target.value)}
                     maxLength={6}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSendCode}
-                    disabled={countdown > 0 || loading}
-                    className="whitespace-nowrap"
-                  >
-                    {countdown > 0 ? `${countdown} 秒后重发` : '发送验证码'}
+                  <Button type="button" variant="outline" onClick={handleSendCode} disabled={loading || countdown > 0}>
+                    {countdown > 0 ? `${countdown}s` : '发送验证码'}
                   </Button>
                 </div>
               </div>
 
-              <Button
-                type="button"
-                className="w-full cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
-                onClick={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? '登录中...' : '登录 / 注册'}
+              <Button type="button" className="w-full" onClick={handleSubmit} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : '登录'}
               </Button>
             </TabsContent>
 
@@ -398,9 +406,7 @@ export function LoginDialog({
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{wechatUnavailableMessage}</AlertDescription>
                   </Alert>
-                  <p className="text-center text-sm text-gray-500">
-                    当前环境暂时无法使用微信扫码登录，请先使用手机号登录。
-                  </p>
+                  <p className="text-center text-sm text-gray-500">当前环境暂时无法使用微信扫码登录，请先使用手机号登录。</p>
                 </div>
               ) : wechatConfig ? (
                 <div className="w-full space-y-4 py-8">
@@ -418,7 +424,7 @@ export function LoginDialog({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={generateWechatQrCode}
+                      onClick={() => void generateWechatQrCode()}
                       disabled={loading}
                       className="flex items-center gap-2"
                     >
@@ -431,7 +437,7 @@ export function LoginDialog({
                 <div className="w-full space-y-4 py-8 text-center">
                   <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-gray-400" />
                   <p className="text-gray-500">正在加载二维码...</p>
-                  <Button onClick={generateWechatQrCode} disabled={loading} variant="outline" className="mt-4">
+                  <Button onClick={() => void generateWechatQrCode()} disabled={loading} variant="outline" className="mt-4">
                     重试
                   </Button>
                 </div>
