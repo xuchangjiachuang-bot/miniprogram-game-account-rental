@@ -4,6 +4,7 @@ import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
 import { fenToYuan } from '@/lib/wechat/utils';
+import { queryTransactionByOutTradeNo } from '@/lib/wechat/v3';
 
 export async function getAuthenticatedPaymentUser(request: NextRequest): Promise<User | null> {
   const token = getServerToken(request);
@@ -193,4 +194,103 @@ export async function markWechatWalletRechargePaid(params: {
 
     return { paymentRecord, alreadyPaid: false };
   });
+}
+
+async function markWechatPaymentFailed(recordId: string, tradeState: string, failureReason?: string) {
+  await db
+    .update(paymentRecords)
+    .set({
+      status: 'failed',
+      failureReason: failureReason || tradeState,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(paymentRecords.id, recordId));
+}
+
+export async function reconcileWechatWalletRechargeStatus(params: {
+  paymentRecordId: string;
+  userId?: string;
+}) {
+  const conditions = [
+    eq(paymentRecords.id, params.paymentRecordId),
+    eq(paymentRecords.type, 'recharge'),
+    eq(paymentRecords.method, 'wechat'),
+  ];
+
+  if (params.userId) {
+    conditions.push(eq(paymentRecords.userId, params.userId));
+  }
+
+  const paymentRecordList = await db
+    .select()
+    .from(paymentRecords)
+    .where(and(...conditions))
+    .limit(1);
+
+  if (paymentRecordList.length === 0) {
+    throw new Error('RECHARGE_RECORD_NOT_FOUND');
+  }
+
+  const paymentRecord = paymentRecordList[0];
+  if (paymentRecord.status === 'success' || !paymentRecord.thirdPartyOrderId) {
+    return paymentRecord;
+  }
+
+  const transaction = await queryTransactionByOutTradeNo(paymentRecord.thirdPartyOrderId);
+
+  if (transaction.trade_state === 'SUCCESS') {
+    await markWechatWalletRechargePaid({
+      outTradeNo: paymentRecord.thirdPartyOrderId,
+      transactionId: transaction.transaction_id,
+      totalFeeFen: transaction.amount?.total,
+    });
+  } else if (['CLOSED', 'REVOKED', 'PAYERROR'].includes(transaction.trade_state)) {
+    await markWechatPaymentFailed(
+      paymentRecord.id,
+      transaction.trade_state,
+      transaction.trade_state_desc
+    );
+  }
+
+  const refreshedPaymentRecordList = await db
+    .select()
+    .from(paymentRecords)
+    .where(eq(paymentRecords.id, paymentRecord.id))
+    .limit(1);
+
+  return refreshedPaymentRecordList[0] || paymentRecord;
+}
+
+export async function reconcileWechatOrderStatus(orderId: string) {
+  const orderList = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (orderList.length === 0) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  const order = orderList[0];
+  if (['paid', 'completed'].includes(order.status || '')) {
+    return order;
+  }
+
+  const transaction = await queryTransactionByOutTradeNo(order.id.replace(/-/g, ''));
+  if (transaction.trade_state === 'SUCCESS') {
+    await markWechatOrderPaid({
+      orderId: order.id,
+      transactionId: transaction.transaction_id,
+      totalFeeFen: transaction.amount?.total,
+    });
+  }
+
+  const refreshedOrderList = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, order.id))
+    .limit(1);
+
+  return refreshedOrderList[0] || order;
 }

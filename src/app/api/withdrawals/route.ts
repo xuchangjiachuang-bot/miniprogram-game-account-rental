@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/user-service';
 import { getUserBalance, requestWithdrawal } from '@/lib/user-balance-service';
 
+function getBearerToken(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  return authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
+    const token = getBearerToken(request);
     if (!token) {
       return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
     }
@@ -18,54 +21,48 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const amount = Number(body.amount || 0);
-    const withdrawalType = typeof body.withdrawal_type === 'string' ? body.withdrawal_type : 'wechat';
-    const rawAccountInfo = body.accountInfo ?? body.account_info ?? null;
+    const requestedType = typeof body.withdrawal_type === 'string' ? body.withdrawal_type : 'wechat';
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ success: false, error: '提现金额必须大于 0' }, { status: 400 });
     }
 
-    const accountInfo = withdrawalType === 'wechat'
-      ? {
-          openid: user.wechat_openid,
-          accountName: user.username || user.phone || '',
-          wechatAccount: rawAccountInfo || '',
-        }
-      : rawAccountInfo;
+    if (requestedType !== 'wechat') {
+      return NextResponse.json(
+        { success: false, error: '当前仅支持微信提现，请先使用微信授权登录' },
+        { status: 400 }
+      );
+    }
 
-    if (withdrawalType === 'wechat' && !user.wechat_openid) {
+    if (!user.wechat_openid) {
       return NextResponse.json(
         { success: false, error: '当前账号未绑定微信，无法发起微信提现' },
         { status: 400 }
       );
     }
 
-    if (!accountInfo) {
-      return NextResponse.json({ success: false, error: '缺少账户信息' }, { status: 400 });
-    }
+    const accountInfo = {
+      openid: user.wechat_openid,
+      accountName: user.realName || user.username || user.phone || '',
+      phone: user.phone || '',
+      nickname: user.username || '',
+    };
 
     const result = await requestWithdrawal(user.id, amount, accountInfo);
-
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        message: result.message,
-        data: {
-          withdrawalId: result.withdrawalId,
-          amount: result.amount,
-          fee: result.fee,
-          actualAmount: result.actualAmount,
-        },
-      });
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.message }, { status: 400 });
     }
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: result.message,
+    return NextResponse.json({
+      success: true,
+      message: result.message,
+      data: {
+        withdrawalId: result.withdrawalId,
+        amount: result.amount,
+        fee: result.fee,
+        actualAmount: result.actualAmount,
       },
-      { status: 400 }
-    );
+    });
   } catch (error: any) {
     console.error('申请提现失败:', error);
     return NextResponse.json(
@@ -80,9 +77,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
+    const token = getBearerToken(request);
     if (!token) {
       return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
     }
@@ -93,7 +88,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { db, withdrawals } = await import('@/lib/db');
-    const { eq, desc } = await import('drizzle-orm');
+    const { desc, eq } = await import('drizzle-orm');
     const withdrawalList = await db
       .select()
       .from(withdrawals)

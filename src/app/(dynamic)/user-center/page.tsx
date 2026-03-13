@@ -46,6 +46,10 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface WalletUiSettings {
+  withdrawalFee: number;
+}
+
 export default function UserCenterPage() {
   const { user, loading } = useUser();
   const [activeTab, setActiveTab] = useState('profile');
@@ -113,6 +117,9 @@ export default function UserCenterPage() {
   const [rechargeAmount, setRechargeAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
+  const [walletUiSettings, setWalletUiSettings] = useState<WalletUiSettings>({
+    withdrawalFee: 1,
+  });
 
   // 个人资料表单
   const [profileForm, setProfileForm] = useState({
@@ -199,10 +206,12 @@ export default function UserCenterPage() {
         avatarKey: '',
         email: user.email || ''
       });
+      setWithdrawAccount(user.wechat_openid || '');
       // 加载群聊列表
       loadGroupChats();
       // 加载钱包数据
       loadWalletData();
+      loadPublicPlatformSettings();
       // 加载通知数据
       loadNotifications();
       // 加载订单列表
@@ -211,6 +220,29 @@ export default function UserCenterPage() {
   }, [user]);
 
   // 加载钱包数据
+  const loadPublicPlatformSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/platform-settings', {
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        throw new Error('加载平台配置失败');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '加载平台配置失败');
+      }
+
+      setWalletUiSettings({
+        withdrawalFee: Number(result.data?.withdrawalFee || 1),
+      });
+    } catch (error) {
+      console.error('加载平台配置失败:', error);
+    }
+  };
+
   const loadWalletData = async () => {
     if (!user) return;
 
@@ -516,6 +548,57 @@ export default function UserCenterPage() {
   };
 
   // 加载群聊列表
+  const handleWechatWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      toast.error('请输入有效的提现金额');
+      return;
+    }
+
+    if (!user?.wechat_openid) {
+      toast.error('请先使用微信授权登录并绑定微信后再提现');
+      return;
+    }
+
+    if (balance && parseFloat(withdrawAmount) > Number(balance.available_balance || 0)) {
+      toast.error('提现金额超过可用余额');
+      return;
+    }
+
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error('请先登录后再提现');
+        return;
+      }
+
+      const response = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: parseFloat(withdrawAmount),
+          withdrawal_type: 'wechat'
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        toast.error(result.error || '提现失败');
+        return;
+      }
+
+      toast.success(`微信提现 ¥${withdrawAmount} 已提交`);
+      setWithdrawAmount('');
+      setWithdrawAccount('');
+      loadWalletData();
+    } catch (error) {
+      console.error('提现失败:', error);
+      toast.error('提现失败，请重试');
+    }
+  };
+
   const loadGroupChats = async () => {
     setLoadingChats(true);
     try {
@@ -1255,14 +1338,24 @@ export default function UserCenterPage() {
                               <Input
                                 placeholder="请输入支付宝/微信账号"
                                 value={withdrawAccount}
+                                disabled={Boolean(user?.wechat_openid)}
                                 onChange={(e) => setWithdrawAccount(e.target.value)}
                               />
                             </div>
-                            <Button onClick={handleWithdraw} className="w-full">
+                            {user?.wechat_openid ? (
+                              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                已绑定微信账号，提现时会直接打款到当前微信，无需手动输入微信号。
+                              </div>
+                            ) : (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                                当前账号未绑定微信，请先使用微信授权登录后再提现。
+                              </div>
+                            )}
+                            <Button onClick={handleWechatWithdraw} className="w-full" disabled={!user?.wechat_openid}>
                               申请提现
                             </Button>
                             <p className="text-xs text-gray-500 text-center">
-                              * 提现手续费 1%，最低 1 元
+                              {`* 提现手续费 ${walletUiSettings.withdrawalFee}%`}
                             </p>
                           </TabsContent>
                         </Tabs>

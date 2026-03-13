@@ -1,8 +1,7 @@
-import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db, paymentRecords } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
+import { reconcileWechatWalletRechargeStatus } from '@/lib/wechat/payment-flow';
 
 export async function GET(
   request: NextRequest,
@@ -16,25 +15,18 @@ export async function GET(
 
     const user = await verifyToken(token);
     if (!user) {
-      return NextResponse.json({ success: false, error: '登录状态已失效，请重新登录' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: '登录状态已失效，请重新登录' },
+        { status: 401 }
+      );
     }
 
     const { id } = await params;
-    const recordList = await db
-      .select()
-      .from(paymentRecords)
-      .where(and(
-        eq(paymentRecords.id, id),
-        eq(paymentRecords.userId, user.id),
-        eq(paymentRecords.type, 'recharge'),
-      ))
-      .limit(1);
+    const record = await reconcileWechatWalletRechargeStatus({
+      paymentRecordId: id,
+      userId: user.id,
+    });
 
-    if (recordList.length === 0) {
-      return NextResponse.json({ success: false, error: '充值记录不存在' }, { status: 404 });
-    }
-
-    const record = recordList[0];
     return NextResponse.json({
       success: true,
       data: {
@@ -42,11 +34,16 @@ export async function GET(
         amount: Number(record.amount) || 0,
         status: record.status,
         transactionId: record.transactionId,
+        failureReason: record.failureReason,
         createdAt: record.createdAt,
       },
     });
   } catch (error: any) {
-    console.error('[Recharge Status] 查询充值状态失败:', error);
+    if (error.message === 'RECHARGE_RECORD_NOT_FOUND') {
+      return NextResponse.json({ success: false, error: '充值记录不存在' }, { status: 404 });
+    }
+
+    console.error('[Recharge Status] Failed to query recharge status:', error);
     return NextResponse.json(
       {
         success: false,

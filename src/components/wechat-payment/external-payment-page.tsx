@@ -205,6 +205,8 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           setPolling(false);
           setPaymentStatus('success');
           router.push(`/orders/${orderId}`);
+        } else if (!result.success) {
+          setError(result.error || '检查订单支付状态失败');
         }
       }
 
@@ -219,6 +221,12 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           setPolling(false);
           setPaymentStatus('success');
           router.push('/user-center?tab=wallet');
+        } else if (result.success && result.data.status === 'failed') {
+          setPolling(false);
+          setPaymentStatus('failed');
+          setError(result.data.failureReason || '微信支付未成功，请重新发起支付');
+        } else if (!result.success) {
+          setError(result.error || '检查充值支付状态失败');
         }
       }
     } catch (statusError) {

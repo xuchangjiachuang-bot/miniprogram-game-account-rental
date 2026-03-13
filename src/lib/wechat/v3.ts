@@ -66,6 +66,24 @@ export interface CreateTransferBillParams {
   userRecvPerception?: string;
 }
 
+export interface WechatPayTransactionResult {
+  appid?: string;
+  mchid?: string;
+  out_trade_no: string;
+  transaction_id?: string;
+  trade_type?: string;
+  trade_state: string;
+  trade_state_desc?: string;
+  success_time?: string;
+  attach?: string;
+  amount?: {
+    total?: number;
+    payer_total?: number;
+    currency?: string;
+    payer_currency?: string;
+  };
+}
+
 export interface WechatPayNotification<T = Record<string, any>> {
   id: string;
   create_time: string;
@@ -445,6 +463,17 @@ export async function createNativeTransaction(params: CreateNativeTransactionPar
       },
     },
   });
+}
+
+export async function queryTransactionByOutTradeNo(outTradeNo: string) {
+  const config = await getWechatPayV3Config();
+  const encodedOutTradeNo = encodeURIComponent(outTradeNo);
+  const encodedMchid = encodeURIComponent(config.mchid);
+
+  return sendWechatPayRequest<WechatPayTransactionResult>(
+    'GET',
+    `/v3/pay/transactions/out-trade-no/${encodedOutTradeNo}?mchid=${encodedMchid}`
+  );
 }
 
 export async function buildJsapiPaymentParams(prepayId: string, appId?: string) {
