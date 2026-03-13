@@ -40,6 +40,7 @@ interface GroupChat {
 interface ChatMessage {
   id: string;
   senderId: string;
+  senderType?: 'buyer' | 'seller' | 'admin' | 'system';
   senderName: string;
   senderAvatar?: string;
   content: string;
@@ -232,6 +233,27 @@ export default function UserCenterPage() {
         break;
     }
   }, [user, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'chats' || !user) {
+      return;
+    }
+
+    const groupTimer = window.setInterval(() => {
+      loadGroupChats();
+    }, 15000);
+
+    const messageTimer = selectedChat ? window.setInterval(() => {
+      loadChatMessages(selectedChat.id, { silent: true });
+    }, 5000) : null;
+
+    return () => {
+      window.clearInterval(groupTimer);
+      if (messageTimer) {
+        window.clearInterval(messageTimer);
+      }
+    };
+  }, [activeTab, selectedChat?.id, user?.id]);
 
   // 加载钱包数据
   const loadPublicPlatformSettings = async () => {
@@ -633,10 +655,7 @@ export default function UserCenterPage() {
   const loadGroupChats = async () => {
     setLoadingChats(true);
     try {
-      // 获取 token
       const token = getToken();
-
-      // 从 API 加载群聊数据
       const res = await fetch('/api/chat/user-groups', {
         headers: token ? {
           'Authorization': `Bearer ${token}`
@@ -646,8 +665,14 @@ export default function UserCenterPage() {
 
       if (result.success && result.data) {
         setGroupChats(result.data);
+        setSelectedChat((current) => {
+          if (!current) {
+            return current;
+          }
+
+          return result.data.find((chat: GroupChat) => chat.id === current.id) || current;
+        });
       } else {
-        // 如果没有群聊，显示空状态
         setGroupChats([]);
       }
     } catch (error) {
@@ -658,10 +683,8 @@ export default function UserCenterPage() {
     }
   };
 
-  // 加载聊天记录
-  const loadChatMessages = async (chatId: string) => {
+  const loadChatMessages = async (chatId: string, options?: { silent?: boolean }) => {
     try {
-      // 从 API 加载聊天记录
       const token = getToken();
       const res = await fetch(`/api/chat/groups/${chatId}/messages?limit=50`, {
         headers: token ? {
@@ -674,60 +697,67 @@ export default function UserCenterPage() {
         setChatMessages(result.data.map((message: any) => ({
           id: message.id,
           senderId: message.senderId,
+          senderType: message.senderType,
           senderName: message.senderName || message.senderType || '系统',
           senderAvatar: message.senderAvatar,
           content: message.content,
-          timestamp: message.timestamp || message.createdAt || new Date().toISOString()
+          timestamp: message.createdAt || message.timestamp || new Date().toISOString()
         })));
       } else {
         setChatMessages([]);
       }
     } catch (error) {
       console.error('加载聊天记录失败:', error);
-      toast.error('加载聊天记录失败');
+      if (!options?.silent) {
+        toast.error('加载聊天记录失败');
+      }
     }
   };
 
-  // 选择群聊
   const handleSelectChat = (chat: GroupChat) => {
     setSelectedChat(chat);
     loadChatMessages(chat.id);
   };
 
-  // 发送消息（通过 Socket）
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat || !user) return;
 
-    // 通过 Socket 发送消息（如果 Socket 已连接）
-    // 否则使用 API 发送
     try {
-      // 获取 token
       const token = getToken();
-
-      // 使用 fetch API 发送消息（后备方案）
       const response = await fetch(`/api/chat/groups/${selectedChat.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({          messageType: 'text',
+        body: JSON.stringify({
+          messageType: 'text',
           content: newMessage.trim()
         })
       });
 
-      setNewMessage('');
-      toast.success('消息已发送');
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '发送消息失败');
+      }
 
-      // 重新加载消息
-      loadChatMessages(selectedChat.id);
+      setNewMessage('');
+      setChatMessages((current) => [...current, {
+        id: result.data.id,
+        senderId: result.data.senderId,
+        senderType: result.data.senderType,
+        senderName: result.data.senderName,
+        senderAvatar: result.data.senderAvatar,
+        content: result.data.content,
+        timestamp: result.data.createdAt,
+      }]);
+      loadGroupChats();
     } catch (error) {
       console.error('发送消息失败:', error);
       toast.error('发送消息失败');
     }
   };
 
-  // 处理头像上传
   const handleAvatarUpload = async (url: string, key: string) => {
     // 更新本地状态
     setProfileForm({
@@ -1087,7 +1117,7 @@ export default function UserCenterPage() {
                       {/* 聊天记录 */}
                       <div className="flex-1 overflow-y-auto py-4 space-y-4">
                         {chatMessages.map((message) => {
-                          const isSelf = message.senderId === '1';
+                          const isSelf = message.senderId === user?.id;
                           return (
                             <div
                               key={message.id}
@@ -1642,4 +1672,3 @@ export default function UserCenterPage() {
     </div>
   );
 }
-

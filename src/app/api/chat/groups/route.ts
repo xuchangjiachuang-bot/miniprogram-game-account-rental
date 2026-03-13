@@ -1,85 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/server-auth';
-import {
-  getGroup,
-  getGroupMessages,
-  sendMessage,
-  getGroupMembers,
-  createGroup,
-  getUserGroups
-} from '@/lib/chat-service-new';
-import { chatManager } from '@/storage/database/chatManager';
+import { and, eq } from 'drizzle-orm';
+import { db, orders } from '@/lib/db';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
+import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 
-/**
- * GET /api/chat/groups/:groupId
- * 获取群聊信息
- */
-export async function GET(request: NextRequest) {
-  try {
-    const userId = getServerUserId(request);
-    if (!userId) {
-      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
-    }
+export const dynamic = 'force-dynamic';
 
-    const { pathname } = new URL(request.url);
-    const groupId = pathname.split('/').pop();
-
-    if (!groupId) {
-      return NextResponse.json({ success: false, error: '群聊ID不能为空' }, { status: 400 });
-    }
-
-    const group = await getGroup(groupId);
-
-    if (!group) {
-      return NextResponse.json({ success: false, error: '群聊不存在' }, { status: 404 });
-    }
-
-    return NextResponse.json({ success: true, data: group });
-  } catch (error: any) {
-    console.error('获取群聊信息失败:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-/**
- * POST /api/chat/groups
- * 创建群聊（仅用于订单）
- */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getServerUserId(request);
-    if (!userId) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json({ success: false, error: '登录状态已失效，请重新登录' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { orderId, title, buyerId, sellerId } = body;
-
-    if (!orderId || !title || !buyerId || !sellerId) {
-      return NextResponse.json({ success: false, error: '参数不完整' }, { status: 400 });
+    const orderId = typeof body.orderId === 'string' ? body.orderId : '';
+    if (!orderId) {
+      return NextResponse.json({ success: false, error: '缺少订单ID' }, { status: 400 });
     }
 
-    // 检查是否已经存在群聊
-    const existingGroup = await chatManager.getGroupChatByOrderId(orderId);
-    if (existingGroup) {
-      return NextResponse.json({ success: true, data: existingGroup });
+    const orderRows = await db
+      .select({
+        id: orders.id,
+      })
+      .from(orders)
+      .where(and(
+        eq(orders.id, orderId),
+        eq(orders.buyerId, user.id),
+      ))
+      .limit(1);
+
+    if (!orderRows[0]) {
+      return NextResponse.json({ success: false, error: '无权为该订单创建群聊' }, { status: 403 });
     }
 
-    // 创建群聊
-    const group = await createGroup({
-      orderId,
-      title,
-      buyerId,
-      sellerId
-    });
-
-    if (!group) {
-      return NextResponse.json({ success: false, error: '创建群聊失败' }, { status: 500 });
-    }
-
+    const group = await ensureOrderGroupChat(orderId);
     return NextResponse.json({ success: true, data: group });
   } catch (error: any) {
-    console.error('创建群聊失败:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('[POST /api/chat/groups] Error:', error);
+    return NextResponse.json({ success: false, error: error.message || '创建群聊失败' }, { status: 500 });
   }
 }
