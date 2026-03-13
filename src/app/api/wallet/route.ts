@@ -3,7 +3,6 @@ import { db, userBalances } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { getUserBalance } from '@/lib/user-balance-service';
 import { verifyToken } from '@/lib/user-service';
-import { reconcilePendingWechatWalletRechargesForUser } from '@/lib/wechat/payment-flow';
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,8 +27,6 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-
-    await reconcilePendingWechatWalletRechargesForUser(user.id);
 
     let balance = await getUserBalance(user.id);
 

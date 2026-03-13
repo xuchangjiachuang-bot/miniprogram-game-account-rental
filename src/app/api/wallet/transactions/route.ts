@@ -3,7 +3,6 @@ import { desc, eq } from 'drizzle-orm';
 import { db, balanceTransactions } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
-import { reconcilePendingWechatWalletRechargesForUser } from '@/lib/wechat/payment-flow';
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,8 +27,6 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-
-    await reconcilePendingWechatWalletRechargesForUser(user.id);
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1', 10);

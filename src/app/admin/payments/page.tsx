@@ -59,6 +59,7 @@ export default function AdminPayments() {
   const [checkingConfig, setCheckingConfig] = useState(false);
   const [configCheck, setConfigCheck] = useState<ConfigCheckData | null>(null);
   const [uploadingCert, setUploadingCert] = useState(false);
+  const [reconcilingPayments, setReconcilingPayments] = useState(false);
 
   const [formData, setFormData] = useState<WechatFormData>({
     appid: '',
@@ -291,6 +292,31 @@ export default function AdminPayments() {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleReconcileRechargePayments = async () => {
+    try {
+      setReconcilingPayments(true);
+      const response = await fetch('/api/admin/payments/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 30 }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || '支付对账失败');
+        return;
+      }
+
+      const { total, successCount, failedCount } = result.data;
+      toast.success(`支付对账完成：共 ${total} 笔，成功 ${successCount} 笔，失败 ${failedCount} 笔`);
+    } catch (error) {
+      console.error('支付对账失败:', error);
+      toast.error('支付对账失败');
+    } finally {
+      setReconcilingPayments(false);
+    }
+  };
+
   const handleCertUpload = async (event: React.ChangeEvent<HTMLInputElement>, certType: 'p12' | 'cert' | 'key') => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -372,6 +398,33 @@ export default function AdminPayments() {
         <h1 className="text-2xl font-bold text-gray-900">支付配置管理</h1>
         <p className="text-sm text-gray-600 mt-1">管理平台的支付方式和相关配置</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>支付对账</CardTitle>
+          <CardDescription>
+            正常到账以微信异步回调为准。这里仅用于处理历史异常单，不会在用户钱包页面实时执行。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-600">
+            会对最近待处理的微信充值记录执行一次后台查单补偿。
+          </p>
+          <Button onClick={handleReconcileRechargePayments} disabled={reconcilingPayments}>
+            {reconcilingPayments ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                对账中...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                立即对账
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* 支付方式概览 */}
       <div className="grid gap-6 md:grid-cols-2">
