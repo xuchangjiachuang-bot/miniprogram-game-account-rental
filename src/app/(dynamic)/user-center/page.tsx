@@ -121,6 +121,10 @@ export default function UserCenterPage() {
   const [walletUiSettings, setWalletUiSettings] = useState<WalletUiSettings>({
     withdrawalFee: 1,
   });
+  const hasBoundWechatWithdrawAccount = Boolean(user?.wechat_openid);
+  const withdrawAccountDisplayValue = hasBoundWechatWithdrawAccount
+    ? '当前授权登录的微信账号（自动到账）'
+    : withdrawAccount;
 
   // 个人资料表单
   const [profileForm, setProfileForm] = useState({
@@ -1398,12 +1402,12 @@ export default function UserCenterPage() {
                               <Label>提现账户</Label>
                               <Input
                                 placeholder="提现将直接打款到当前绑定微信"
-                                value={user?.wechat_openid || withdrawAccount}
-                                disabled={Boolean(user?.wechat_openid)}
+                                value={withdrawAccountDisplayValue}
+                                disabled={hasBoundWechatWithdrawAccount}
                                 onChange={(e) => setWithdrawAccount(e.target.value)}
                               />
                             </div>
-                            {user?.wechat_openid ? (
+                            {hasBoundWechatWithdrawAccount ? (
                               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                                 已绑定微信账号，提现时会直接打款到当前微信，无需手动输入微信号。
                               </div>
@@ -1412,7 +1416,7 @@ export default function UserCenterPage() {
                                 当前账号未绑定微信，请先使用微信授权登录后再提现。
                               </div>
                             )}
-                            <Button onClick={handleWechatWithdraw} className="w-full" disabled={!user?.wechat_openid}>
+                            <Button onClick={handleWechatWithdraw} className="w-full" disabled={!hasBoundWechatWithdrawAccount}>
                               申请提现
                             </Button>
                             <p className="text-xs text-gray-500 text-center">
