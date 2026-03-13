@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/server-auth';
 import { db, userBalances } from '@/lib/db';
+import { getServerToken } from '@/lib/server-auth';
 import { getUserBalance } from '@/lib/user-balance-service';
+import { verifyToken } from '@/lib/user-service';
+import { reconcilePendingWechatWalletRechargesForUser } from '@/lib/wechat/payment-flow';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getServerUserId(request);
-    if (!userId) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
@@ -16,25 +18,38 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let balance = await getUserBalance(userId);
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '登录状态已失效，请重新登录',
+        },
+        { status: 401 }
+      );
+    }
+
+    await reconcilePendingWechatWalletRechargesForUser(user.id);
+
+    let balance = await getUserBalance(user.id);
 
     if (!balance) {
       await db.insert(userBalances).values({
         id: crypto.randomUUID(),
-        userId,
+        userId: user.id,
         availableBalance: '0',
         frozenBalance: '0',
         totalWithdrawn: '0',
         totalEarned: '0',
       });
 
-      balance = await getUserBalance(userId);
+      balance = await getUserBalance(user.id);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        user_id: userId,
+        user_id: user.id,
         available_balance: balance?.availableBalance || 0,
         frozen_balance: balance?.frozenBalance || 0,
         total_balance: (balance?.availableBalance || 0) + (balance?.frozenBalance || 0),

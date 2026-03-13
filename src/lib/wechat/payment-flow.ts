@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
@@ -154,10 +154,31 @@ export async function markWechatWalletRechargePaid(params: {
       .limit(1);
 
     if (balanceList.length === 0) {
+      await tx.insert(userBalances).values({
+        id: crypto.randomUUID(),
+        userId: paymentRecord.userId,
+        availableBalance: '0',
+        frozenBalance: '0',
+        totalWithdrawn: '0',
+        totalEarned: '0',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const refreshedBalanceList = balanceList.length > 0
+      ? balanceList
+      : await tx
+        .select()
+        .from(userBalances)
+        .where(eq(userBalances.userId, paymentRecord.userId))
+        .limit(1);
+
+    if (refreshedBalanceList.length === 0) {
       throw new Error('USER_BALANCE_NOT_FOUND');
     }
 
-    const balance = balanceList[0];
+    const balance = refreshedBalanceList[0];
     const oldBalance = Number(balance.availableBalance) || 0;
     const amount = Number(paymentRecord.amount) || 0;
     const newBalance = oldBalance + amount;
@@ -259,6 +280,31 @@ export async function reconcileWechatWalletRechargeStatus(params: {
     .limit(1);
 
   return refreshedPaymentRecordList[0] || paymentRecord;
+}
+
+export async function reconcilePendingWechatWalletRechargesForUser(userId: string) {
+  const pendingRechargeRecords = await db
+    .select({ id: paymentRecords.id })
+    .from(paymentRecords)
+    .where(and(
+      eq(paymentRecords.userId, userId),
+      eq(paymentRecords.type, 'recharge'),
+      eq(paymentRecords.method, 'wechat'),
+      eq(paymentRecords.status, 'pending'),
+    ))
+    .orderBy(desc(paymentRecords.createdAt))
+    .limit(20);
+
+  for (const record of pendingRechargeRecords) {
+    try {
+      await reconcileWechatWalletRechargeStatus({
+        paymentRecordId: record.id,
+        userId,
+      });
+    } catch (error) {
+      console.error('[WeChat Pay] 对账补入微信充值失败:', record.id, error);
+    }
+  }
 }
 
 export async function reconcileWechatOrderStatus(orderId: string) {

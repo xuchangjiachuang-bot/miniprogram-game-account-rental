@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, desc } from 'drizzle-orm';
-import { getServerUserId } from '@/lib/server-auth';
+import { desc, eq } from 'drizzle-orm';
 import { db, balanceTransactions } from '@/lib/db';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
+import { reconcilePendingWechatWalletRechargesForUser } from '@/lib/wechat/payment-flow';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getServerUserId(request);
-    if (!userId) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
@@ -16,6 +18,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '登录状态已失效，请重新登录',
+        },
+        { status: 401 }
+      );
+    }
+
+    await reconcilePendingWechatWalletRechargesForUser(user.id);
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
@@ -23,7 +38,7 @@ export async function GET(request: NextRequest) {
     const transactions = await db
       .select()
       .from(balanceTransactions)
-      .where(eq(balanceTransactions.userId, userId))
+      .where(eq(balanceTransactions.userId, user.id))
       .orderBy(desc(balanceTransactions.createdAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize);

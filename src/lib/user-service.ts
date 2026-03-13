@@ -3,7 +3,7 @@
  * 处理用户注册、登录、认证等功能
  */
 
-import { db, users, userBalances } from '@/lib/db';
+import { balanceTransactions, db, paymentRecords, users, userBalances } from '@/lib/db';
 import { eq, sql } from 'drizzle-orm';
 
 // ==================== 类型定义 ====================
@@ -613,6 +613,82 @@ async function createUserBalance(userId: string): Promise<void> {
   }
 }
 
+async function migrateLegacyWalletData(oldUserId: string, newUserId: string): Promise<void> {
+  if (!oldUserId || !newUserId || oldUserId === newUserId) {
+    return;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      const now = new Date().toISOString();
+      const oldBalanceList = await tx
+        .select()
+        .from(userBalances)
+        .where(eq(userBalances.userId, oldUserId))
+        .limit(1);
+      const newBalanceList = await tx
+        .select()
+        .from(userBalances)
+        .where(eq(userBalances.userId, newUserId))
+        .limit(1);
+
+      if (oldBalanceList.length > 0) {
+        const oldBalance = oldBalanceList[0];
+
+        if (newBalanceList.length === 0) {
+          await tx
+            .update(userBalances)
+            .set({
+              userId: newUserId,
+              updatedAt: now,
+            })
+            .where(eq(userBalances.id, oldBalance.id));
+        } else {
+          const newBalance = newBalanceList[0];
+
+          await tx
+            .update(userBalances)
+            .set({
+              availableBalance: (
+                Number(newBalance.availableBalance || 0) + Number(oldBalance.availableBalance || 0)
+              ).toFixed(2),
+              frozenBalance: (
+                Number(newBalance.frozenBalance || 0) + Number(oldBalance.frozenBalance || 0)
+              ).toFixed(2),
+              totalWithdrawn: (
+                Number(newBalance.totalWithdrawn || 0) + Number(oldBalance.totalWithdrawn || 0)
+              ).toFixed(2),
+              totalEarned: (
+                Number(newBalance.totalEarned || 0) + Number(oldBalance.totalEarned || 0)
+              ).toFixed(2),
+              updatedAt: now,
+            })
+            .where(eq(userBalances.id, newBalance.id));
+
+          await tx.delete(userBalances).where(eq(userBalances.id, oldBalance.id));
+        }
+      }
+
+      await tx
+        .update(paymentRecords)
+        .set({
+          userId: newUserId,
+          updatedAt: now,
+        })
+        .where(eq(paymentRecords.userId, oldUserId));
+
+      await tx
+        .update(balanceTransactions)
+        .set({
+          userId: newUserId,
+        })
+        .where(eq(balanceTransactions.userId, oldUserId));
+    });
+  } catch (error) {
+    console.error('迁移旧用户钱包数据失败:', oldUserId, newUserId, error);
+  }
+}
+
 async function getCanonicalUserByPhone(phone: string): Promise<User | null> {
   try {
     const dbUsers = await db
@@ -1061,60 +1137,36 @@ export async function verifyToken(token: string): Promise<User | null> {
       .limit(1);
 
     if (dbUser.length === 0) {
-      // 用户ID在数据库中不存在，尝试通过手机号查找
-      console.log('用户ID不在数据库中，尝试通过手机号查找:', user.id, user.phone);
+      console.log('用户ID不在数据库中，尝试收口到真实用户:', user.id, user.phone, user.wechat_openid);
 
-      const phoneUser = await db
-        .select({
-          id: users.id,
-          phone: users.phone,
-          nickname: users.nickname,
-          avatar: users.avatar,
-          userType: users.userType,
-          isVerified: users.isVerified,
-          realName: users.realName,
-          createdAt: users.createdAt,
-          updatedAt: users.updatedAt,
-        })
-        .from(users)
-        .where(eq(users.phone, user.phone))
-        .limit(1);
+      let canonicalUser: User | null = null;
 
-      if (phoneUser.length > 0) {
-        // 找到数据库中的用户，更新用户数据
-        const newDbUser = phoneUser[0];
-        user = {
-          id: newDbUser.id,  // 使用数据库中的ID
-          user_no: newDbUser.id.substring(0, 8), // 使用 ID 前缀作为 user_no
-          phone: newDbUser.phone,
-          username: newDbUser.nickname || user.username,
-          avatar: newDbUser.avatar || user.avatar,
-          user_type: newDbUser.userType as UserType,
-          isRealNameVerified: newDbUser.isVerified || false,
-          realName: newDbUser.realName || undefined,
-          created_at: new Date(newDbUser.createdAt!),
-          updated_at: new Date(newDbUser.updatedAt!)
-        };
+      if (user.wechat_openid) {
+        canonicalUser = await getCanonicalUserByWechatOpenid(user.wechat_openid);
+      }
 
-        console.log('准备更新Token数据 - 旧ID:', tokenData.userId, '新ID:', user.id);
+      if (!canonicalUser && user.phone) {
+        canonicalUser = await getCanonicalUserByPhone(user.phone);
+      }
 
-        // 更新 Token 数据
+      if (canonicalUser) {
+        const legacyUserId = user.id;
+        user = canonicalUser;
+
+        await migrateLegacyWalletData(legacyUserId, user.id);
+
         mockTokens.set(token, {
           userId: user.id,
           user,
-          timestamp: tokenData.timestamp
+          timestamp: tokenData.timestamp,
         });
-
-        // 更新内存中的用户数据
         mockUsers.set(user.id, user);
-
-        // 立即保存到文件
         saveTokens(mockTokens);
+        saveUsers(mockUsers);
 
-        console.log('已更新用户ID和Token数据:', user.id, user.phone);
+        console.log('已将 token 收口到数据库真实用户:', user.id, user.phone, user.wechat_openid);
       } else {
-        // 数据库中也不存在该手机号，同步用户数据
-        console.log('数据库中不存在该用户，同步数据:', user.phone);
+        console.log('数据库中不存在对应真实用户，尝试同步旧 token 用户:', user.phone, user.wechat_openid);
         syncUserToDatabase(user).catch(err => console.error('同步用户数据失败:', err));
       }
     }
