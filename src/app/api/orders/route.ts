@@ -5,6 +5,7 @@ import {
   getUserOrdersWithCounts,
   CreateOrderParams,
 } from '@/lib/order-service';
+import { syncExpiredOrders } from '@/lib/order-lifecycle-service';
 import { accounts, ensureDatabaseInitialized, db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
         },
         { status: 401 }
       );
+    }
+
+    try {
+      await syncExpiredOrders();
+    } catch (error) {
+      console.warn('[GET /api/orders] Failed to sync expired orders:', error);
     }
 
     const { searchParams } = new URL(request.url);

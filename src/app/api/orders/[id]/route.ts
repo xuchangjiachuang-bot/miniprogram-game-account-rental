@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
 import { transformDbOrderToApiFormat } from '@/lib/order-service';
+import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
 import { getServerUserId } from '@/lib/server-auth';
 
@@ -29,6 +30,15 @@ export async function GET(
       } catch (error) {
         console.warn('[Order Detail] Failed to reconcile payment status:', error);
       }
+    }
+
+    try {
+      const syncedOrder = await syncSingleOrderLifecycle(id);
+      if (syncedOrder) {
+        orderList = [syncedOrder];
+      }
+    } catch (error) {
+      console.warn('[Order Detail] Failed to sync lifecycle status:', error);
     }
 
     const order = orderList[0];
@@ -114,13 +124,13 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: '账号归还成功，等待卖家验收（48小时内完成验收）',
+      message: '账号归还成功，等待卖家验号（48 小时内完成验号）',
       data: {
         orderId: id,
         orderNo: order.orderNo,
         status: 'pending_verification',
         verificationDeadline: deadline,
-        note: '卖家验收通过后，订单将自动完成并分账；若发现异常可发起纠纷',
+        note: '卖家验号通过后，订单将自动完成并分账；若发现异常可发起纠纷。',
       },
     });
   } catch (error: any) {
