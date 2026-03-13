@@ -606,7 +606,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <CardTitle>订单操作</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {order.status === 'pending' && (
+                {order.status === 'pending_payment' && (
                   <>
                     <Button
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
@@ -702,7 +702,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </Button>
                   </>
                 )}
-                {order.status === 'dispute' && (
+                {order.status === 'disputed' && (
                   <Button variant="outline" className="w-full">
                     查看纠纷详情
                   </Button>

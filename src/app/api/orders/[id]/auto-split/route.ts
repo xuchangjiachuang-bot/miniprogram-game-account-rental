@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeAutoSplit, getOrderSplitRecords } from '@/lib/auto-split-service';
+import { executeAutoSplit, getSplitStatus } from '@/lib/platform-split-service';
 
 /**
- * 自动触发订单分账
- * POST /api/orders/[id]/auto-split
+ * Manual split trigger kept for compatibility, but now uses the same
+ * settlement implementation as verification and scheduled expiry handling.
  */
 export async function POST(
   request: NextRequest,
@@ -11,38 +11,28 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-
-    // 执行自动分账
     const result = await executeAutoSplit(id);
-
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: error.message,
     }, { status: 500 });
   }
 }
 
-/**
- * 获取订单分账记录
- * GET /api/orders/[id]/auto-split
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-
-    // 获取分账记录
-    const result = await getOrderSplitRecords(id);
-
+    const result = await getSplitStatus(id);
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: error.message,
     }, { status: 500 });
   }
 }

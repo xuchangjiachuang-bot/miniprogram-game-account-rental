@@ -5,7 +5,8 @@ import {
   getUserOrdersWithCounts,
   CreateOrderParams,
 } from '@/lib/order-service';
-import { ensureDatabaseInitialized } from '@/lib/db';
+import { accounts, ensureDatabaseInitialized, db } from '@/lib/db';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,17 +52,66 @@ export async function POST(request: NextRequest) {
   try {
     await ensureDatabaseInitialized();
 
+    const userId = getServerUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '未登录',
+        },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
+    const accountId = body.account_id as string | undefined;
+    if (!accountId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '缺少账号ID',
+        },
+        { status: 400 }
+      );
+    }
+
+    const accountList = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, accountId))
+      .limit(1);
+
+    if (accountList.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '账号不存在',
+        },
+        { status: 404 }
+      );
+    }
+
+    const account = accountList[0];
+    if (account.status !== 'available') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '账号当前不可下单',
+        },
+        { status: 400 }
+      );
+    }
+
     const params: CreateOrderParams = {
-      account_id: body.account_id,
-      buyer_id: body.buyer_id,
-      seller_id: body.seller_id,
-      coins_million: body.coins_million,
-      price_ratio: body.price_ratio,
-      rent_amount: body.rent_amount,
-      deposit_amount: body.deposit_amount,
-      total_amount: body.total_amount,
-      rent_hours: body.rent_hours,
+      account_id: account.id,
+      buyer_id: userId,
+      seller_id: account.sellerId,
+      coins_million: Number(account.coinsM || 0),
+      price_ratio: Number(account.rentalRatio || 0),
+      rent_amount: Number(account.accountValue || account.recommendedRental || 0),
+      deposit_amount: Number(account.deposit || 0),
+      total_amount: Number(account.totalPrice || Number(account.accountValue || account.recommendedRental || 0) + Number(account.deposit || 0)),
+      rent_hours: Number(body.rent_hours || account.rentalHours || 24),
     };
 
     if (!params.account_id || !params.buyer_id || !params.seller_id) {
