@@ -110,8 +110,60 @@ function getRuntimeEnv(key: string) {
   return process.env[key];
 }
 
+function stripWrappingQuotes(value: string) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
+}
+
+function wrapPem(label: string, body: string) {
+  const wrapped = body.match(/.{1,64}/g)?.join('\n') || body;
+  return `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----`;
+}
+
+function normalizePemBody(body: string) {
+  return body.replace(/[\s\u00a0]+/g, '');
+}
+
 function normalizeMultilineSecret(value: string) {
-  return value.replace(/\r/g, '').replace(/\\n/g, '\n').trim();
+  const normalized = stripWrappingQuotes(value).replace(/\r/g, '').replace(/\\n/g, '\n');
+  const pemMatch = normalized.match(/-----BEGIN ([A-Z ]+)-----([\s\S]+?)-----END \1-----/);
+
+  if (pemMatch) {
+    const label = pemMatch[1];
+    const body = normalizePemBody(pemMatch[2]);
+    return wrapPem(label, body);
+  }
+
+  const compact = normalizePemBody(normalized);
+  if (compact.length > 128 && /^[A-Za-z0-9+/=]+$/.test(compact)) {
+    return wrapPem('PRIVATE KEY', compact);
+  }
+
+  return normalized.trim();
+}
+
+function buildPrivateKeyCandidates(privateKey: string) {
+  const normalized = normalizeMultilineSecret(privateKey);
+  const candidates = new Set<string>([normalized]);
+  const body = normalizePemBody(
+    normalized
+      .replace(/-----BEGIN [A-Z ]+-----/g, '')
+      .replace(/-----END [A-Z ]+-----/g, '')
+  );
+
+  if (body && /^[A-Za-z0-9+/=]+$/.test(body)) {
+    candidates.add(wrapPem('PRIVATE KEY', body));
+    candidates.add(wrapPem('RSA PRIVATE KEY', body));
+  }
+
+  return Array.from(candidates);
 }
 
 async function getConfiguredValue(
@@ -211,10 +263,27 @@ export async function assertWechatPayV3Config(requiredFields?: Array<keyof Wecha
 }
 
 function getPrivateKeyObject(privateKey: string) {
-  return crypto.createPrivateKey({
-    key: privateKey,
-    format: 'pem',
+  const candidates = buildPrivateKeyCandidates(privateKey);
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      return crypto.createPrivateKey({
+        key: candidate,
+        format: 'pem',
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  console.error('[wechat-pay-v3] Failed to parse private key', {
+    length: privateKey.length,
+    hasBeginMarker: privateKey.includes('BEGIN'),
+    hasEndMarker: privateKey.includes('END'),
+    candidateCount: candidates.length,
   });
+  throw lastError;
 }
 
 function buildAuthorizationHeader(
