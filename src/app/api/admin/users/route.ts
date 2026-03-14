@@ -1,7 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { db, userBalances, users } from '@/lib/db';
 import { and, desc, eq, like, or, sql } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/admin-auth';
+import { ensureUserBalance } from '@/lib/user-balance-service';
+
+function normalizeBalance(row: { availableBalance?: unknown; frozenBalance?: unknown } | null | undefined) {
+  return {
+    availableBalance: Number(row?.availableBalance) || 0,
+    frozenBalance: Number(row?.frozenBalance) || 0,
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,8 +39,8 @@ export async function GET(request: NextRequest) {
       conditions.push(
         or(
           like(users.phone, `%${search}%`),
-          like(users.nickname, `%${search}%`)
-        )
+          like(users.nickname, `%${search}%`),
+        ),
       );
     }
 
@@ -64,24 +72,41 @@ export async function GET(request: NextRequest) {
         },
       })
       .from(users)
-      // `user_balances.user_id` is stored as varchar in the existing database.
       .leftJoin(userBalances, sql`${users.id}::text = ${userBalances.userId}`);
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
+      query = query.where(and(...conditions)) as typeof query;
     }
 
-    query = query.orderBy(desc(users.createdAt)) as any;
+    query = query.orderBy(desc(users.createdAt)) as typeof query;
 
     const allUsers = await query;
     const offset = (page - 1) * pageSize;
     const paginatedUsers = allUsers.slice(offset, offset + pageSize);
 
-    const formattedUsers = paginatedUsers.map((row: any) => ({
-      ...row.user,
-      walletBalance: row.balance?.availableBalance || 0,
-      frozenBalance: row.balance?.frozenBalance || 0,
-    }));
+    const formattedUsers = await Promise.all(
+      paginatedUsers.map(async (row) => {
+        let balance = normalizeBalance(row.balance);
+
+        if (!row.balance) {
+          try {
+            const ensuredBalance = await ensureUserBalance(row.user.id);
+            balance = {
+              availableBalance: ensuredBalance.availableBalance,
+              frozenBalance: ensuredBalance.frozenBalance,
+            };
+          } catch (error) {
+            console.error('[Admin Users] 初始化用户钱包失败:', row.user.id, error);
+          }
+        }
+
+        return {
+          ...row.user,
+          walletBalance: balance.availableBalance,
+          frozenBalance: balance.frozenBalance,
+        };
+      }),
+    );
 
     return NextResponse.json({
       success: true,
@@ -90,11 +115,11 @@ export async function GET(request: NextRequest) {
       page,
       pageSize,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('获取用户列表失败:', error);
     return NextResponse.json(
-      { success: false, error: error.message || '获取用户列表失败' },
-      { status: 500 }
+      { success: false, error: error instanceof Error ? error.message : '获取用户列表失败' },
+      { status: 500 },
     );
   }
 }

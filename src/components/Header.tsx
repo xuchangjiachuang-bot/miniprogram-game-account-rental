@@ -425,7 +425,7 @@ export function Header() {
                       className="relative h-10 w-10 rounded-full group hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 transition-all duration-200"
                     >
                       <Avatar className="h-10 w-10 transition-transform duration-200 group-hover:scale-105">
-                        <AvatarImage src={user.avatar} alt={user.username} />
+                        <AvatarImage src={user.avatar ?? undefined} alt={user.username} />
                         <AvatarFallback>{user.username?.charAt(0) || 'U'}</AvatarFallback>
                       </Avatar>
                     </Button>

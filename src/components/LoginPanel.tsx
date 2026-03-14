@@ -1,0 +1,357 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { AlertCircle, Loader2, QrCode, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import WechatQrLogin from '@/components/WechatQrLogin';
+import { setToken } from '@/lib/auth-token';
+import { useUser } from '@/contexts/UserContext';
+import {
+  checkWechatLoginState,
+  fetchWechatLoginConfig,
+  isWechatLoginSuccessMessage,
+  resolveLoginReturnTo,
+  type WechatLoginConfigData,
+} from '@/lib/wechat-login-client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+type LoginPanelMode = 'page' | 'dialog';
+
+interface LoginPanelProps {
+  mode: LoginPanelMode;
+  onClose?: () => void;
+  onSuccess?: () => void;
+}
+
+const WECHAT_POLL_INTERVAL_MS = 1500;
+const WECHAT_POLL_TIMEOUT_MS = 4 * 60 * 1000;
+
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
+export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, loading: userLoading, refreshUser } = useUser();
+
+  const [isBrowserReady, setIsBrowserReady] = useState(false);
+  const [isWechatBrowser, setIsWechatBrowser] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [wechatConfig, setWechatConfig] = useState<WechatLoginConfigData | null>(null);
+  const [wechatUnavailableMessage, setWechatUnavailableMessage] = useState('');
+
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFinalizingLoginRef = useRef(false);
+  const finalizeLoginRef = useRef<(token?: string | null) => Promise<void>>(async () => undefined);
+
+  const errorQuery = mode === 'page' ? searchParams.get('error') : null;
+  const reasonQuery = mode === 'page' ? searchParams.get('reason') : null;
+
+  const returnTo = useMemo(() => {
+    if (mode === 'page') {
+      return resolveLoginReturnTo(searchParams.get('returnTo'));
+    }
+
+    if (typeof window === 'undefined') {
+      return '/';
+    }
+
+    return resolveLoginReturnTo(`${window.location.pathname}${window.location.search}`);
+  }, [mode, searchParams]);
+
+  const clearPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+  }, []);
+
+  finalizeLoginRef.current = async (token?: string | null) => {
+    if (isFinalizingLoginRef.current) {
+      return;
+    }
+
+    isFinalizingLoginRef.current = true;
+    clearPolling();
+
+    try {
+      if (token) {
+        setToken(token);
+      }
+
+      await refreshUser();
+      toast.success('登录成功');
+
+      if (mode === 'dialog') {
+        onClose?.();
+        onSuccess?.();
+        return;
+      }
+
+      router.replace(returnTo);
+    } catch (error) {
+      isFinalizingLoginRef.current = false;
+      throw error;
+    }
+  };
+
+  const startWechatPolling = useCallback((state: string) => {
+    clearPolling();
+
+    pollingTimeoutRef.current = setTimeout(() => {
+      clearPolling();
+      setWechatConfig(null);
+      setWechatUnavailableMessage('二维码已过期，请点击刷新后重试');
+    }, WECHAT_POLL_TIMEOUT_MS);
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const result = await checkWechatLoginState(state);
+        if (!result.loggedIn) {
+          return;
+        }
+
+        await finalizeLoginRef.current(result.token);
+      } catch (error) {
+        console.error('[wechat-login] failed to check qr login state:', error);
+      }
+    }, WECHAT_POLL_INTERVAL_MS);
+  }, [clearPolling]);
+
+  const loadWechatQrConfig = useCallback(async () => {
+    if (isWechatBrowser) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMessage('');
+      setWechatUnavailableMessage('');
+      setWechatConfig(null);
+      clearPolling();
+
+      const nextConfig = await fetchWechatLoginConfig();
+      setWechatConfig(nextConfig);
+      startWechatPolling(nextConfig.state);
+    } catch (error) {
+      setWechatUnavailableMessage(getErrorMessage(error, '当前环境暂时无法使用微信扫码登录'));
+    } finally {
+      setLoading(false);
+    }
+  }, [clearPolling, isWechatBrowser, startWechatPolling]);
+
+  useEffect(() => {
+    setIsBrowserReady(true);
+    setIsWechatBrowser(/MicroMessenger/i.test(window.navigator.userAgent));
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'page' || !errorQuery) {
+      return;
+    }
+
+    const message =
+      errorQuery === 'wechat_auth_failed'
+        ? reasonQuery
+          ? decodeURIComponent(reasonQuery)
+          : '微信授权登录失败，请重试'
+        : decodeURIComponent(errorQuery);
+
+    toast.error(message);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('error');
+    nextParams.delete('reason');
+    const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [errorQuery, mode, pathname, reasonQuery, router, searchParams]);
+
+  useEffect(() => {
+    if (userLoading || !user) {
+      return;
+    }
+
+    if (mode === 'dialog') {
+      onClose?.();
+      return;
+    }
+
+    router.replace(returnTo);
+  }, [mode, onClose, returnTo, router, user, userLoading]);
+
+  useEffect(() => {
+    if (!isBrowserReady) {
+      return;
+    }
+
+    if (isWechatBrowser) {
+      clearPolling();
+      setWechatConfig(null);
+      setWechatUnavailableMessage('');
+      return;
+    }
+
+    void loadWechatQrConfig();
+
+    return () => {
+      clearPolling();
+    };
+  }, [clearPolling, isBrowserReady, isWechatBrowser, loadWechatQrConfig]);
+
+  useEffect(() => {
+    if (!isBrowserReady || isWechatBrowser) {
+      return;
+    }
+
+    const handleWechatMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (!isWechatLoginSuccessMessage(event.data)) {
+        return;
+      }
+
+      void finalizeLoginRef.current(event.data.token ?? null).catch((error) => {
+        setErrorMessage(getErrorMessage(error, '登录状态同步失败，请刷新页面后重试'));
+      });
+    };
+
+    window.addEventListener('message', handleWechatMessage);
+    return () => {
+      window.removeEventListener('message', handleWechatMessage);
+    };
+  }, [isBrowserReady, isWechatBrowser]);
+
+  useEffect(() => {
+    return () => {
+      clearPolling();
+    };
+  }, [clearPolling]);
+
+  const handleWechatAuthorizeLogin = () => {
+    setLoading(true);
+    window.location.href = `/api/auth/wechat/authorize?state=wechat_oauth&returnTo=${encodeURIComponent(returnTo)}`;
+  };
+
+  const body = (
+    <div className="space-y-6">
+      {errorMessage ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!isBrowserReady ? (
+        <div className="flex min-h-[240px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      ) : isWechatBrowser ? (
+        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+          <div className="text-center">
+            <QrCode className="mx-auto mb-3 h-10 w-10 text-emerald-600" />
+          </div>
+          <Button
+            type="button"
+            className="w-full cursor-pointer bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700"
+            onClick={handleWechatAuthorizeLogin}
+            disabled={loading}
+          >
+            微信授权登录
+          </Button>
+          <p className="text-center text-sm text-gray-500">当前在微信内打开，将直接完成授权登录。</p>
+        </div>
+      ) : (
+        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+          {wechatUnavailableMessage ? (
+            <div className="space-y-4">
+              <Alert>
+                <AlertDescription>{wechatUnavailableMessage}</AlertDescription>
+              </Alert>
+              <div className="flex justify-center">
+                <Button variant="outline" onClick={() => void loadWechatQrConfig()} disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  重试
+                </Button>
+              </div>
+            </div>
+          ) : wechatConfig ? (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <WechatQrLogin
+                  key={wechatConfig.state}
+                  appId={wechatConfig.appId}
+                  redirectUri={wechatConfig.redirectUri}
+                  state={wechatConfig.state}
+                  width={300}
+                  height={400}
+                />
+              </div>
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void loadWechatQrConfig()}
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  刷新二维码
+                </Button>
+              </div>
+              <p className="text-center text-sm text-gray-500">请使用手机微信扫码确认登录。</p>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-gray-400" />
+              <p className="text-gray-500">正在加载二维码...</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (mode === 'dialog') {
+    return body;
+  }
+
+  if (userLoading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="space-y-2 text-center">
+          <CardTitle className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
+            微信登录
+          </CardTitle>
+          <CardDescription>电脑端请扫码，微信内打开时会直接走授权登录。</CardDescription>
+        </CardHeader>
+        <CardContent>{body}</CardContent>
+      </Card>
+    </div>
+  );
+}

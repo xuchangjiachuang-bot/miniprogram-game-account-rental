@@ -250,8 +250,8 @@ export default function AdminSms() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">短信API配置系统</h1>
-          <p className="text-sm text-gray-600 mt-1">配置短信服务提供商的API密钥和参数</p>
+          <h1 className="text-2xl font-bold text-gray-900">短信服务配置</h1>
+          <p className="text-sm text-gray-600 mt-1">用于通知、测试发送和服务商调试，不再承担前台登录入口。</p>
         </div>
       </div>
 

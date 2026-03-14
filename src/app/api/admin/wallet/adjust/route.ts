@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/admin-auth';
-import { db, userBalances, users } from '@/lib/db';
-import { addAvailableBalance, getUserBalance } from '@/lib/user-balance-service';
+import { db, users } from '@/lib/db';
+import { addAvailableBalance, ensureUserBalance } from '@/lib/user-balance-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,14 +20,14 @@ export async function POST(request: NextRequest) {
     if (!phone && !userId) {
       return NextResponse.json(
         { success: false, error: '缺少用户标识' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json(
         { success: false, error: '充值金额必须大于 0' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -44,42 +44,23 @@ export async function POST(request: NextRequest) {
     if (userList.length === 0) {
       return NextResponse.json(
         { success: false, error: '用户不存在' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const user = userList[0];
-    let balance = await getUserBalance(user.id);
-    if (!balance) {
-      await db.insert(userBalances).values({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        availableBalance: '0',
-        frozenBalance: '0',
-        totalWithdrawn: '0',
-        totalEarned: '0',
-      });
-
-      balance = await getUserBalance(user.id);
-    }
-
-    if (!balance) {
-      return NextResponse.json(
-        { success: false, error: '初始化用户钱包失败' },
-        { status: 500 }
-      );
-    }
+    await ensureUserBalance(user.id);
 
     const result = await addAvailableBalance(
       user.id,
       amount,
-      `${reason}（管理员：${auth.admin.username}）`
+      `${reason}（管理员：${auth.admin.username}）`,
     );
 
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.message || '充值失败' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -95,11 +76,11 @@ export async function POST(request: NextRequest) {
         newBalance: result.newBalance,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Admin Wallet Adjust] 调账失败:', error);
     return NextResponse.json(
-      { success: false, error: error.message || '调账失败' },
-      { status: 500 }
+      { success: false, error: error instanceof Error ? error.message : '调账失败' },
+      { status: 500 },
     );
   }
 }

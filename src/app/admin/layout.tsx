@@ -73,7 +73,7 @@ const defaultMenuItems = [
   },
   {
     id: 'sms',
-    title: '短信系统',
+    title: '短信服务',
     href: '/admin/sms',
     icon: MessageSquareText
   },

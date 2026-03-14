@@ -1,19 +1,19 @@
-/**
- * 用户余额服务
- * 管理用户余额、冻结余额、提现等操作
- */
-
-import { db, userBalances, balanceTransactions, withdrawals, platformSettings } from './db';
+import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-
-// ==================== 类型定义 ====================
+import {
+  balanceTransactions,
+  db,
+  platformSettings,
+  userBalances,
+  withdrawals,
+} from './db';
 
 export interface UserBalance {
   userId: string;
-  availableBalance: number;  // 可用余额
-  frozenBalance: number;     // 冻结余额
-  totalWithdrawn: number;    // 累计提现
-  totalEarned: number;       // 累计收入
+  availableBalance: number;
+  frozenBalance: number;
+  totalWithdrawn: number;
+  totalEarned: number;
 }
 
 export interface BalanceUpdateResult {
@@ -32,500 +32,460 @@ export interface WithdrawalResult {
   actualAmount?: number;
 }
 
-// ==================== 用户余额核心功能 ====================
+function toNumber(value: unknown) {
+  return Number(value || 0);
+}
 
-/**
- * 获取用户余额
- *
- * @param userId 用户ID
- * @returns 用户余额信息
- */
+function toUserBalance(record: typeof userBalances.$inferSelect): UserBalance {
+  return {
+    userId: record.userId,
+    availableBalance: toNumber(record.availableBalance),
+    frozenBalance: toNumber(record.frozenBalance),
+    totalWithdrawn: toNumber(record.totalWithdrawn),
+    totalEarned: toNumber(record.totalEarned),
+  };
+}
+
+function isUniqueConstraintError(error: unknown): error is { code: string } {
+  return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === '23505';
+}
+
+async function insertBalanceTransaction(params: {
+  userId: string;
+  transactionType: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string;
+  withdrawalId?: string;
+}) {
+  await db.insert(balanceTransactions).values({
+    id: randomUUID(),
+    userId: params.userId,
+    withdrawalId: params.withdrawalId || null,
+    transactionType: params.transactionType,
+    amount: params.amount.toFixed(2),
+    balanceBefore: params.balanceBefore.toFixed(2),
+    balanceAfter: params.balanceAfter.toFixed(2),
+    description: params.description,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 export async function getUserBalance(userId: string): Promise<UserBalance | null> {
   try {
-    const balanceList = await db
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, userId));
-
-    if (!balanceList || balanceList.length === 0) {
-      return null;
-    }
-
-    const balance = balanceList[0];
-
-    return {
-      userId: balance.userId,
-      availableBalance: Number(balance.availableBalance) || 0,
-      frozenBalance: Number(balance.frozenBalance) || 0,
-      totalWithdrawn: Number(balance.totalWithdrawn) || 0,
-      totalEarned: Number(balance.totalEarned) || 0
-    };
+    const rows = await db.select().from(userBalances).where(eq(userBalances.userId, userId)).limit(1);
+    const row = rows[0];
+    return row ? toUserBalance(row) : null;
   } catch (error) {
-    console.error('获取用户余额失败:', error);
+    console.error('[user-balance] getUserBalance failed:', error);
     return null;
   }
 }
 
-/**
- * 增加用户可用余额
- *
- * @param userId 用户ID
- * @param amount 金额
- * @param description 描述
- * @returns 更新结果
- */
+export async function ensureUserBalance(userId: string): Promise<UserBalance> {
+  const existing = await getUserBalance(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    await db.insert(userBalances).values({
+      id: randomUUID(),
+      userId,
+      availableBalance: '0',
+      frozenBalance: '0',
+      totalWithdrawn: '0',
+      totalEarned: '0',
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      console.error('[user-balance] ensureUserBalance failed:', error);
+      throw error;
+    }
+  }
+
+  const initialized = await getUserBalance(userId);
+  if (!initialized) {
+    throw new Error('USER_BALANCE_INIT_FAILED');
+  }
+
+  return initialized;
+}
+
 export async function addAvailableBalance(
   userId: string,
   amount: number,
-  description: string = '余额增加'
+  description = 'Balance adjusted',
 ): Promise<BalanceUpdateResult> {
   try {
-    // 获取当前余额
-    const balanceList = await db
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, userId));
-
-    if (!balanceList || balanceList.length === 0) {
-      return {
-        success: false,
-        message: '用户余额记录不存在',
-        oldBalance: 0,
-        newBalance: 0
-      };
-    }
-
-    const balance = balanceList[0];
-    const oldBalance = Number(balance.availableBalance) || 0;
+    const balance = await ensureUserBalance(userId);
+    const oldBalance = balance.availableBalance;
     const newBalance = oldBalance + amount;
-    const oldTotalEarned = Number(balance.totalEarned) || 0;
-    const newTotalEarned = oldTotalEarned + amount;
+    const newTotalEarned = balance.totalEarned + amount;
 
-    // 更新余额
     await db
       .update(userBalances)
       .set({
-        availableBalance: newBalance.toString(),
-        totalEarned: newTotalEarned.toString(),
-        updatedAt: new Date().toISOString()
+        availableBalance: newBalance.toFixed(2),
+        totalEarned: newTotalEarned.toFixed(2),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(userBalances.userId, userId));
 
-    // 记录余额变动
-    await db.insert(balanceTransactions).values({
-      id: crypto.randomUUID(),
-      userId: userId,
+    await insertBalanceTransaction({
+      userId,
       transactionType: 'income',
-      amount: amount.toString(),
-      balanceBefore: oldBalance.toString(),
-      balanceAfter: newBalance.toString(),
-      description: description,
-      createdAt: new Date().toISOString()
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      description,
     });
 
     return {
       success: true,
-      message: '余额增加成功',
+      message: 'BALANCE_UPDATED',
       oldBalance,
-      newBalance
+      newBalance,
     };
   } catch (error: any) {
-    console.error('增加用户余额失败:', error);
+    console.error('[user-balance] addAvailableBalance failed:', error);
     return {
       success: false,
-      message: error.message || '余额增加失败',
+      message: error?.message || 'BALANCE_UPDATE_FAILED',
       oldBalance: 0,
-      newBalance: 0
+      newBalance: 0,
     };
   }
 }
 
-/**
- * 冻结用户余额
- *
- * @param userId 用户ID
- * @param amount 金额
- * @param description 描述
- * @returns 更新结果
- */
 export async function freezeBalance(
   userId: string,
   amount: number,
-  description: string = '余额冻结'
+  description = 'Withdrawal requested',
 ): Promise<BalanceUpdateResult> {
   try {
-    // 获取当前余额
-    const balanceList = await db
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, userId));
-
-    if (!balanceList || balanceList.length === 0) {
+    const balance = await ensureUserBalance(userId);
+    if (balance.availableBalance < amount) {
       return {
         success: false,
-        message: '用户余额记录不存在',
-        oldBalance: 0,
-        newBalance: 0
+        message: 'INSUFFICIENT_AVAILABLE_BALANCE',
+        oldBalance: balance.availableBalance,
+        newBalance: balance.availableBalance,
       };
     }
 
-    const balance = balanceList[0];
-    const oldAvailable = Number(balance.availableBalance) || 0;
-    const oldFrozen = Number(balance.frozenBalance) || 0;
+    const oldBalance = balance.availableBalance;
+    const newBalance = oldBalance - amount;
+    const newFrozenBalance = balance.frozenBalance + amount;
 
-    // 检查余额是否足够
-    if (oldAvailable < amount) {
-      return {
-        success: false,
-        message: `可用余额不足，需要￥${amount}，当前￥${oldAvailable}`,
-        oldBalance: oldAvailable,
-        newBalance: oldAvailable
-      };
-    }
-
-    const newAvailable = oldAvailable - amount;
-    const newFrozen = oldFrozen + amount;
-
-    // 更新余额
     await db
       .update(userBalances)
       .set({
-        availableBalance: newAvailable.toString(),
-        frozenBalance: newFrozen.toString(),
-        updatedAt: new Date().toISOString()
+        availableBalance: newBalance.toFixed(2),
+        frozenBalance: newFrozenBalance.toFixed(2),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(userBalances.userId, userId));
 
-    // 记录余额变动
-    await db.insert(balanceTransactions).values({
-      id: crypto.randomUUID(),
-      userId: userId,
+    await insertBalanceTransaction({
+      userId,
       transactionType: 'freeze',
-      amount: amount.toString(),
-      balanceBefore: oldAvailable.toString(),
-      balanceAfter: newAvailable.toString(),
-      description: description,
-      createdAt: new Date().toISOString()
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      description,
     });
 
     return {
       success: true,
-      message: '余额冻结成功',
-      oldBalance: oldAvailable,
-      newBalance: newAvailable
+      message: 'BALANCE_FROZEN',
+      oldBalance,
+      newBalance,
     };
   } catch (error: any) {
-    console.error('冻结用户余额失败:', error);
+    console.error('[user-balance] freezeBalance failed:', error);
     return {
       success: false,
-      message: error.message || '余额冻结失败',
+      message: error?.message || 'BALANCE_FREEZE_FAILED',
       oldBalance: 0,
-      newBalance: 0
+      newBalance: 0,
     };
   }
 }
 
-/**
- * 解冻用户余额
- *
- * @param userId 用户ID
- * @param amount 金额
- * @param description 描述
- * @returns 更新结果
- */
 export async function unfreezeBalance(
   userId: string,
   amount: number,
-  description: string = '余额解冻'
+  description = 'Balance released',
 ): Promise<BalanceUpdateResult> {
   try {
-    // 获取当前余额
-    const balanceList = await db
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, userId));
-
-    if (!balanceList || balanceList.length === 0) {
+    const balance = await ensureUserBalance(userId);
+    if (balance.frozenBalance < amount) {
       return {
         success: false,
-        message: '用户余额记录不存在',
-        oldBalance: 0,
-        newBalance: 0
+        message: 'INSUFFICIENT_FROZEN_BALANCE',
+        oldBalance: balance.availableBalance,
+        newBalance: balance.availableBalance,
       };
     }
 
-    const balance = balanceList[0];
-    const oldAvailable = Number(balance.availableBalance) || 0;
-    const oldFrozen = Number(balance.frozenBalance) || 0;
+    const oldBalance = balance.availableBalance;
+    const newBalance = oldBalance + amount;
+    const newFrozenBalance = balance.frozenBalance - amount;
 
-    // 检查冻结余额是否足够
-    if (oldFrozen < amount) {
-      return {
-        success: false,
-        message: `冻结余额不足，需要￥${amount}，当前￥${oldFrozen}`,
-        oldBalance: oldAvailable,
-        newBalance: oldAvailable
-      };
-    }
-
-    const newAvailable = oldAvailable + amount;
-    const newFrozen = oldFrozen - amount;
-
-    // 更新余额
     await db
       .update(userBalances)
       .set({
-        availableBalance: newAvailable.toString(),
-        frozenBalance: newFrozen.toString(),
-        updatedAt: new Date().toISOString()
+        availableBalance: newBalance.toFixed(2),
+        frozenBalance: newFrozenBalance.toFixed(2),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(userBalances.userId, userId));
 
-    // 记录余额变动
-    await db.insert(balanceTransactions).values({
-      id: crypto.randomUUID(),
-      userId: userId,
+    await insertBalanceTransaction({
+      userId,
       transactionType: 'unfreeze',
-      amount: amount.toString(),
-      balanceBefore: oldAvailable.toString(),
-      balanceAfter: newAvailable.toString(),
-      description: description,
-      createdAt: new Date().toISOString()
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      description,
     });
 
     return {
       success: true,
-      message: '余额解冻成功',
-      oldBalance: oldAvailable,
-      newBalance: newAvailable
+      message: 'BALANCE_UNFROZEN',
+      oldBalance,
+      newBalance,
     };
   } catch (error: any) {
-    console.error('解冻用户余额失败:', error);
+    console.error('[user-balance] unfreezeBalance failed:', error);
     return {
       success: false,
-      message: error.message || '余额解冻失败',
+      message: error?.message || 'BALANCE_UNFREEZE_FAILED',
       oldBalance: 0,
-      newBalance: 0
+      newBalance: 0,
     };
   }
 }
 
-/**
- * 申请提现
- *
- * @param userId 用户ID
- * @param amount 提现金额
- * @param accountInfo 账户信息（微信openid等）
- * @returns 提现结果
- */
 export async function requestWithdrawal(
   userId: string,
   amount: number,
-  accountInfo: any
+  accountInfo: Record<string, unknown>,
 ): Promise<WithdrawalResult> {
   try {
-    // 1. 获取平台配置
-    const settingsList = await db.select().from(platformSettings);
-    const settings = settingsList[0] || {
-      withdrawalFee: 1
-    };
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        success: false,
+        message: 'INVALID_WITHDRAWAL_AMOUNT',
+      };
+    }
 
-    const withdrawalFeeRate = Number(settings.withdrawalFee) || 1;
-
-    // 2. 计算手续费
-    const fee = withdrawalFeeRate > 0
-      ? Math.max(amount * (withdrawalFeeRate / 100), 1)
-      : 0;
-    const actualAmount = amount - fee;
+    const settingsRows = await db.select().from(platformSettings).limit(1);
+    const settings = settingsRows[0];
+    const feeRate = toNumber(settings?.withdrawalFee) || 1;
+    const fee = feeRate > 0 ? Math.max(amount * (feeRate / 100), 1) : 0;
+    const actualAmount = Number((amount - fee).toFixed(2));
 
     if (actualAmount <= 0) {
       return {
         success: false,
-        message: '提现金额必须大于手续费，当前手续费最低 1 元'
+        message: 'WITHDRAWAL_AMOUNT_TOO_SMALL',
       };
     }
 
-    // 3. 检查用户余额
-    const balance = await getUserBalance(userId);
-    if (!balance) {
-      return {
-        success: false,
-        message: '用户余额记录不存在'
-      };
-    }
-
+    const balance = await ensureUserBalance(userId);
     if (balance.availableBalance < amount) {
       return {
         success: false,
-        message: `可用余额不足，需要￥${amount}，当前￥${balance.availableBalance}`
+        message: 'INSUFFICIENT_AVAILABLE_BALANCE',
       };
     }
 
-    // 4. 开始事务
+    const withdrawalId = randomUUID();
+    const withdrawalNo = `WD${Date.now()}${Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0')}`;
+    const reviewRequired = settings?.requireManualReview !== false;
+    const username =
+      String(accountInfo.accountName || accountInfo.nickname || accountInfo.phone || userId).slice(0, 100);
+
     await db.transaction(async (tx) => {
-      // 4.1 冻结提现金额
-      const freezeResult = await freezeBalance(userId, amount, '提现申请');
+      await tx
+        .update(userBalances)
+        .set({
+          availableBalance: (balance.availableBalance - amount).toFixed(2),
+          frozenBalance: (balance.frozenBalance + amount).toFixed(2),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(userBalances.userId, userId));
 
-      if (!freezeResult.success) {
-        throw new Error(freezeResult.message);
-      }
-
-      // 4.2 创建提现记录
-      const withdrawalId = crypto.randomUUID();
-      const withdrawalNo = `WD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      await tx.insert(balanceTransactions).values({
+        id: randomUUID(),
+        userId,
+        withdrawalId,
+        transactionType: 'freeze',
+        amount: amount.toFixed(2),
+        balanceBefore: balance.availableBalance.toFixed(2),
+        balanceAfter: (balance.availableBalance - amount).toFixed(2),
+        description: 'Withdrawal requested',
+        createdAt: new Date().toISOString(),
+      });
 
       await tx.insert(withdrawals).values({
         id: withdrawalId,
-        withdrawalNo: withdrawalNo,
-        userId: userId,
-        username: '',  // TODO: 从用户表获取
-        amount: amount.toString(),
-        withdrawalFee: withdrawalFeeRate.toString(),
-        feeAmount: fee.toString(),
-        actualAmount: actualAmount.toString(),
+        withdrawalNo,
+        userId,
+        username,
+        amount: amount.toFixed(2),
+        withdrawalFee: feeRate.toFixed(2),
+        feeAmount: fee.toFixed(2),
+        actualAmount: actualAmount.toFixed(2),
         withdrawalType: 'wechat',
-        accountInfo: JSON.stringify(accountInfo),
-        status: 'pending',
+        accountInfo,
+        status: reviewRequired ? 'pending' : 'approved',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
     });
 
     return {
       success: true,
-      message: '提现申请成功，等待审核',
+      message: reviewRequired ? 'WITHDRAWAL_CREATED' : 'WITHDRAWAL_APPROVED',
+      withdrawalId,
       amount,
       fee,
-      actualAmount
+      actualAmount,
     };
   } catch (error: any) {
-    console.error('申请提现失败:', error);
+    console.error('[user-balance] requestWithdrawal failed:', error);
     return {
       success: false,
-      message: error.message || '申请提现失败'
+      message: error?.message || 'WITHDRAWAL_REQUEST_FAILED',
     };
   }
 }
 
-/**
- * 审核提现
- *
- * @param withdrawalId 提现ID
- * @param approved 是否通过
- * @param reviewerId 审核人ID
- * @param remark 备注
- * @returns 审核结果
- */
 export async function reviewWithdrawal(
   withdrawalId: string,
   approved: boolean,
   reviewerId: string,
-  remark: string = ''
+  remark = '',
 ): Promise<WithdrawalResult> {
   try {
-    // 获取提现记录
-    const withdrawalList = await db
+    const withdrawalRows = await db
       .select()
       .from(withdrawals)
-      .where(eq(withdrawals.id, withdrawalId));
+      .where(eq(withdrawals.id, withdrawalId))
+      .limit(1);
+    const withdrawal = withdrawalRows[0];
 
-    if (!withdrawalList || withdrawalList.length === 0) {
+    if (!withdrawal) {
       return {
         success: false,
-        message: '提现记录不存在'
+        message: 'WITHDRAWAL_NOT_FOUND',
       };
     }
 
-    const withdrawal = withdrawalList[0];
-
-    // 检查提现状态
     if (withdrawal.status !== 'pending') {
       return {
         success: false,
-        message: `提现状态不正确，当前状态：${withdrawal.status}`
+        message: 'WITHDRAWAL_ALREADY_REVIEWED',
       };
     }
 
-    const amount = Number(withdrawal.amount) || 0;
-    const actualAmount = Number(withdrawal.actualAmount) || 0;
+    const amount = toNumber(withdrawal.amount);
+    const fee = toNumber(withdrawal.feeAmount);
+    const actualAmount = toNumber(withdrawal.actualAmount);
+    const balance = await ensureUserBalance(withdrawal.userId);
 
-    if (approved) {
-      // 审核通过，执行转账
-      await db.transaction(async (tx) => {
-        // 1. 扣除冻结余额
-        const unfreezeResult = await db
+    await db.transaction(async (tx) => {
+      if (approved) {
+        await tx
           .update(userBalances)
           .set({
             frozenBalance: sql`${userBalances.frozenBalance} - ${amount}`,
-            updatedAt: new Date().toISOString()
+            totalWithdrawn: sql`${userBalances.totalWithdrawn} + ${actualAmount}`,
+            updatedAt: new Date().toISOString(),
           })
           .where(eq(userBalances.userId, withdrawal.userId));
 
-        // 2. 更新提现记录
+        await tx.insert(balanceTransactions).values({
+          id: randomUUID(),
+          userId: withdrawal.userId,
+          withdrawalId: withdrawal.id,
+          transactionType: 'withdrawal',
+          amount: amount.toFixed(2),
+          balanceBefore: balance.availableBalance.toFixed(2),
+          balanceAfter: balance.availableBalance.toFixed(2),
+          description: remark || 'Withdrawal approved',
+          createdAt: new Date().toISOString(),
+        });
+
         await tx
           .update(withdrawals)
           .set({
             status: 'approved',
-            reviewerId: reviewerId,
+            reviewerId,
             reviewTime: new Date().toISOString(),
             reviewRemark: remark,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           })
           .where(eq(withdrawals.id, withdrawalId));
 
-        // 3. 更新累计提现
-        await tx
-          .update(userBalances)
-          .set({
-            totalWithdrawn: sql`${userBalances.totalWithdrawn} + ${actualAmount}`,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(userBalances.userId, withdrawal.userId));
+        return;
+      }
+
+      await tx
+        .update(userBalances)
+        .set({
+          availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+          frozenBalance: sql`${userBalances.frozenBalance} - ${amount}`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(userBalances.userId, withdrawal.userId));
+
+      await tx.insert(balanceTransactions).values({
+        id: randomUUID(),
+        userId: withdrawal.userId,
+        withdrawalId: withdrawal.id,
+        transactionType: 'unfreeze',
+        amount: amount.toFixed(2),
+        balanceBefore: balance.availableBalance.toFixed(2),
+        balanceAfter: (balance.availableBalance + amount).toFixed(2),
+        description: remark || 'Withdrawal rejected',
+        createdAt: new Date().toISOString(),
       });
 
-      return {
-        success: true,
-        message: '提现审核通过，待转账',
-        amount,
-        fee: Number(withdrawal.feeAmount) || 0,
-        actualAmount
-      };
-    } else {
-      // 审核拒绝，解冻余额
-      await db.transaction(async (tx) => {
-        // 1. 解冻余额
-        await tx
-          .update(userBalances)
-          .set({
-            availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
-            frozenBalance: sql`${userBalances.frozenBalance} - ${amount}`,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(userBalances.userId, withdrawal.userId));
+      await tx
+        .update(withdrawals)
+        .set({
+          status: 'rejected',
+          reviewerId,
+          reviewTime: new Date().toISOString(),
+          reviewRemark: remark,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(withdrawals.id, withdrawalId));
+    });
 
-        // 2. 更新提现记录
-        await tx
-          .update(withdrawals)
-          .set({
-            status: 'rejected',
-            reviewerId: reviewerId,
-            reviewTime: new Date().toISOString(),
-            reviewRemark: remark,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(withdrawals.id, withdrawalId));
-      });
-
-      return {
-        success: true,
-        message: '提现审核已拒绝，余额已解冻'
-      };
-    }
+    return {
+      success: true,
+      message: approved ? 'WITHDRAWAL_APPROVED' : 'WITHDRAWAL_REJECTED',
+      amount,
+      fee,
+      actualAmount,
+    };
   } catch (error: any) {
-    console.error('审核提现失败:', error);
+    console.error('[user-balance] reviewWithdrawal failed:', error);
     return {
       success: false,
-      message: error.message || '审核提现失败'
+      message: error?.message || 'WITHDRAWAL_REVIEW_FAILED',
     };
   }
 }

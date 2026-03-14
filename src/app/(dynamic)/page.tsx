@@ -16,7 +16,6 @@ import Link from 'next/link';
 import { AccountCard } from '@/components/AccountCard';
 import { ProtectedLink } from '@/components/ProtectedLink';
 import { AccountDetailDialog } from '@/components/AccountDetailDialog';
-import { WechatBindDialog } from '@/components/WechatBindDialog';
 import { CustomerServiceButton } from '@/components/customer-service-button';
 import { LoginDialog } from '@/components/LoginDialog';
 import { useUser } from '@/contexts/UserContext';
@@ -75,7 +74,6 @@ export default function Home() {
   const [skinList, setSkinList] = useState<string[]>([]);
   const [carousels, setCarousels] = useState<any[]>([]);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
-  const [showWechatBindDialog, setShowWechatBindDialog] = useState(false);
 
   const router = useRouter();
 
@@ -109,25 +107,6 @@ export default function Home() {
   useEffect(() => {
     loadConfig();
   }, []);
-
-  // 检查微信登录回调（绑定手机号流程）
-  useEffect(() => {
-    checkWechatBind();
-  }, []);
-
-  const checkWechatBind = () => {
-    // 检查是否有微信登录的临时cookie（绑定手机号流程）
-    if (typeof window !== 'undefined') {
-      const wechatOpenid = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('wechat_openid='));
-
-      if (wechatOpenid) {
-        console.log('检测到微信登录回调，显示微信绑定对话框');
-        setShowWechatBindDialog(true);
-      }
-    }
-  };
 
   // 监听配置更新（通过 SSE）
   useConfigUpdate('all', (event) => {
@@ -1159,13 +1138,6 @@ export default function Home() {
             window.location.href = `/orders?accountId=${selectedAccount.id}`;
           }
         }}
-      />
-
-      {/* 微信绑定手机号弹窗 */}
-      <WechatBindDialog
-        open={showWechatBindDialog}
-        onOpenChange={setShowWechatBindDialog}
-        onSuccess={refreshUser}
       />
 
       {/* 登录弹窗 */}

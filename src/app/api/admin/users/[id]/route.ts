@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db, userBalances, users } from '@/lib/db';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { db, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/admin-auth';
+import { ensureUserBalance } from '@/lib/user-balance-service';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await requireAdmin(request);
@@ -16,12 +17,8 @@ export async function GET(
     const { id } = await params;
 
     const userList = await db
-      .select({
-        user: users,
-        balance: userBalances,
-      })
+      .select()
       .from(users)
-      .leftJoin(userBalances, eq(users.id, userBalances.userId))
       .where(eq(users.id, id))
       .limit(1);
 
@@ -29,23 +26,24 @@ export async function GET(
       return NextResponse.json({ success: false, error: '用户不存在' }, { status: 404 });
     }
 
-    const userData = userList[0];
+    const user = userList[0];
+    const balance = await ensureUserBalance(user.id);
 
     return NextResponse.json({
       success: true,
       data: {
-        ...userData.user,
-        availableBalance: userData.balance?.availableBalance || 0,
-        frozenBalance: userData.balance?.frozenBalance || 0,
-        totalEarned: userData.balance?.totalEarned || 0,
-        totalWithdrawn: userData.balance?.totalWithdrawn || 0,
+        ...user,
+        availableBalance: balance.availableBalance,
+        frozenBalance: balance.frozenBalance,
+        totalEarned: balance.totalEarned,
+        totalWithdrawn: balance.totalWithdrawn,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('获取用户详情失败:', error);
     return NextResponse.json(
-      { success: false, error: error.message || '获取用户详情失败' },
-      { status: 500 }
+      { success: false, error: error instanceof Error ? error.message : '获取用户详情失败' },
+      { status: 500 },
     );
   }
 }
