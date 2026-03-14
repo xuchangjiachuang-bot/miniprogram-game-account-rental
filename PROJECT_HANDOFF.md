@@ -132,7 +132,13 @@ When checking the version list, use the Git commit and commit message as the sou
 
 ### Post-Deploy Verification
 
-After each publish, check these flows in order:
+After each publish, do not immediately trust the platform status badge. Verify in this order:
+
+1. Confirm the service version list shows the intended Git commit and message.
+2. Confirm the published online version has switched to that target version.
+3. Only then start external behavior testing.
+
+Once the target version is confirmed, check these flows in order:
 
 1. Open the homepage.
 2. Open the login UI.
@@ -145,6 +151,44 @@ If login behavior looks wrong, always distinguish between these two cases:
 
 - old version still deployed
 - latest version deployed but runtime or data is broken
+
+### Version Confirmation Before Testing
+
+Future threads should follow this rule:
+
+- do not treat a browser error observed during deployment as the final result
+- do not start deep bug analysis until the deployed version is confirmed to be the intended commit
+
+When direct commit visibility is available in the cloud console, use that first.
+
+When direct commit visibility is not enough, use external behavior checks as a secondary signal:
+
+- whether `/login` behavior matches the newest expected flow
+- whether old callback query parameters are still present
+- whether known fixed errors still appear unchanged
+
+This is only a fallback. The preferred source of truth is always the cloud version list and published revision.
+
+### Recommended Improvement
+
+The project should add a lightweight runtime version endpoint later, for example:
+
+- `/api/version`
+
+Suggested response fields:
+
+- deployed commit sha
+- build time
+- environment name
+
+With this in place, future verification can become:
+
+1. publish target commit
+2. request `/api/version`
+3. confirm the deployed commit matches
+4. start browser testing
+
+Until that endpoint exists, always use the cloud version list plus external behavior checks together.
 
 ### CLI Key And Log Inspection
 

@@ -1,17 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Loader2, QrCode, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import WechatQrLogin from '@/components/WechatQrLogin';
-import { setToken } from '@/lib/auth-token';
 import { useUser } from '@/contexts/UserContext';
 import {
-  checkWechatLoginState,
   createWechatOauthState,
   fetchWechatLoginConfig,
-  isWechatLoginSuccessMessage,
   resolveLoginReturnTo,
   type WechatLoginConfigData,
 } from '@/lib/wechat-login-client';
@@ -27,9 +24,6 @@ interface LoginPanelProps {
   onSuccess?: () => void;
 }
 
-const WECHAT_POLL_INTERVAL_MS = 1500;
-const WECHAT_POLL_TIMEOUT_MS = 4 * 60 * 1000;
-
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -42,7 +36,7 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: userLoading, refreshUser } = useUser();
+  const { user, loading: userLoading } = useUser();
 
   const [isBrowserReady, setIsBrowserReady] = useState(false);
   const [isWechatBrowser, setIsWechatBrowser] = useState(false);
@@ -50,11 +44,6 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
   const [errorMessage, setErrorMessage] = useState('');
   const [wechatConfig, setWechatConfig] = useState<WechatLoginConfigData | null>(null);
   const [wechatUnavailableMessage, setWechatUnavailableMessage] = useState('');
-
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFinalizingLoginRef = useRef(false);
-  const finalizeLoginRef = useRef<(token?: string | null) => Promise<void>>(async () => undefined);
 
   const errorQuery = mode === 'page' ? searchParams.get('error') : null;
   const reasonQuery = mode === 'page' ? searchParams.get('reason') : null;
@@ -71,70 +60,6 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
     return resolveLoginReturnTo(`${window.location.pathname}${window.location.search}`);
   }, [mode, searchParams]);
 
-  const clearPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-
-    if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current);
-      pollingTimeoutRef.current = null;
-    }
-  }, []);
-
-  finalizeLoginRef.current = async (token?: string | null) => {
-    if (isFinalizingLoginRef.current) {
-      return;
-    }
-
-    isFinalizingLoginRef.current = true;
-    clearPolling();
-
-    try {
-      if (token) {
-        setToken(token);
-      }
-
-      await refreshUser();
-      toast.success('登录成功');
-
-      if (mode === 'dialog') {
-        onClose?.();
-        onSuccess?.();
-        return;
-      }
-
-      router.replace(returnTo);
-    } catch (error) {
-      isFinalizingLoginRef.current = false;
-      throw error;
-    }
-  };
-
-  const startWechatPolling = useCallback((state: string) => {
-    clearPolling();
-
-    pollingTimeoutRef.current = setTimeout(() => {
-      clearPolling();
-      setWechatConfig(null);
-      setWechatUnavailableMessage('二维码已过期，请点击刷新后重试');
-    }, WECHAT_POLL_TIMEOUT_MS);
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const result = await checkWechatLoginState(state);
-        if (!result.loggedIn) {
-          return;
-        }
-
-        await finalizeLoginRef.current(result.token);
-      } catch (error) {
-        console.error('[wechat-login] failed to check qr login state:', error);
-      }
-    }, WECHAT_POLL_INTERVAL_MS);
-  }, [clearPolling]);
-
   const loadWechatQrConfig = useCallback(async () => {
     if (isWechatBrowser) {
       return;
@@ -145,17 +70,15 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
       setErrorMessage('');
       setWechatUnavailableMessage('');
       setWechatConfig(null);
-      clearPolling();
 
-      const nextConfig = await fetchWechatLoginConfig();
+      const nextConfig = await fetchWechatLoginConfig(returnTo);
       setWechatConfig(nextConfig);
-      startWechatPolling(nextConfig.state);
     } catch (error) {
       setWechatUnavailableMessage(getErrorMessage(error, '当前环境暂时无法使用微信扫码登录'));
     } finally {
       setLoading(false);
     }
-  }, [clearPolling, isWechatBrowser, startWechatPolling]);
+  }, [isWechatBrowser, returnTo]);
 
   useEffect(() => {
     setIsBrowserReady(true);
@@ -190,61 +113,20 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
 
     if (mode === 'dialog') {
       onClose?.();
+      onSuccess?.();
       return;
     }
 
     router.replace(returnTo);
-  }, [mode, onClose, returnTo, router, user, userLoading]);
-
-  useEffect(() => {
-    if (!isBrowserReady) {
-      return;
-    }
-
-    if (isWechatBrowser) {
-      clearPolling();
-      setWechatConfig(null);
-      setWechatUnavailableMessage('');
-      return;
-    }
-
-    void loadWechatQrConfig();
-
-    return () => {
-      clearPolling();
-    };
-  }, [clearPolling, isBrowserReady, isWechatBrowser, loadWechatQrConfig]);
+  }, [mode, onClose, onSuccess, returnTo, router, user, userLoading]);
 
   useEffect(() => {
     if (!isBrowserReady || isWechatBrowser) {
       return;
     }
 
-    const handleWechatMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) {
-        return;
-      }
-
-      if (!isWechatLoginSuccessMessage(event.data)) {
-        return;
-      }
-
-      void finalizeLoginRef.current(event.data.token ?? null).catch((error) => {
-        setErrorMessage(getErrorMessage(error, '登录状态同步失败，请刷新页面后重试'));
-      });
-    };
-
-    window.addEventListener('message', handleWechatMessage);
-    return () => {
-      window.removeEventListener('message', handleWechatMessage);
-    };
-  }, [isBrowserReady, isWechatBrowser]);
-
-  useEffect(() => {
-    return () => {
-      clearPolling();
-    };
-  }, [clearPolling]);
+    void loadWechatQrConfig();
+  }, [isBrowserReady, isWechatBrowser, loadWechatQrConfig]);
 
   const handleWechatAuthorizeLogin = () => {
     setLoading(true);
@@ -297,14 +179,7 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
           ) : wechatConfig ? (
             <div className="space-y-4">
               <div className="flex justify-center">
-                <WechatQrLogin
-                  key={wechatConfig.state}
-                  appId={wechatConfig.appId}
-                  redirectUri={wechatConfig.redirectUri}
-                  state={wechatConfig.state}
-                  width={300}
-                  height={400}
-                />
+                <WechatQrLogin loginUrl={wechatConfig.loginUrl} width={320} height={480} />
               </div>
               <div className="flex justify-center">
                 <Button
@@ -318,7 +193,6 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
                   刷新二维码
                 </Button>
               </div>
-              <p className="text-center text-sm text-gray-500">请使用手机微信扫码确认登录。</p>
             </div>
           ) : (
             <div className="py-8 text-center">

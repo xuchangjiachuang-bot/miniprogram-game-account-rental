@@ -1,9 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { getWechatOpenUserInfo, type WechatUserInfo, wechatLogin } from '@/lib/wechat-oauth';
 import { wechatLogin as wechatUserLogin } from '@/lib/user-service';
-import { saveLoginState } from '@/lib/wechat-login-store';
-
-const WECHAT_LOGIN_SUCCESS_MESSAGE_TYPE = 'wechat_login_success';
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof Error && error.message) {
@@ -14,15 +11,22 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 }
 
 function isWechatQrLoginState(state: string | null) {
-  return typeof state === 'string' && /^login_\d+_[a-z0-9]+$/i.test(state);
+  return typeof state === 'string' && state.startsWith('wechat_pc:');
 }
 
 function getReturnToFromState(state: string | null) {
-  if (!state || !state.startsWith('wechat_oauth:')) {
+  if (!state) {
     return '';
   }
 
-  const encoded = state.slice('wechat_oauth:'.length).trim();
+  let encoded = '';
+
+  if (state.startsWith('wechat_oauth:')) {
+    encoded = state.slice('wechat_oauth:'.length).trim();
+  } else if (state.startsWith('wechat_pc:')) {
+    encoded = state.slice('wechat_pc:'.length).trim();
+  }
+
   if (!encoded) {
     return '';
   }
@@ -66,101 +70,6 @@ function clearWechatReturnToCookie(response: NextResponse) {
 
 function getBaseUrl(request: NextRequest) {
   return process.env.NEXT_PUBLIC_BASE_URL || new URL(request.url).origin;
-}
-
-function renderQrLoginResultPage(token: string, user: unknown, targetOrigin: string) {
-  const safeToken = JSON.stringify(token);
-  const safeUser = JSON.stringify(JSON.stringify(user));
-  const safeTargetOrigin = JSON.stringify(targetOrigin);
-
-  return new NextResponse(
-    `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>登录成功</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .card {
-      width: min(92vw, 420px);
-      padding: 32px 28px;
-      background: rgba(255, 255, 255, 0.96);
-      border-radius: 20px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-      text-align: center;
-    }
-    .icon {
-      font-size: 54px;
-      margin-bottom: 12px;
-    }
-    h1 {
-      margin: 0 0 10px;
-      color: #111827;
-      font-size: 26px;
-    }
-    p {
-      margin: 0;
-      color: #6b7280;
-      line-height: 1.6;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">✓</div>
-    <h1>登录成功</h1>
-    <p>请返回电脑页面，系统会自动完成登录。</p>
-  </div>
-  <script>
-    (function () {
-      var message = {
-        type: '${WECHAT_LOGIN_SUCCESS_MESSAGE_TYPE}',
-        token: ${safeToken},
-        user: JSON.parse(${safeUser})
-      };
-
-      try {
-        if (message.token) {
-          window.localStorage.removeItem('cached_user');
-          window.localStorage.removeItem('user_cache_time');
-          window.localStorage.setItem('auth_token', message.token);
-        }
-      } catch (storageError) {
-        console.error('wechat localStorage sync failed', storageError);
-      }
-
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage(message, ${safeTargetOrigin});
-        }
-        if (window.opener) {
-          window.opener.postMessage(message, ${safeTargetOrigin});
-          window.close();
-          return;
-        }
-      } catch (error) {
-        console.error('wechat postMessage failed', error);
-      }
-    })();
-  </script>
-</body>
-</html>`,
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-      },
-    },
-  );
 }
 
 function renderPcQrMisusePage() {
@@ -266,14 +175,6 @@ export async function GET(request: NextRequest) {
         errorUrl.searchParams.set('reason', encodeURIComponent(loginResult.message));
       }
       return NextResponse.redirect(errorUrl);
-    }
-
-    if (isQrLogin && state) {
-      await saveLoginState(state, loginResult.token);
-      return attachAuthCookie(
-        renderQrLoginResultPage(loginResult.token, loginResult.user, baseUrl),
-        loginResult.token,
-      );
     }
 
     const redirectUrl = new URL(returnTo || '/', baseUrl);

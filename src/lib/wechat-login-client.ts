@@ -1,17 +1,10 @@
-﻿'use client';
-
-export const WECHAT_LOGIN_SUCCESS_MESSAGE_TYPE = 'wechat_login_success';
+'use client';
 
 export interface WechatLoginConfigData {
   appId: string;
   redirectUri: string;
   state: string;
-}
-
-export interface WechatLoginSuccessMessage {
-  type: typeof WECHAT_LOGIN_SUCCESS_MESSAGE_TYPE;
-  token?: string | null;
-  user?: unknown;
+  loginUrl: string;
 }
 
 interface WechatLoginConfigResponse {
@@ -22,14 +15,6 @@ interface WechatLoginConfigResponse {
     appId?: string;
     redirectUri?: string;
   };
-}
-
-interface WechatLoginStateResponse {
-  success: boolean;
-  loggedIn?: boolean;
-  token?: string;
-  error?: string;
-  message?: string;
 }
 
 interface JsonResponseBase {
@@ -64,15 +49,6 @@ async function readJsonResponse<T extends JsonResponseBase>(
   return result;
 }
 
-export function createWechatQrLoginState() {
-  return `login_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-export function createWechatOauthState(returnTo: string) {
-  const safeReturnTo = resolveLoginReturnTo(returnTo);
-  return `wechat_oauth:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
-}
-
 export function resolveLoginReturnTo(returnTo?: string | null) {
   if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
     return returnTo;
@@ -81,21 +57,17 @@ export function resolveLoginReturnTo(returnTo?: string | null) {
   return '/';
 }
 
-export function isWechatLoginSuccessMessage(value: unknown): value is WechatLoginSuccessMessage {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const token = candidate.token;
-
-  return (
-    candidate.type === WECHAT_LOGIN_SUCCESS_MESSAGE_TYPE &&
-    (token === undefined || token === null || typeof token === 'string')
-  );
+export function createWechatOauthState(returnTo: string) {
+  const safeReturnTo = resolveLoginReturnTo(returnTo);
+  return `wechat_oauth:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
 }
 
-export async function fetchWechatLoginConfig(): Promise<WechatLoginConfigData> {
+export function createWechatPcState(returnTo: string) {
+  const safeReturnTo = resolveLoginReturnTo(returnTo);
+  return `wechat_pc:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
+}
+
+export async function fetchWechatLoginConfig(returnTo: string): Promise<WechatLoginConfigData> {
   const response = await fetch('/api/auth/wechat/config', {
     cache: 'no-store',
   });
@@ -114,28 +86,19 @@ export async function fetchWechatLoginConfig(): Promise<WechatLoginConfigData> {
     throw new Error('微信登录配置不完整，请稍后再试');
   }
 
+  const state = createWechatPcState(returnTo);
+  const params = new URLSearchParams({
+    appid: appId,
+    redirect_uri: encodeURIComponent(redirectUri),
+    response_type: 'code',
+    scope: 'snsapi_login',
+    state,
+  });
+
   return {
     appId,
     redirectUri,
-    state: createWechatQrLoginState(),
-  };
-}
-
-export async function checkWechatLoginState(state: string) {
-  const response = await fetch(`/api/auth/wechat/check-login?state=${encodeURIComponent(state)}`, {
-    cache: 'no-store',
-  });
-  const result = await readJsonResponse<WechatLoginStateResponse>(
-    response,
-    '检查微信登录状态失败',
-  );
-
-  if (!result.success) {
-    throw new Error(result.error || result.message || '检查微信登录状态失败');
-  }
-
-  return {
-    loggedIn: result.loggedIn === true,
-    token: result.token || null,
+    state,
+    loginUrl: `https://open.weixin.qq.com/connect/qrconnect?${params.toString()}#wechat_redirect`,
   };
 }
