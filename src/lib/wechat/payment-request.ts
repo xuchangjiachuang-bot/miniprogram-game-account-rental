@@ -195,6 +195,16 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
   const totalFeeFen = yuanToFen(resolvedAmount);
   const notifyUrl = getNotifyUrl(request, channel);
   const attach = buildRechargeAttach(paymentRecordId);
+  console.log('[WeChat Pay] creating recharge payment', {
+    userId: user.id,
+    channel,
+    amount: resolvedAmount,
+    paymentRecordId,
+    outTradeNo,
+    notifyUrl,
+    hasOpenid: Boolean(resolvedOpenid),
+    openidPrefix: resolvedOpenid ? String(resolvedOpenid).slice(0, 8) : null,
+  });
 
   if (channel === 'jsapi') {
     const payment = await createJsapiTransaction({
@@ -208,6 +218,12 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
     });
 
     const jsapiParams = await buildJsapiPaymentParams(payment.prepay_id);
+    console.log('[WeChat Pay] recharge payment created', {
+      channel,
+      paymentRecordId,
+      outTradeNo,
+      prepayIdPrefix: payment.prepay_id?.slice(0, 18) || null,
+    });
     return {
       ...jsapiParams,
       rechargeId: paymentRecordId,
@@ -226,6 +242,12 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
       appUrl: getWechatNotifyBaseUrl(request),
     });
 
+    console.log('[WeChat Pay] recharge payment created', {
+      channel,
+      paymentRecordId,
+      outTradeNo,
+      hasMwebUrl: Boolean(payment.h5_url),
+    });
     return {
       rechargeId: paymentRecordId,
       amount: resolvedAmount,
@@ -241,6 +263,12 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
     attach,
   });
 
+  console.log('[WeChat Pay] recharge payment created', {
+    channel,
+    paymentRecordId,
+    outTradeNo,
+    hasCodeUrl: Boolean(payment.code_url),
+  });
   return {
     rechargeId: paymentRecordId,
     amount: resolvedAmount,

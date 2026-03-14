@@ -43,6 +43,12 @@ function parseWechatAttach(rawAttach?: string) {
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  console.log('[WeChat Pay] JSAPI callback received', {
+    bodyLength: rawBody.length,
+    hasWechatSignature: Boolean(request.headers.get('wechatpay-signature')),
+    hasWechatTimestamp: Boolean(request.headers.get('wechatpay-timestamp')),
+    userAgent: request.headers.get('user-agent'),
+  });
 
   try {
     const notification = await decryptWechatPayNotification<{
@@ -60,11 +66,20 @@ export async function POST(request: NextRequest) {
     }
 
     const resource = notification.decryptedResource;
+    console.log('[WeChat Pay] JSAPI callback decrypted', {
+      eventType: notification.event_type,
+      outTradeNo: resource.out_trade_no,
+      transactionId: resource.transaction_id,
+      tradeState: resource.trade_state,
+      attach: resource.attach,
+      totalFeeFen: resource.amount?.total,
+    });
     if (resource.trade_state !== 'SUCCESS') {
       return createSuccessResponse();
     }
 
     const attach = parseWechatAttach(resource.attach);
+    console.log('[WeChat Pay] JSAPI callback resolved attach', attach);
 
     if (attach.kind === 'wallet_recharge') {
       await markWechatWalletRechargePaid({
@@ -79,6 +94,12 @@ export async function POST(request: NextRequest) {
         totalFeeFen: resource.amount?.total,
       });
     }
+
+    console.log('[WeChat Pay] JSAPI callback processed successfully', {
+      outTradeNo: resource.out_trade_no,
+      transactionId: resource.transaction_id,
+      kind: attach.kind || 'order',
+    });
 
     return createSuccessResponse();
   } catch (error: any) {

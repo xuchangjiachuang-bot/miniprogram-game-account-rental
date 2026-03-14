@@ -22,9 +22,20 @@ export async function GET(
     }
 
     const { id } = await params;
+    console.log('[Recharge Status] reconciling recharge status', {
+      paymentRecordId: id,
+      userId: user.id,
+    });
     const record = await reconcileWechatWalletRechargeStatus({
       paymentRecordId: id,
       userId: user.id,
+    });
+
+    console.log('[Recharge Status] recharge status resolved', {
+      paymentRecordId: record.id,
+      status: record.status,
+      transactionId: record.transactionId,
+      failureReason: record.failureReason,
     });
 
     return NextResponse.json({

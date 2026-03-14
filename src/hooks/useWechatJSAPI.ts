@@ -7,7 +7,7 @@ declare global {
 }
 
 interface CheckJsApiResult {
-  chooseWXPay?: boolean;
+  chooseWXPay?: boolean | 'true' | 'false';
 }
 
 function stringifyWechatSdkError(error: unknown) {
@@ -26,18 +26,33 @@ function stringifyWechatSdkError(error: unknown) {
   }
 }
 
+function isWechatBrowser(userAgent: string) {
+  return /MicroMessenger/i.test(userAgent);
+}
+
+function isDesktopWechatBrowser(userAgent: string) {
+  return /WindowsWechat|MacWechat|wxwork/i.test(userAgent) || (!/Mobile/i.test(userAgent) && /MicroMessenger/i.test(userAgent));
+}
+
 const WECHAT_SDK_READY_TIMEOUT_MS = 8000;
 
 export function useWechatJSAPI() {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const isWechat = isWechatBrowser(userAgent);
+  const isDesktopWechat = isDesktopWechatBrowser(userAgent);
+  const isMobileWechat = isWechat && !isDesktopWechat;
 
   useEffect(() => {
-    const isWechat = /MicroMessenger/i.test(navigator.userAgent);
-
     if (!isWechat) {
-      setError('请在微信中打开');
+      setError('请在微信内打开');
+      return;
+    }
+
+    if (isDesktopWechat) {
+      setError('当前是桌面微信环境，请改用扫码支付');
       return;
     }
 
@@ -47,7 +62,7 @@ export function useWechatJSAPI() {
     }
 
     void loadWechatSDK();
-  }, []);
+  }, [isDesktopWechat, isWechat]);
 
   const loadWechatSDK = async () => {
     try {
@@ -85,7 +100,7 @@ export function useWechatJSAPI() {
       const timeout = window.setTimeout(() => {
         reject(
           new Error(
-            '微信 JS SDK 初始化超时，请检查公众号 JS 接口安全域名、支付授权目录，以及当前是否为微信内真实环境',
+            '微信 JS SDK 初始化超时，请检查公众号 JS 接口安全域名、支付授权目录，以及当前是否为手机微信内真实环境',
           ),
         );
       }, WECHAT_SDK_READY_TIMEOUT_MS);
@@ -135,7 +150,9 @@ export function useWechatJSAPI() {
     loaded,
     loading,
     error,
-    isWechat: /MicroMessenger/i.test(navigator.userAgent),
+    isWechat,
+    isDesktopWechat,
+    isMobileWechat,
     configWechatSDK,
     checkPaymentPermission,
   };
