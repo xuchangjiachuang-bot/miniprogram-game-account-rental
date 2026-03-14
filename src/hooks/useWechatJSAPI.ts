@@ -6,16 +6,16 @@ declare global {
   }
 }
 
-/**
- * 加载微信 JS-SDK
- */
+interface CheckJsApiResult {
+  chooseWXPay?: boolean;
+}
+
 export function useWechatJSAPI() {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 检查是否已经在微信环境中
     const isWechat = /MicroMessenger/i.test(navigator.userAgent);
 
     if (!isWechat) {
@@ -23,14 +23,12 @@ export function useWechatJSAPI() {
       return;
     }
 
-    // 检查是否已加载
     if (typeof window !== 'undefined' && window.wx) {
       setLoaded(true);
       return;
     }
 
-    // 加载微信 JS-SDK
-    loadWechatSDK();
+    void loadWechatSDK();
   }, []);
 
   const loadWechatSDK = async () => {
@@ -38,32 +36,28 @@ export function useWechatJSAPI() {
       setLoading(true);
       setError(null);
 
-      // 加载微信 JS-SDK
       const script = document.createElement('script');
       script.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js';
       script.async = true;
       script.onload = () => {
-        console.log('[WeChat JSAPI] SDK 加载成功');
+        console.log('[WeChat JSAPI] SDK loaded');
         setLoaded(true);
         setLoading(false);
       };
       script.onerror = () => {
-        console.error('[WeChat JSAPI] SDK 加载失败');
+        console.error('[WeChat JSAPI] SDK load failed');
         setError('微信 SDK 加载失败');
         setLoading(false);
       };
 
       document.head.appendChild(script);
     } catch (err: any) {
-      console.error('[WeChat JSAPI] 加载失败:', err);
+      console.error('[WeChat JSAPI] load failed:', err);
       setError(err.message || '加载失败');
       setLoading(false);
     }
   };
 
-  /**
-   * 配置微信 JS-SDK
-   */
   const configWechatSDK = async (appId: string, timestamp: number, nonceStr: string, signature: string) => {
     if (!loaded || !window.wx) {
       throw new Error('微信 SDK 未加载');
@@ -72,21 +66,39 @@ export function useWechatJSAPI() {
     return new Promise((resolve, reject) => {
       window.wx.config({
         debug: false,
-        appId: appId,
-        timestamp: timestamp,
-        nonceStr: nonceStr,
-        signature: signature,
-        jsApiList: ['chooseWXPay'],
+        appId,
+        timestamp,
+        nonceStr,
+        signature,
+        jsApiList: ['chooseWXPay', 'checkJsApi'],
       });
 
       window.wx.ready(() => {
-        console.log('[WeChat JSAPI] 配置成功');
+        console.log('[WeChat JSAPI] config ready');
         resolve(true);
       });
 
       window.wx.error((res: any) => {
-        console.error('[WeChat JSAPI] 配置失败:', res);
+        console.error('[WeChat JSAPI] config failed:', res);
         reject(res);
+      });
+    });
+  };
+
+  const checkPaymentPermission = async (): Promise<CheckJsApiResult> => {
+    if (!loaded || !window.wx) {
+      throw new Error('微信 SDK 未加载');
+    }
+
+    return new Promise((resolve, reject) => {
+      window.wx.checkJsApi({
+        jsApiList: ['chooseWXPay'],
+        success: (result: { checkResult?: CheckJsApiResult }) => {
+          resolve(result?.checkResult || {});
+        },
+        fail: (sdkError: any) => {
+          reject(sdkError);
+        },
       });
     });
   };
@@ -97,5 +109,6 @@ export function useWechatJSAPI() {
     error,
     isWechat: /MicroMessenger/i.test(navigator.userAgent),
     configWechatSDK,
+    checkPaymentPermission,
   };
 }

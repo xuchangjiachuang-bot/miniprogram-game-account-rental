@@ -15,6 +15,31 @@ export interface WechatPayConfig {
   certSerialNo?: string;
 }
 
+function maskValue(value: string) {
+  if (!value) return 'Not configured';
+  if (value.length <= 8) return `${value.slice(0, 2)}***`;
+  return `${value.slice(0, 6)}***${value.slice(-2)}`;
+}
+
+function mapMissingField(field: string) {
+  switch (field) {
+    case 'mchid':
+      return 'Merchant ID (MCHID)';
+    case 'appid':
+      return 'Payment AppID';
+    case 'notifyUrl':
+      return 'Notify URL';
+    case 'apiV3Key':
+      return 'API v3 Key';
+    case 'serialNo':
+      return 'Merchant Certificate Serial No';
+    case 'privateKey':
+      return 'Merchant Private Key';
+    default:
+      return field;
+  }
+}
+
 export async function getWechatPayConfig(): Promise<WechatPayConfig> {
   const config = await getWechatPayV3Config();
 
@@ -34,24 +59,7 @@ export async function checkWechatPayConfig(): Promise<{ valid: boolean; missing:
   const result = await assertWechatPayV3Config();
   return {
     valid: result.valid,
-    missing: result.missing.map((field) => {
-      switch (field) {
-        case 'mchid':
-          return '商户号(MCHID)';
-        case 'appid':
-          return '支付 AppID(APPID)';
-        case 'notifyUrl':
-          return '支付回调地址(NOTIFY_URL)';
-        case 'apiV3Key':
-          return 'APIv3 密钥(API_V3_KEY)';
-        case 'serialNo':
-          return '商户证书序列号(SERIAL_NO)';
-        case 'privateKey':
-          return '商户私钥(PRIVATE_KEY)';
-        default:
-          return field;
-      }
-    }),
+    missing: result.missing.map(mapMissingField),
   };
 }
 
@@ -59,16 +67,7 @@ export async function checkCertConfig(): Promise<{ valid: boolean; missing: stri
   const result = await assertWechatPayV3Config(['serialNo', 'privateKey']);
   return {
     valid: result.valid,
-    missing: result.missing.map((field) => {
-      switch (field) {
-        case 'serialNo':
-          return '商户证书序列号(SERIAL_NO)';
-        case 'privateKey':
-          return '商户私钥(PRIVATE_KEY)';
-        default:
-          return field;
-      }
-    }),
+    missing: result.missing.map(mapMissingField),
   };
 }
 
@@ -76,17 +75,20 @@ export async function getWechatPayConfigStatus() {
   const config = await getWechatPayV3Config();
   const check = await checkWechatPayConfig();
   const certCheck = await checkCertConfig();
+  const appIdMatch = Boolean(config.appid && config.mpAppId && config.appid === config.mpAppId);
 
   return {
     configured: check.valid,
     missingFields: check.missing,
     certConfigured: certCheck.valid,
     certMissing: certCheck.missing,
-    appId: config.appid ? `${config.appid.slice(0, 8)}***` : '未配置',
-    mchId: config.mchid ? `${config.mchid.slice(0, 8)}***` : '未配置',
-    notifyUrl: config.notifyUrl || '未配置',
-    certPath: '使用环境变量商户私钥',
-    keyPath: '使用环境变量商户私钥',
+    appId: maskValue(config.appid),
+    mpAppId: maskValue(config.mpAppId),
+    appIdMatch,
+    mchId: maskValue(config.mchid),
+    notifyUrl: config.notifyUrl || 'Not configured',
+    certPath: 'Using environment variable private key',
+    keyPath: 'Using environment variable private key',
     apiVersion: 'v3',
     transferConfigured: Boolean(config.transferSceneId),
   };

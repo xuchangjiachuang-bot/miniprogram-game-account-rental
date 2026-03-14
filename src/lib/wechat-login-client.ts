@@ -1,5 +1,7 @@
 'use client';
 
+import { buildWechatLoginState, normalizeWechatReturnTo } from '@/lib/wechat/login-shared';
+
 export interface WechatLoginConfigData {
   appId: string;
   redirectUri: string;
@@ -30,18 +32,6 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
-function encodeBase64Url(value: string) {
-  if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
-    return window
-      .btoa(unescape(encodeURIComponent(value)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-  }
-
-  throw new Error('BASE64_URL_ENCODE_UNAVAILABLE');
-}
-
 async function readJsonResponse<T extends JsonResponseBase>(
   response: Response,
   fallbackMessage: string,
@@ -61,28 +51,21 @@ async function readJsonResponse<T extends JsonResponseBase>(
   return result;
 }
 
-export function resolveLoginReturnTo(returnTo?: string | null) {
-  if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
-    return returnTo;
-  }
-
-  return '/';
-}
+export const resolveLoginReturnTo = normalizeWechatReturnTo;
 
 export function createWechatOauthState(returnTo: string) {
-  const safeReturnTo = resolveLoginReturnTo(returnTo);
-  return `wechat_oauth:${encodeBase64Url(safeReturnTo)}`;
+  return buildWechatLoginState('oauth', returnTo);
 }
 
 export function createWechatPcState(returnTo: string) {
-  const safeReturnTo = resolveLoginReturnTo(returnTo);
-  return `wechat_pc:${encodeBase64Url(safeReturnTo)}`;
+  return buildWechatLoginState('pc', returnTo);
 }
 
 export async function fetchWechatLoginConfig(returnTo: string): Promise<WechatLoginConfigData> {
   const response = await fetch('/api/auth/wechat/config', {
     cache: 'no-store',
   });
+
   const result = await readJsonResponse<WechatLoginConfigResponse>(
     response,
     '当前环境暂时无法使用微信登录',
@@ -94,14 +77,15 @@ export async function fetchWechatLoginConfig(returnTo: string): Promise<WechatLo
 
   const appId = result.data?.appId?.trim();
   const redirectUri = result.data?.redirectUri?.trim();
+
   if (!appId || !redirectUri) {
-    throw new Error('微信登录配置不完整，请稍后再试');
+    throw new Error('微信登录配置不完整，请稍后重试');
   }
 
   const state = createWechatPcState(returnTo);
   const params = new URLSearchParams({
     appid: appId,
-    redirect_uri: encodeURIComponent(redirectUri),
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'snsapi_login',
     state,

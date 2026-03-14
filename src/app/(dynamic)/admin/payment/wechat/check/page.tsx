@@ -12,6 +12,8 @@ interface ConfigData {
   certConfigured: boolean;
   certMissing: string[];
   appId?: string;
+  mpAppId?: string;
+  appIdMatch?: boolean;
   mchId?: string;
   notifyUrl?: string;
 }
@@ -136,6 +138,38 @@ export default function WechatPaymentConfigPage() {
                 </div>
               )}
             </div>
+
+            <div className="flex items-center justify-between p-4 rounded-lg border">
+              <div className="flex items-center gap-3">
+                {config.mpAppId ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <XCircle className="h-5 w-5 text-red-500" />}
+                <div>
+                  <div className="font-medium">公众号 AppID</div>
+                  <div className="text-sm text-muted-foreground">JSAPI 支付和微信内授权使用的 AppID</div>
+                </div>
+              </div>
+              {config.mpAppId && (
+                <div className="flex items-center gap-2">
+                  <code className="px-3 py-1 bg-muted rounded text-sm">{config.mpAppId}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(config.mpAppId!)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Alert variant={config.appIdMatch ? 'default' : 'destructive'}>
+              {config.appIdMatch ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              <AlertTitle>{config.appIdMatch ? 'AppID 一致' : 'AppID 可能不一致'}</AlertTitle>
+              <AlertDescription>
+                {config.appIdMatch
+                  ? '支付 AppID 与公众号 AppID 已对齐，微信内支付权限匹配概率更高。'
+                  : '如果微信内出现 chooseWXPay:permission denied，优先检查商户号绑定的支付 AppID 是否和公众号 AppID 一致。'}
+              </AlertDescription>
+            </Alert>
 
             <div className="flex items-center justify-between p-4 rounded-lg border">
               <div className="flex items-center gap-3">

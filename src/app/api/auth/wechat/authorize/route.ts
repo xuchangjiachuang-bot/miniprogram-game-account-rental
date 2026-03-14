@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateWechatAuthUrl } from '@/lib/wechat-oauth';
+import {
+  attachWechatReturnToCookie,
+  createWechatOauthRedirectUrl,
+  getRequestHostname,
+  isLocalHostname,
+  normalizeReturnTo,
+} from '@/lib/wechat/login-flow';
 
 /**
  * 微信 OAuth 授权入口
@@ -9,11 +15,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const state = searchParams.get('state') || 'login';
-    const returnTo = searchParams.get('returnTo') || '';
-    const requestHost = request.headers.get('host')?.toLowerCase() || '';
-    const requestHostname = requestHost.split(':')[0];
+    const returnTo = normalizeReturnTo(searchParams.get('returnTo'));
+    const requestHostname = getRequestHostname(request);
 
-    if (['localhost', '127.0.0.1', '0.0.0.0'].includes(requestHostname)) {
+    if (isLocalHostname(requestHostname)) {
       const redirectUrl = new URL('/login', request.url);
       redirectUrl.searchParams.set(
         'error',
@@ -22,20 +27,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    const authUrl = await generateWechatAuthUrl(state);
-    const response = NextResponse.redirect(authUrl);
-
-    if (returnTo.startsWith('/')) {
-      response.cookies.set('wechat_auth_return_to', returnTo, {
-        maxAge: 60 * 10,
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-      });
-    }
-
-    return response;
+    const authUrl = await createWechatOauthRedirectUrl(state);
+    return attachWechatReturnToCookie(NextResponse.redirect(authUrl), returnTo);
   } catch (error: any) {
     console.error('微信 OAuth 授权失败:', error);
     return NextResponse.json(

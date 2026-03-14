@@ -197,7 +197,7 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
                 打开微信扫码登录
               </Button>
               <p className="text-center text-sm text-gray-500">
-                将跳转到微信官方扫码登录页，扫码确认后自动回到当前页面。
+                将跳转到微信官方扫码登录页，扫码确认后会自动回到当前页面。
               </p>
               <div className="flex justify-center">
                 <Button

@@ -1,38 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerToken } from '@/lib/server-auth';
-import { verifyToken } from '@/lib/user-service';
-import { checkWechatPayConfig } from '@/lib/wechat/config';
-import { createWechatRechargePayment } from '@/lib/wechat/payment-request';
+import {
+  assertWechatPaymentConfigured,
+  createRechargeWechatPayment,
+  requireWechatPaymentUser,
+  resolveWechatPaymentError,
+} from '@/lib/wechat/payment-service';
 
 export async function POST(request: NextRequest) {
   try {
-    const configCheck = await checkWechatPayConfig();
-    if (!configCheck.valid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '微信支付配置不完整',
-          missing: configCheck.missing,
-        },
-        { status: 500 }
-      );
-    }
-
-    const token = getServerToken(request);
-    if (!token) {
-      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
-    }
-
-    const user = await verifyToken(token);
-    if (!user) {
-      return NextResponse.json({ success: false, error: '登录状态已失效，请重新登录' }, { status: 401 });
-    }
+    await assertWechatPaymentConfigured();
+    const user = await requireWechatPaymentUser(request);
 
     const body = await request.json();
     const amount = Number(body.amount || 0);
     const openid = typeof body.openid === 'string' ? body.openid : user.wechat_openid;
 
-    const paymentData = await createWechatRechargePayment({
+    const paymentData = await createRechargeWechatPayment({
       request,
       user,
       amount,
@@ -40,25 +23,24 @@ export async function POST(request: NextRequest) {
       openid,
     });
 
-    return NextResponse.json({
-      success: true,
-      data: paymentData,
-    });
-  } catch (error: any) {
-    if (error.message === 'INVALID_RECHARGE_AMOUNT') {
+    return NextResponse.json({ success: true, data: paymentData });
+  } catch (error) {
+    const resolved = resolveWechatPaymentError(error);
+
+    if (resolved.message === 'WECHAT_PAY_CONFIG_INVALID') {
+      return NextResponse.json({ success: false, error: '微信支付配置不完整', missing: resolved.missing }, { status: 500 });
+    }
+    if (resolved.message === 'UNAUTHORIZED') {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
+    }
+    if (resolved.message === 'INVALID_RECHARGE_AMOUNT') {
       return NextResponse.json({ success: false, error: '充值金额必须大于 0' }, { status: 400 });
     }
-    if (error.message === 'MISSING_OPENID') {
+    if (resolved.message === 'MISSING_OPENID') {
       return NextResponse.json({ success: false, error: '当前账号未绑定微信 openid' }, { status: 400 });
     }
 
-    console.error('[WeChat Pay] 创建钱包充值订单失败:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || '创建钱包充值订单失败',
-      },
-      { status: 500 }
-    );
+    console.error('[WeChat Pay] create jsapi recharge failed:', error);
+    return NextResponse.json({ success: false, error: resolved.message || '创建 JSAPI 充值订单失败' }, { status: 500 });
   }
 }
