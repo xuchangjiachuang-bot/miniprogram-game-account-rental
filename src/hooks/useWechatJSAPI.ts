@@ -10,6 +10,22 @@ interface CheckJsApiResult {
   chooseWXPay?: boolean;
 }
 
+function stringifyWechatSdkError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 const WECHAT_SDK_READY_TIMEOUT_MS = 8000;
 
 export function useWechatJSAPI() {
@@ -92,7 +108,7 @@ export function useWechatJSAPI() {
       window.wx.error((res: any) => {
         window.clearTimeout(timeout);
         console.error('[WeChat JSAPI] config failed:', res);
-        reject(res);
+        reject(new Error(`WECHAT_JSAPI_CONFIG_FAILED: ${stringifyWechatSdkError(res)}`));
       });
     });
   };
@@ -109,7 +125,7 @@ export function useWechatJSAPI() {
           resolve(result?.checkResult || {});
         },
         fail: (sdkError: any) => {
-          reject(sdkError);
+          reject(new Error(`WECHAT_JSAPI_CHECK_API_FAILED: ${stringifyWechatSdkError(sdkError)}`));
         },
       });
     });

@@ -26,6 +26,19 @@ interface CurrentUserInfo {
   wechatOpenid: string | null;
 }
 
+interface JsapiDebugState {
+  pageUrl?: string;
+  signatureRequestUrl?: string;
+  signatureResponse?: unknown;
+  signatureNormalizedUrl?: string;
+  sdkConfigStatus?: 'idle' | 'loading' | 'ready' | 'failed';
+  sdkConfigError?: string;
+  checkJsApiResult?: unknown;
+  checkJsApiError?: string;
+  createPaymentPayload?: unknown;
+  createPaymentResponse?: unknown;
+}
+
 type PaymentMode = 'order' | 'recharge';
 
 function WechatJSAPIPaymentContent() {
@@ -56,6 +69,7 @@ function WechatJSAPIPaymentContent() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [polling, setPolling] = useState(false);
   const [paymentPermissionReady, setPaymentPermissionReady] = useState(false);
+  const [jsapiDebug, setJsapiDebug] = useState<JsapiDebugState>({});
 
   useEffect(() => {
     setCurrentRechargeId(rechargeId || '');
@@ -117,7 +131,7 @@ function WechatJSAPIPaymentContent() {
     }
 
     if (errMsg.includes('permission denied')) {
-      return '微信返回 chooseWXPay:permission denied。请检查公众号支付权限、JS接口安全域名、支付授权目录，以及商户号是否已绑定当前公众号 AppID。';
+      return '微信返回 chooseWXPay:permission denied，请检查公众号支付权限、JS 接口安全域名、支付授权目录以及商户号与 AppID 绑定关系。';
     }
 
     if (errMsg.includes('choosewxpay:fail')) {
@@ -132,6 +146,7 @@ function WechatJSAPIPaymentContent() {
       setLoading(true);
       setError(null);
       setPaymentPermissionReady(false);
+      setJsapiDebug({});
 
       const token = getToken();
       if (!token) {
@@ -213,12 +228,24 @@ function WechatJSAPIPaymentContent() {
 
   async function setupWechatSdk() {
     try {
+      const pageUrl = window.location.href;
+
       setConfiguringSdk(true);
       setError(null);
       setPaymentPermissionReady(false);
+      setJsapiDebug({
+        pageUrl,
+        signatureRequestUrl: pageUrl,
+        sdkConfigStatus: 'loading',
+      });
 
-      const signatureResponse = await fetch(`/api/wechat/jsapi-signature?url=${encodeURIComponent(window.location.href)}`);
+      const signatureResponse = await fetch(`/api/wechat/jsapi-signature?url=${encodeURIComponent(pageUrl)}`);
       const signatureResult = await signatureResponse.json();
+      setJsapiDebug((current) => ({
+        ...current,
+        signatureResponse: signatureResult,
+        signatureNormalizedUrl: signatureResult?.data?.debug?.normalizedUrl,
+      }));
 
       if (!signatureResult.success) {
         throw new Error(signatureResult.error || '获取微信支付签名失败');
@@ -226,15 +253,31 @@ function WechatJSAPIPaymentContent() {
 
       const { appId, timestamp, nonceStr, signature } = signatureResult.data;
       await configWechatSDK(appId, timestamp, nonceStr, signature);
+      setJsapiDebug((current) => ({
+        ...current,
+        sdkConfigStatus: 'ready',
+      }));
 
       const permissionResult = await checkPaymentPermission();
+      setJsapiDebug((current) => ({
+        ...current,
+        checkJsApiResult: permissionResult,
+      }));
+
       if (!permissionResult.chooseWXPay) {
-        throw new Error('当前公众号或当前网页环境未获得 chooseWXPay 权限，请检查微信 JS接口安全域名、支付授权目录及商户号绑定关系');
+        throw new Error('当前公众号或当前网页环境未获得 chooseWXPay 权限，请检查微信 JS 接口安全域名、支付授权目录及商户号绑定关系');
       }
 
       setPaymentPermissionReady(true);
     } catch (sdkConfigError: any) {
-      setError(sdkConfigError.message || '初始化微信支付环境失败');
+      const message = sdkConfigError?.message || 'WECHAT_JSAPI_SETUP_FAILED';
+      setJsapiDebug((current) => ({
+        ...current,
+        sdkConfigStatus: 'failed',
+        sdkConfigError: message,
+        checkJsApiError: message.includes('WECHAT_JSAPI_CHECK_API_FAILED') ? message : current.checkJsApiError,
+      }));
+      setError(message);
     } finally {
       setConfiguringSdk(false);
     }
@@ -314,6 +357,14 @@ function WechatJSAPIPaymentContent() {
         ? { orderId, openid: currentUser.wechatOpenid }
         : { amount: Number(rechargeInfo?.amount || rechargeAmount || 0), openid: currentUser.wechatOpenid };
 
+      setJsapiDebug((current) => ({
+        ...current,
+        createPaymentPayload: {
+          endpoint,
+          payload,
+        },
+      }));
+
       const createResponse = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -324,6 +375,11 @@ function WechatJSAPIPaymentContent() {
       });
 
       const createResult = await createResponse.json();
+      setJsapiDebug((current) => ({
+        ...current,
+        createPaymentResponse: createResult,
+      }));
+
       if (!createResult.success) {
         setError(createResult.error || '创建支付失败');
         return;
@@ -503,7 +559,7 @@ function WechatJSAPIPaymentContent() {
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>微信支付权限未就绪</AlertTitle>
-                  <AlertDescription>当前页面已进入微信，但 chooseWXPay 权限未通过检测，请优先检查公众号支付授权配置。</AlertDescription>
+                  <AlertDescription>当前页面已进入微信，但 chooseWXPay 权限没有通过检测，请优先检查公众号支付配置。</AlertDescription>
                 </Alert>
               ) : null}
 
@@ -513,6 +569,15 @@ function WechatJSAPIPaymentContent() {
                   <AlertTitle>支付提示</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
+              ) : null}
+
+              {isWechat ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">JSAPI Debug</div>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-slate-700">
+                    {JSON.stringify(jsapiDebug, null, 2)}
+                  </pre>
+                </div>
               ) : null}
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

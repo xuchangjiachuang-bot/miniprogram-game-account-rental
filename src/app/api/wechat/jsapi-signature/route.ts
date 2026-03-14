@@ -119,6 +119,14 @@ export async function GET(request: NextRequest) {
     }
 
     const normalizedUrl = rawUrl.split('#')[0];
+    console.log('[WeChat JSAPI] signing request', {
+      rawUrl,
+      normalizedUrl,
+      requestHost: request.headers.get('host'),
+      referer: request.headers.get('referer'),
+      userAgent: request.headers.get('user-agent'),
+    });
+
     const ticket = await getJsapiTicket();
     const { appId } = await getWechatMpConfig();
     const nonceStr = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
@@ -136,6 +144,10 @@ export async function GET(request: NextRequest) {
         timestamp,
         nonceStr,
         signature,
+        debug: {
+          rawUrl,
+          normalizedUrl,
+        },
       },
     });
   } catch (error: any) {
