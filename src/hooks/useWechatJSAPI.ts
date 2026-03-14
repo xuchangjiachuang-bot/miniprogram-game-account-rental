@@ -10,6 +10,8 @@ interface CheckJsApiResult {
   chooseWXPay?: boolean;
 }
 
+const WECHAT_SDK_READY_TIMEOUT_MS = 8000;
+
 export function useWechatJSAPI() {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,6 +66,14 @@ export function useWechatJSAPI() {
     }
 
     return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(
+          new Error(
+            '微信 JS SDK 初始化超时，请检查公众号 JS 接口安全域名、支付授权目录，以及当前是否为微信内真实环境',
+          ),
+        );
+      }, WECHAT_SDK_READY_TIMEOUT_MS);
+
       window.wx.config({
         debug: false,
         appId,
@@ -74,11 +84,13 @@ export function useWechatJSAPI() {
       });
 
       window.wx.ready(() => {
+        window.clearTimeout(timeout);
         console.log('[WeChat JSAPI] config ready');
         resolve(true);
       });
 
       window.wx.error((res: any) => {
+        window.clearTimeout(timeout);
         console.error('[WeChat JSAPI] config failed:', res);
         reject(res);
       });
