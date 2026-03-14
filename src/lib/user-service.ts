@@ -75,16 +75,31 @@ function getAuthTokenSecret() {
   );
 }
 
+function toBase64Url(value: string) {
+  return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = normalized.length % 4;
+
+  if (padding === 0) {
+    return normalized;
+  }
+
+  return normalized.padEnd(normalized.length + (4 - padding), '=');
+}
+
 function base64UrlEncode(value: string) {
-  return Buffer.from(value, 'utf8').toString('base64url');
+  return toBase64Url(Buffer.from(value, 'utf8').toString('base64'));
 }
 
 function base64UrlDecode(value: string) {
-  return Buffer.from(value, 'base64url').toString('utf8');
+  return Buffer.from(fromBase64Url(value), 'base64').toString('utf8');
 }
 
 function signPayload(payload: string) {
-  return createHmac('sha256', getAuthTokenSecret()).update(payload).digest('base64url');
+  return toBase64Url(createHmac('sha256', getAuthTokenSecret()).update(payload).digest('base64'));
 }
 
 function normalizeUser(row: UserRow): User {

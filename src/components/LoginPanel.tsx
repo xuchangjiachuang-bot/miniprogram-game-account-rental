@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Loader2, QrCode, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import WechatQrLogin from '@/components/WechatQrLogin';
 import { useUser } from '@/contexts/UserContext';
 import {
   createWechatOauthState,
@@ -134,6 +133,16 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
     window.location.href = `/api/auth/wechat/authorize?state=${encodeURIComponent(oauthState)}&returnTo=${encodeURIComponent(returnTo)}`;
   };
 
+  const handleWechatPcLogin = () => {
+    if (!wechatConfig?.loginUrl) {
+      toast.error('微信扫码登录配置尚未就绪，请稍后重试');
+      return;
+    }
+
+    setLoading(true);
+    window.location.href = wechatConfig.loginUrl;
+  };
+
   const body = (
     <div className="space-y-6">
       {errorMessage ? (
@@ -178,9 +187,18 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
             </div>
           ) : wechatConfig ? (
             <div className="space-y-4">
-              <div className="flex justify-center">
-                <WechatQrLogin loginUrl={wechatConfig.loginUrl} width={320} height={480} />
-              </div>
+              <Button
+                type="button"
+                className="w-full cursor-pointer bg-gradient-to-r from-sky-600 to-cyan-600 text-white hover:from-sky-700 hover:to-cyan-700"
+                onClick={handleWechatPcLogin}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
+                打开微信扫码登录
+              </Button>
+              <p className="text-center text-sm text-gray-500">
+                将跳转到微信官方扫码登录页，扫码确认后自动回到当前页面。
+              </p>
               <div className="flex justify-center">
                 <Button
                   variant="outline"

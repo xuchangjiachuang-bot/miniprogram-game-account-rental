@@ -30,6 +30,18 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
+function encodeBase64Url(value: string) {
+  if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+    return window
+      .btoa(unescape(encodeURIComponent(value)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  throw new Error('BASE64_URL_ENCODE_UNAVAILABLE');
+}
+
 async function readJsonResponse<T extends JsonResponseBase>(
   response: Response,
   fallbackMessage: string,
@@ -59,12 +71,12 @@ export function resolveLoginReturnTo(returnTo?: string | null) {
 
 export function createWechatOauthState(returnTo: string) {
   const safeReturnTo = resolveLoginReturnTo(returnTo);
-  return `wechat_oauth:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
+  return `wechat_oauth:${encodeBase64Url(safeReturnTo)}`;
 }
 
 export function createWechatPcState(returnTo: string) {
   const safeReturnTo = resolveLoginReturnTo(returnTo);
-  return `wechat_pc:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
+  return `wechat_pc:${encodeBase64Url(safeReturnTo)}`;
 }
 
 export async function fetchWechatLoginConfig(returnTo: string): Promise<WechatLoginConfigData> {

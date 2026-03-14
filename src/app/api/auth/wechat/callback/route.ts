@@ -14,6 +14,15 @@ function isWechatQrLoginState(state: string | null) {
   return typeof state === 'string' && state.startsWith('wechat_pc:');
 }
 
+function decodeBase64Url(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = normalized.length % 4;
+  const withPadding =
+    padding === 0 ? normalized : normalized.padEnd(normalized.length + (4 - padding), '=');
+
+  return Buffer.from(withPadding, 'base64').toString('utf8');
+}
+
 function getReturnToFromState(state: string | null) {
   if (!state) {
     return '';
@@ -32,7 +41,7 @@ function getReturnToFromState(state: string | null) {
   }
 
   try {
-    const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+    const decoded = decodeBase64Url(encoded);
     return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '';
   } catch {
     return '';

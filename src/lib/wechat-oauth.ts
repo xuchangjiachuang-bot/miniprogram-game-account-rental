@@ -86,6 +86,20 @@ async function getWechatConfig(): Promise<WechatOAuthConfig> {
   };
 }
 
+function assertWechatConfig(config: WechatOAuthConfig, type: 'mp' | 'open') {
+  if (!config.appId) {
+    throw new Error(type === 'mp' ? 'WECHAT_MP_APPID_MISSING' : 'WECHAT_OPEN_APPID_MISSING');
+  }
+
+  if (!config.appSecret) {
+    throw new Error(type === 'mp' ? 'WECHAT_MP_SECRET_MISSING' : 'WECHAT_OPEN_SECRET_MISSING');
+  }
+
+  if (!config.redirectUri) {
+    throw new Error('WECHAT_REDIRECT_URI_MISSING');
+  }
+}
+
 export async function getWechatOpenConfig(): Promise<WechatOAuthConfig> {
   try {
     const setting = await getWechatPlatformSettingsCompat();
@@ -115,6 +129,7 @@ export async function getWechatOpenConfig(): Promise<WechatOAuthConfig> {
 
 export async function generateWechatAuthUrl(state: string = 'login'): Promise<string> {
   const config = await getWechatConfig();
+  assertWechatConfig(config, 'mp');
 
   const params = new URLSearchParams({
     appid: config.appId,
@@ -129,6 +144,7 @@ export async function generateWechatAuthUrl(state: string = 'login'): Promise<st
 
 export async function generateWechatQrLoginUrl(state: string = 'login'): Promise<string> {
   const config = await getWechatOpenConfig();
+  assertWechatConfig(config, 'open');
 
   const params = new URLSearchParams({
     appid: config.appId,
@@ -145,6 +161,7 @@ async function getAccessToken(
   code: string
 ): Promise<{ access_token: string; openid: string; errcode?: number; errmsg?: string }> {
   const config = await getWechatConfig();
+  assertWechatConfig(config, 'mp');
   const url = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${config.appId}&secret=${config.appSecret}&code=${code}&grant_type=authorization_code`;
 
   const response = await fetchWechatJson<{ access_token: string; openid: string; errcode?: number; errmsg?: string }>(url, {
@@ -166,14 +183,7 @@ async function getOpenAccessToken(
   code: string
 ): Promise<{ access_token: string; openid: string; unionid: string; errcode?: number; errmsg?: string }> {
   const config = await getWechatOpenConfig();
-
-  if (!config.appId) {
-    throw new Error('appid missing');
-  }
-
-  if (!config.appSecret) {
-    throw new Error('appsecret missing');
-  }
+  assertWechatConfig(config, 'open');
 
   if (!code) {
     throw new Error('code missing');

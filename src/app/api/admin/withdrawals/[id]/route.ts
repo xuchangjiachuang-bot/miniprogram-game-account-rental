@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, admins, withdrawals } from '@/lib/db';
 import { eq } from 'drizzle-orm';
-import { reviewWithdrawal } from '@/lib/user-balance-service';
+import { reviewWithdrawalRequest } from '@/lib/withdrawal-service';
 
 /**
  * 审核提现
- * POST /api/admin/withdrawals/[id]/review
+ * POST /api/admin/withdrawals/[id]
  */
 export async function POST(
   request: NextRequest,
@@ -47,24 +47,35 @@ export async function POST(
     }
 
     // 审核提现
-    const result = await reviewWithdrawal(id, approved, admin.id, remark);
+    const result = await reviewWithdrawalRequest({
+      withdrawalId: id,
+      status: approved ? 'approved' : 'rejected',
+      reviewComment: remark,
+      reviewerId: admin.id,
+    });
 
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        message: result.message,
-        data: {
-          amount: result.amount,
-          fee: result.fee,
-          actualAmount: result.actualAmount
-        }
-      });
-    } else {
+    if (!result.success) {
       return NextResponse.json({
         success: false,
-        error: result.message
+        error: result.error || '审核提现失败'
       }, { status: 400 });
     }
+
+    const thirdPartyTransactionId =
+      result.data && 'thirdPartyTransactionId' in result.data
+        ? result.data.thirdPartyTransactionId
+        : null;
+
+    return NextResponse.json({
+      success: true,
+      message: approved ? '提现已批准' : '提现已拒绝',
+      data: {
+        amount: result.data?.amount ?? 0,
+        fee: result.data?.fee ?? 0,
+        actualAmount: result.data?.actualAmount ?? 0,
+        thirdPartyTransactionId,
+      }
+    });
   } catch (error: any) {
     console.error('审核提现失败:', error);
     return NextResponse.json({
