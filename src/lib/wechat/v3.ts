@@ -320,6 +320,7 @@ async function sendWechatPayRequest<T>(
     headers: {
       Authorization: authorization,
       Accept: 'application/json',
+      'Accept-Language': 'zh-CN',
       'Content-Type': 'application/json',
       ...options?.extraHeaders,
     },
