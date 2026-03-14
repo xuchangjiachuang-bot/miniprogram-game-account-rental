@@ -52,3 +52,30 @@ The first V2 bootstrap response returns:
 - `buildMarker: v2-login-bootstrap-001`
 
 Use that marker to verify cloud deployment is really serving the new V2 code.
+
+## Local Preflight
+
+Before every cloud deploy, run:
+
+```bash
+node ./scripts/check-v2-wechat-login.mjs
+```
+
+Or with the package script:
+
+```bash
+pnpm run check:v2:wechat
+```
+
+If the local database is behind the V2 schema, run:
+
+```bash
+pnpm run fix:v2:wechat-schema
+```
+
+What it checks:
+
+- `users` table has the V2 login columns
+- unique indexes for mp and PC openid both exist
+- no duplicate mp/open-platform openid rows exist
+- `/api/v2/auth/wechat/config` is reachable when a local app is running

@@ -8,6 +8,8 @@
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
     "start": "bash ./scripts/start.sh",
+    "fix:v2:wechat-schema": "node ./scripts/apply-v2-wechat-login-schema.mjs",
+    "check:v2:wechat": "node ./scripts/check-v2-wechat-login.mjs",
     "ts-check": "tsc -p tsconfig.json",
     "mp:upload": "bash ./scripts/upload-miniprogram.sh",
     "mp:upload:manual": "bash ./scripts/upload-miniprogram.sh \"$1\" \"$2\""
