@@ -33,6 +33,10 @@ export interface User {
   last_login_at?: string | null;
   wechatOpenid?: string | null;
   wechat_openid?: string | null;
+  wechatMpOpenid?: string | null;
+  wechat_mp_openid?: string | null;
+  wechatOpenPlatformOpenid?: string | null;
+  wechat_open_platform_openid?: string | null;
   wechatUnionid?: string | null;
   wechat_unionid?: string | null;
   wechatNickname?: string | null;
@@ -62,9 +66,18 @@ interface TokenPayload {
   exp: number;
 }
 
+interface WechatIdentityPatch {
+  wechatOpenid?: string | null;
+  wechatMpOpenid?: string | null;
+  wechatOpenPlatformOpenid?: string | null;
+}
+
 const AUTH_TOKEN_VERSION = 1;
 const AUTH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 const USERNAME_FALLBACK_PREFIX = 'User';
+const USER_NICKNAME_MAX_LENGTH = 50;
+const WECHAT_NICKNAME_MAX_LENGTH = 100;
+const WECHAT_AVATAR_MAX_LENGTH = 500;
 
 function getAuthTokenSecret() {
   return (
@@ -102,6 +115,34 @@ function signPayload(payload: string) {
   return toBase64Url(createHmac('sha256', getAuthTokenSecret()).update(payload).digest('base64'));
 }
 
+function trimToLength(value: string | null | undefined, maxLength: number) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeWechatNickname(nickname: string | undefined, openid: string) {
+  const fallback = `${USERNAME_FALLBACK_PREFIX}${openid.slice(-4)}`;
+  const safeNickname = trimToLength(nickname, USER_NICKNAME_MAX_LENGTH);
+  const safeWechatNickname = trimToLength(nickname, WECHAT_NICKNAME_MAX_LENGTH);
+
+  return {
+    nickname: safeNickname || fallback,
+    wechatNickname: safeWechatNickname || fallback,
+  };
+}
+
+function normalizeWechatAvatar(avatar: string | undefined) {
+  return trimToLength(avatar, WECHAT_AVATAR_MAX_LENGTH);
+}
+
 function normalizeUser(row: UserRow): User {
   const userType = (row.userType || 'buyer') as UserType;
   const nickname = row.nickname || row.phone || `${USERNAME_FALLBACK_PREFIX}${row.id.slice(-4)}`;
@@ -135,6 +176,10 @@ function normalizeUser(row: UserRow): User {
     last_login_at: lastLoginAt,
     wechatOpenid: row.wechatOpenid || null,
     wechat_openid: row.wechatOpenid || null,
+    wechatMpOpenid: row.wechatMpOpenid || null,
+    wechat_mp_openid: row.wechatMpOpenid || null,
+    wechatOpenPlatformOpenid: row.wechatOpenPlatformOpenid || null,
+    wechat_open_platform_openid: row.wechatOpenPlatformOpenid || null,
     wechatUnionid: row.wechatUnionid || null,
     wechat_unionid: row.wechatUnionid || null,
     wechatNickname: row.wechatNickname || null,
@@ -176,15 +221,26 @@ async function getUserRowById(userId: string) {
   return isActiveUser(row) ? row : null;
 }
 
-async function getUserRowByWechatIdentity(openid: string, unionid?: string) {
-  await ensureWechatLoginSchema();
-  const condition = unionid
-    ? or(eq(users.wechatUnionid, unionid), eq(users.wechatOpenid, openid))
-    : eq(users.wechatOpenid, openid);
+function matchesSourceOpenid(row: UserRow, openid: string, source: 'mp' | 'open') {
+  if (source === 'mp') {
+    return row.wechatMpOpenid === openid || row.wechatOpenid === openid;
+  }
 
-  const rows = await db.select().from(users).where(condition).limit(5);
-  const row = rows.find(isActiveUser);
-  return row || null;
+  return row.wechatOpenPlatformOpenid === openid || row.wechatOpenid === openid;
+}
+
+async function getUserRowsByWechatIdentity(openid: string, source: 'mp' | 'open', unionid?: string) {
+  await ensureWechatLoginSchema();
+  const conditions = source === 'mp'
+    ? [eq(users.wechatMpOpenid, openid), eq(users.wechatOpenid, openid)]
+    : [eq(users.wechatOpenPlatformOpenid, openid), eq(users.wechatOpenid, openid)];
+
+  if (unionid) {
+    conditions.push(eq(users.wechatUnionid, unionid));
+  }
+
+  const rows = await db.select().from(users).where(or(...conditions)).limit(10);
+  return rows.filter(isActiveUser);
 }
 
 async function updateUserRow(userId: string, patch: Partial<UserRow>) {
@@ -199,6 +255,59 @@ async function updateUserRow(userId: string, patch: Partial<UserRow>) {
     .returning();
 
   return updated || null;
+}
+
+function buildIdentityPatch(openid: string, source: 'mp' | 'open', row?: UserRow | null): WechatIdentityPatch {
+  if (source === 'mp') {
+    return {
+      wechatOpenid: openid,
+      wechatMpOpenid: openid,
+    };
+  }
+
+  const shouldClearLegacyOpenid = row?.wechatOpenid === openid && !row.wechatMpOpenid;
+  return {
+    wechatOpenPlatformOpenid: openid,
+    ...(shouldClearLegacyOpenid ? { wechatOpenid: null } : {}),
+  };
+}
+
+async function releaseDuplicateWechatIdentity(row: UserRow, source: 'mp' | 'open') {
+  const patch: Partial<UserRow> = {
+    wechatUnionid: null,
+  };
+
+  if (source === 'mp') {
+    patch.wechatMpOpenid = null;
+    patch.wechatOpenid = null;
+  } else {
+    patch.wechatOpenPlatformOpenid = null;
+    if (!row.wechatMpOpenid) {
+      patch.wechatOpenid = null;
+    }
+  }
+
+  await updateUserRow(row.id, patch);
+}
+
+async function resolveWechatLoginTarget(openid: string, source: 'mp' | 'open', unionid?: string | null) {
+  const rows = await getUserRowsByWechatIdentity(openid, source, unionid || undefined);
+  const unionRow = unionid ? rows.find((row) => row.wechatUnionid === unionid) || null : null;
+  const openidRow = rows.find((row) => matchesSourceOpenid(row, openid, source)) || null;
+  const primary = unionRow || openidRow || rows[0] || null;
+
+  if (!primary) {
+    return null;
+  }
+
+  const duplicates = rows.filter((row) => row.id !== primary.id);
+  for (const duplicate of duplicates) {
+    if (unionid && (duplicate.wechatUnionid === unionid || matchesSourceOpenid(duplicate, openid, source))) {
+      await releaseDuplicateWechatIdentity(duplicate, source);
+    }
+  }
+
+  return primary;
 }
 
 async function ensurePersistentUserState(row: UserRow | null) {
@@ -273,10 +382,12 @@ async function createUser(params: {
   email?: string;
   realName?: string;
   idCard?: string;
-  wechatOpenid?: string;
-  wechatUnionid?: string;
-  wechatNickname?: string;
-  wechatAvatar?: string;
+  wechatOpenid?: string | null;
+  wechatMpOpenid?: string | null;
+  wechatOpenPlatformOpenid?: string | null;
+  wechatUnionid?: string | null;
+  wechatNickname?: string | null;
+  wechatAvatar?: string | null;
 }) {
   await ensureWechatLoginSchema();
   const nickname =
@@ -294,6 +405,8 @@ async function createUser(params: {
       userType: params.userType || 'buyer',
       lastLoginAt: new Date().toISOString(),
       wechatOpenid: params.wechatOpenid || null,
+      wechatMpOpenid: params.wechatMpOpenid || null,
+      wechatOpenPlatformOpenid: params.wechatOpenPlatformOpenid || null,
       wechatUnionid: params.wechatUnionid || null,
       wechatNickname: params.wechatNickname || null,
       wechatAvatar: params.wechatAvatar || null,
@@ -309,11 +422,13 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
     return { success: false, message: 'MISSING_OPENID' };
   }
 
-  const nickname = params.nickname?.trim() || `${USERNAME_FALLBACK_PREFIX}${openid.slice(-4)}`;
-  const avatar = params.avatar?.trim() || null;
+  const source = params.source === 'open' ? 'open' : 'mp';
+  const { nickname, wechatNickname } = normalizeWechatNickname(params.nickname, openid);
+  const avatar = normalizeWechatAvatar(params.avatar);
   const unionid = params.unionid?.trim() || null;
+  const identityPatch = buildIdentityPatch(openid, source);
 
-  let row = await getUserRowByWechatIdentity(openid, unionid || undefined);
+  let row = await resolveWechatLoginTarget(openid, source, unionid);
   if (!row) {
     const phone = await ensureUniqueWechatPhone(openid);
     row = await createUser({
@@ -321,18 +436,18 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
       nickname,
       avatar: avatar || undefined,
       userType: 'buyer',
-      wechatOpenid: openid,
+      ...identityPatch,
       wechatUnionid: unionid || undefined,
-      wechatNickname: nickname,
+      wechatNickname: wechatNickname,
       wechatAvatar: avatar || undefined,
     });
   } else {
     row = await updateUserRow(row.id, {
       nickname,
       avatar: avatar || row.avatar,
-      wechatOpenid: openid,
+      ...buildIdentityPatch(openid, source, row),
       wechatUnionid: unionid || row.wechatUnionid,
-      wechatNickname: nickname,
+      wechatNickname: wechatNickname,
       wechatAvatar: avatar || row.wechatAvatar,
       lastLoginAt: new Date().toISOString(),
     });

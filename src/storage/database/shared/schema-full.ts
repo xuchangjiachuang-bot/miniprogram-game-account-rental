@@ -245,10 +245,19 @@ export const users = pgTable("users", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
 	lastLoginAt: timestamp("last_login_at", { mode: 'string' }),
+	wechatOpenid: varchar("wechat_openid", { length: 100 }),
+	wechatMpOpenid: varchar("wechat_mp_openid", { length: 100 }),
+	wechatOpenPlatformOpenid: varchar("wechat_open_platform_openid", { length: 100 }),
+	wechatUnionid: varchar("wechat_unionid", { length: 100 }),
+	wechatNickname: varchar("wechat_nickname", { length: 100 }),
+	wechatAvatar: varchar("wechat_avatar", { length: 500 }),
 }, (table) => [
 	index("users_phone_idx").using("btree", table.phone.asc().nullsLast().op("text_ops")),
 	index("users_seller_level_idx").using("btree", table.sellerLevel.asc().nullsLast().op("int4_ops")),
 	unique("users_phone_unique").on(table.phone),
+	unique("users_wechat_openid_unique").on(table.wechatOpenid),
+	unique("users_wechat_mp_openid_unique").on(table.wechatMpOpenid),
+	unique("users_wechat_open_platform_openid_unique").on(table.wechatOpenPlatformOpenid),
 ]);
 
 export const userBalances = pgTable("user_balances", {
