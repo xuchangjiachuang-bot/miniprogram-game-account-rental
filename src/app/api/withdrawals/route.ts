@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/user-service';
 import { getUserBalance, requestWithdrawal } from '@/lib/user-balance-service';
 
+function mapWithdrawalMessage(message: string) {
+  switch (message) {
+    case 'INVALID_WITHDRAWAL_AMOUNT':
+      return '提现金额必须大于 0';
+    case 'WITHDRAWAL_AMOUNT_TOO_SMALL':
+      return '提现金额过小，扣除手续费后实际到账金额必须大于 0';
+    case 'INSUFFICIENT_AVAILABLE_BALANCE':
+      return '提现金额超过可用余额';
+    case 'WITHDRAWAL_CREATED':
+      return '提现申请已提交，等待审核';
+    case 'WITHDRAWAL_APPROVED':
+      return '提现申请已通过';
+    case 'WITHDRAWAL_REQUEST_FAILED':
+      return '提现申请失败，请稍后重试';
+    default:
+      return message;
+  }
+}
+
 function getBearerToken(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   return authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
@@ -50,12 +69,12 @@ export async function POST(request: NextRequest) {
 
     const result = await requestWithdrawal(user.id, amount, accountInfo);
     if (!result.success) {
-      return NextResponse.json({ success: false, error: result.message }, { status: 400 });
+      return NextResponse.json({ success: false, error: mapWithdrawalMessage(result.message) }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: result.message,
+      message: mapWithdrawalMessage(result.message),
       data: {
         withdrawalId: result.withdrawalId,
         amount: result.amount,
