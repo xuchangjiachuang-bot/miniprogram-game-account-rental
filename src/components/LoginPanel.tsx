@@ -9,6 +9,7 @@ import { setToken } from '@/lib/auth-token';
 import { useUser } from '@/contexts/UserContext';
 import {
   checkWechatLoginState,
+  createWechatOauthState,
   fetchWechatLoginConfig,
   isWechatLoginSuccessMessage,
   resolveLoginReturnTo,
@@ -247,7 +248,8 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
 
   const handleWechatAuthorizeLogin = () => {
     setLoading(true);
-    window.location.href = `/api/auth/wechat/authorize?state=wechat_oauth&returnTo=${encodeURIComponent(returnTo)}`;
+    const oauthState = createWechatOauthState(returnTo);
+    window.location.href = `/api/auth/wechat/authorize?state=${encodeURIComponent(oauthState)}&returnTo=${encodeURIComponent(returnTo)}`;
   };
 
   const body = (

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { eq, or } from 'drizzle-orm';
 import { db, users } from './db';
+import { ensureWechatLoginSchema } from './init-wechat-login';
 import { ensureUserBalance } from './user-balance-service';
 
 export type UserType = 'buyer' | 'seller' | 'admin';
@@ -154,12 +155,14 @@ async function ensureUniqueWechatPhone(openid: string) {
 }
 
 async function getUserRowById(userId: string) {
+  await ensureWechatLoginSchema();
   const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const row = rows[0];
   return isActiveUser(row) ? row : null;
 }
 
 async function getUserRowByWechatIdentity(openid: string, unionid?: string) {
+  await ensureWechatLoginSchema();
   const condition = unionid
     ? or(eq(users.wechatUnionid, unionid), eq(users.wechatOpenid, openid))
     : eq(users.wechatOpenid, openid);
@@ -170,6 +173,7 @@ async function getUserRowByWechatIdentity(openid: string, unionid?: string) {
 }
 
 async function updateUserRow(userId: string, patch: Partial<UserRow>) {
+  await ensureWechatLoginSchema();
   const [updated] = await db
     .update(users)
     .set({
@@ -259,6 +263,7 @@ async function createUser(params: {
   wechatNickname?: string;
   wechatAvatar?: string;
 }) {
+  await ensureWechatLoginSchema();
   const nickname =
     params.nickname?.trim() || params.phone || `${USERNAME_FALLBACK_PREFIX}${Date.now().toString().slice(-4)}`;
 

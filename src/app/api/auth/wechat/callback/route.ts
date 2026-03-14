@@ -17,6 +17,24 @@ function isWechatQrLoginState(state: string | null) {
   return typeof state === 'string' && /^login_\d+_[a-z0-9]+$/i.test(state);
 }
 
+function getReturnToFromState(state: string | null) {
+  if (!state || !state.startsWith('wechat_oauth:')) {
+    return '';
+  }
+
+  const encoded = state.slice('wechat_oauth:'.length).trim();
+  if (!encoded) {
+    return '';
+  }
+
+  try {
+    const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+    return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '';
+  } catch {
+    return '';
+  }
+}
+
 function attachAuthCookie(response: NextResponse, token: string) {
   response.cookies.set('auth_token', token, {
     maxAge: 60 * 60 * 24 * 7,
@@ -218,7 +236,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const state = searchParams.get('state');
-  const returnTo = getSafeReturnTo(request);
+  const returnTo = getSafeReturnTo(request) || getReturnToFromState(state);
   const userAgent = request.headers.get('user-agent') || '';
   const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
   const isQrLogin = isWechatQrLoginState(state);
@@ -259,9 +277,6 @@ export async function GET(request: NextRequest) {
     }
 
     const redirectUrl = new URL(returnTo || '/', baseUrl);
-    redirectUrl.searchParams.set('token', loginResult.token);
-    redirectUrl.searchParams.set('login_success', 'true');
-    redirectUrl.searchParams.set('wechat_login', '1');
 
     return clearWechatReturnToCookie(attachAuthCookie(NextResponse.redirect(redirectUrl), loginResult.token));
   } catch (error: unknown) {

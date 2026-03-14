@@ -1,5 +1,10 @@
 # projects
 
+## First Read
+
+For any new thread or handoff, read [PROJECT_HANDOFF.md](/Users/11257/Documents/Playground/PROJECT_HANDOFF.md) first.
+It contains the current login architecture, deployment workflow, cloud log debugging process, and the key known pitfalls.
+
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，同时包含微信小程序，由扣子编程 CLI 创建。
 
 ## 快速开始

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@/lib/user-service';
-import { clearAuth, getToken, setToken } from '@/lib/auth-token';
+import { clearAuth, getToken } from '@/lib/auth-token';
 
 interface UserContextType {
   user: User | null;
@@ -15,7 +15,6 @@ interface UserContextType {
 const USER_CACHE_KEY = 'cached_user';
 const USER_CACHE_TIME_KEY = 'user_cache_time';
 const USER_CACHE_TTL = 5 * 60 * 1000;
-const LOGIN_CALLBACK_QUERY_KEYS = ['token', 'login_success', 'wechat_login'] as const;
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
@@ -47,34 +46,6 @@ function writeCachedUser(user: User) {
   localStorage.setItem(USER_CACHE_TIME_KEY, Date.now().toString());
 }
 
-function consumeTokenFromUrl() {
-  if (typeof window === 'undefined') {
-    return { token: null as string | null, tokenChanged: false };
-  }
-
-  const currentUrl = new URL(window.location.href);
-  const urlToken = currentUrl.searchParams.get('token');
-  if (!urlToken) {
-    return { token: null as string | null, tokenChanged: false };
-  }
-
-  const previousToken = getToken();
-  setToken(urlToken);
-
-  LOGIN_CALLBACK_QUERY_KEYS.forEach((key) => currentUrl.searchParams.delete(key));
-
-  const nextUrl =
-    `${currentUrl.pathname}` +
-    `${currentUrl.search ? currentUrl.search : ''}` +
-    `${currentUrl.hash ? currentUrl.hash : ''}`;
-  window.history.replaceState({}, '', nextUrl || '/');
-
-  return {
-    token: urlToken,
-    tokenChanged: previousToken !== urlToken,
-  };
-}
-
 function hasAuthCookie() {
   if (typeof document === 'undefined') {
     return false;
@@ -95,8 +66,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      const { token: urlToken, tokenChanged } = consumeTokenFromUrl();
-      const token = urlToken ?? getToken();
+      const token = getToken();
       const cookieLoggedIn = hasAuthCookie();
 
       if (!token && !cookieLoggedIn) {
@@ -105,7 +75,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (token && !tokenChanged) {
+      if (token) {
         const cachedUser = readCachedUser();
         if (cachedUser) {
           setUser(cachedUser);

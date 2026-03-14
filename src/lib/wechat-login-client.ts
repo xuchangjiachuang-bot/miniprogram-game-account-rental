@@ -68,6 +68,11 @@ export function createWechatQrLoginState() {
   return `login_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+export function createWechatOauthState(returnTo: string) {
+  const safeReturnTo = resolveLoginReturnTo(returnTo);
+  return `wechat_oauth:${Buffer.from(safeReturnTo, 'utf8').toString('base64url')}`;
+}
+
 export function resolveLoginReturnTo(returnTo?: string | null) {
   if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
     return returnTo;
