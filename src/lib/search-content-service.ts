@@ -71,6 +71,20 @@ export type AccountSeoListItem = {
   seo_indexable: boolean | null;
 };
 
+export type PublicAccountLinkItem = {
+  id: string;
+  account_id: string;
+  title: string;
+  description: string | null;
+  coins_m: string;
+  deposit: string;
+  account_value: string | null;
+  recommended_rental: string | null;
+  updated_at: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+};
+
 export type ContentPageInput = {
   slug: string;
   pageType: string;
@@ -193,6 +207,34 @@ export async function listPublishedIndexablePages(pageType?: string) {
     WHERE status = 'published'
       AND indexable = true
     ORDER BY published_at DESC NULLS LAST, updated_at DESC
+  `;
+}
+
+export async function listRelatedPublishedContentPages(
+  pageType: string,
+  excludeSlug: string,
+  limit = 4,
+) {
+  return sqlClient<ContentPageRecord[]>`
+    SELECT *
+    FROM content_pages
+    WHERE status = 'published'
+      AND indexable = true
+      AND page_type = ${pageType}
+      AND slug <> ${normalizeSlug(excludeSlug)}
+    ORDER BY published_at DESC NULLS LAST, updated_at DESC
+    LIMIT ${limit}
+  `;
+}
+
+export async function listLatestPublishedContentPages(limit = 6) {
+  return sqlClient<ContentPageRecord[]>`
+    SELECT *
+    FROM content_pages
+    WHERE status = 'published'
+      AND indexable = true
+    ORDER BY published_at DESC NULLS LAST, updated_at DESC
+    LIMIT ${limit}
   `;
 }
 
@@ -423,5 +465,60 @@ export async function listAccountSeoOverrides(search?: string) {
     WHERE a.is_deleted = false
     ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
     LIMIT 100
+  `;
+}
+
+export async function listPublicAccountLinks(limit = 6, excludeAccountId?: string) {
+  if (excludeAccountId) {
+    return sqlClient<PublicAccountLinkItem[]>`
+      SELECT
+        a.id,
+        a.account_id,
+        a.title,
+        a.description,
+        a.coins_m,
+        a.deposit,
+        a.account_value,
+        a.recommended_rental,
+        a.updated_at,
+        s.title AS seo_title,
+        s.description AS seo_description
+      FROM accounts a
+      LEFT JOIN seo_entity_overrides s
+        ON s.entity_type = 'account'
+       AND s.entity_key = a.account_id
+      WHERE a.is_deleted = false
+        AND a.audit_status = 'approved'
+        AND a.status = 'available'
+        AND a.account_id <> ${excludeAccountId}
+        AND COALESCE(s.indexable, true) = true
+      ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
+      LIMIT ${limit}
+    `;
+  }
+
+  return sqlClient<PublicAccountLinkItem[]>`
+    SELECT
+      a.id,
+      a.account_id,
+      a.title,
+      a.description,
+      a.coins_m,
+      a.deposit,
+      a.account_value,
+      a.recommended_rental,
+      a.updated_at,
+      s.title AS seo_title,
+      s.description AS seo_description
+    FROM accounts a
+    LEFT JOIN seo_entity_overrides s
+      ON s.entity_type = 'account'
+     AND s.entity_key = a.account_id
+    WHERE a.is_deleted = false
+      AND a.audit_status = 'approved'
+      AND a.status = 'available'
+      AND COALESCE(s.indexable, true) = true
+    ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
+    LIMIT ${limit}
   `;
 }

@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { and, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { accounts, db } from '@/lib/db';
-import { getEntitySeoOverride } from '@/lib/search-content-service';
+import {
+  getEntitySeoOverride,
+  listLatestPublishedContentPages,
+  listPublicAccountLinks,
+} from '@/lib/search-content-service';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -83,10 +88,28 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
   const images = getAccountImages(account.screenshots);
   const price = account.accountValue || account.recommendedRental || '0';
   const description = seoOverride?.summary || seoOverride?.description || account.description || '';
+  const latestPages = await listLatestPublishedContentPages(6);
+  const relatedAccounts = await listPublicAccountLinks(4, account.accountId);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
+        <nav className="text-sm text-gray-500">
+          <ol className="flex flex-wrap items-center gap-2">
+            <li>
+              <Link href="/" className="hover:text-gray-900">
+                首页
+              </Link>
+            </li>
+            <li>/</li>
+            <li>
+              <Link href={`/accounts/${account.accountId}`} className="text-gray-700">
+                商品详情
+              </Link>
+            </li>
+          </ol>
+        </nav>
+
         <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
             <div className="space-y-4">
@@ -122,11 +145,22 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
             </div>
 
             <aside className="rounded-2xl border bg-gray-50 p-5">
-              <h2 className="text-lg font-semibold text-gray-900">下单提示</h2>
+              <h2 className="text-lg font-semibold text-gray-900">浏览与下单提示</h2>
               <div className="mt-4 space-y-3 text-sm leading-7 text-gray-600">
                 <p>当前页面用于搜索收录与商品展示，不改动现有首页弹窗详情与下单流程。</p>
                 <p>实际购买仍可从首页列表或现有业务入口继续完成。</p>
                 <p>{`商品编号：${account.accountId}`}</p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/"
+                  className="rounded-full bg-gray-900 px-4 py-2 text-sm text-white transition-colors hover:bg-gray-800"
+                >
+                  返回首页
+                </Link>
+                <span className="rounded-full border px-4 py-2 text-sm text-gray-700">
+                  也可继续查看下方更多内容入口
+                </span>
               </div>
             </aside>
           </div>
@@ -144,6 +178,49 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
                     className="h-56 w-full object-cover"
                   />
                 </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {relatedAccounts.length > 0 ? (
+          <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="text-2xl font-semibold text-gray-900">更多商品</h2>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {relatedAccounts.map((item) => {
+                const relatedPrice = item.account_value || item.recommended_rental || '0';
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/accounts/${item.account_id}`}
+                    className="rounded-xl border bg-gray-50 p-4 transition-colors hover:border-gray-300 hover:bg-white"
+                  >
+                    <div className="font-medium text-gray-900">{item.seo_title || item.title}</div>
+                    <p className="mt-2 text-sm text-gray-600">{`哈夫币 ${item.coins_m}M · 租金 ¥${relatedPrice} · 押金 ¥${item.deposit}`}</p>
+                    {(item.seo_description || item.description) ? (
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
+                        {item.seo_description || item.description}
+                      </p>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {latestPages.length > 0 ? (
+          <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="text-2xl font-semibold text-gray-900">更多内容入口</h2>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {latestPages.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/${item.page_type}/${item.slug}`}
+                  className="rounded-full border px-4 py-2 text-sm text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
+                >
+                  {item.title}
+                </Link>
               ))}
             </div>
           </section>
@@ -166,6 +243,23 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
               price: String(price),
               availability: 'https://schema.org/InStock',
               url: `${siteUrl}/accounts/${account.accountId}`,
+            },
+            breadcrumb: {
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: '首页',
+                  item: siteUrl,
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 2,
+                  name: '商品详情',
+                  item: `${siteUrl}/accounts/${account.accountId}`,
+                },
+              ],
             },
           }),
         }}
