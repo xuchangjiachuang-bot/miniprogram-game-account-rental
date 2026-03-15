@@ -2,7 +2,6 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { initAdminTable } from './init-admin';
 import { initAgreementsTable } from './init-agreements';
-import { initDefaultPaymentConfigs } from './payment/config';
 import { ensureUserBalanceSchema } from './init-user-balance';
 import { smsConfigManager } from '../storage/database/smsConfigManager';
 import * as adminSchema from '../storage/database/shared/admin-schema';
@@ -44,15 +43,6 @@ export async function ensureAgreementsInitialized() {
   }
 }
 
-// 自动初始化支付配置
-let isPaymentConfigsInitialized = false;
-export async function ensurePaymentConfigsInitialized() {
-  if (!isPaymentConfigsInitialized) {
-    await initDefaultPaymentConfigs();
-    isPaymentConfigsInitialized = true;
-  }
-}
-
 // 自动初始化短信配置
 let isSmsConfigsInitialized = false;
 export async function ensureSmsConfigsInitialized() {
@@ -72,7 +62,6 @@ export async function ensureDatabaseInitialized() {
         await Promise.all([
           ensureAdminInitialized(),
           ensureAgreementsInitialized(),
-          ensurePaymentConfigsInitialized(),
           ensureUserBalanceSchema(),
           ensureSmsConfigsInitialized(),
         ]);

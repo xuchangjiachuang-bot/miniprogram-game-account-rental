@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSms, storeVerifyCode, getSmsConfig } from '@/lib/sms-service';
 import { ensureSmsConfigsInitialized } from '@/lib/db';
+import { requireAdmin } from '@/lib/admin-auth';
+
+function isPublicSmsSendEnabled() {
+  return process.env.SMS_SEND_PUBLIC_ENABLED === 'true';
+}
 
 /**
  * 发送短信
@@ -8,6 +13,16 @@ import { ensureSmsConfigsInitialized } from '@/lib/db';
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!isPublicSmsSendEnabled()) {
+      const auth = await requireAdmin(request);
+      if ('error' in auth) {
+        return NextResponse.json({
+          success: false,
+          error: '短信发送入口当前仅允许后台测试使用',
+        }, { status: 403 });
+      }
+    }
+
     // 确保短信配置已初始化
     await ensureSmsConfigsInitialized();
 
