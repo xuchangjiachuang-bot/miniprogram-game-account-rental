@@ -48,12 +48,6 @@ const defaultMenuItems = [
     icon: ShoppingCart
   },
   {
-    id: 'refunds',
-    title: '售后审核',
-    href: '/admin/refunds',
-    icon: AlertCircle
-  },
-  {
     id: 'chat-logs',
     title: '聊天记录',
     href: '/admin/chat-logs',
