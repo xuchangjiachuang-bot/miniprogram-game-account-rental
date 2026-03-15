@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -12,10 +11,7 @@ import {
   Loader2,
   RefreshCw,
   Save,
-  Server,
   Settings2,
-  Shield,
-  Smartphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -110,8 +106,6 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [agreements, setAgreements] = useState<AgreementData[]>([]);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
-  const [redirectUri, setRedirectUri] = useState('');
-  const [serverVerifyUrl, setServerVerifyUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingAgreements, setSavingAgreements] = useState(false);
@@ -119,16 +113,13 @@ export default function AdminSettingsPage() {
   const [testingPayment, setTestingPayment] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setServerVerifyUrl(`${window.location.origin}/api/wechat/server-verify`);
-    }
     void loadAll();
   }, []);
 
   const loadAll = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadSettings(), loadWechatConfig(), loadPaymentStatus(), loadAgreements()]);
+      await Promise.all([loadSettings(), loadPaymentStatus(), loadAgreements()]);
     } catch (error: any) {
       toast.error(error.message || '加载配置中心失败');
     } finally {
@@ -147,30 +138,6 @@ export default function AdminSettingsPage() {
     setSettings((prev) => ({
       ...prev,
       ...result.data,
-      wechatMpAppSecret: prev.wechatMpAppSecret,
-      wechatOpenAppSecret: prev.wechatOpenAppSecret,
-      wechatToken: prev.wechatToken,
-      wechatEncodingAESKey: prev.wechatEncodingAESKey,
-    }));
-  };
-
-  const loadWechatConfig = async () => {
-    const response = await fetch('/api/admin/wechat/config', {
-      credentials: 'include',
-      cache: 'no-store',
-    });
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error || '加载微信配置失败');
-
-    setRedirectUri(result.data.redirectUri || '');
-    setSettings((prev) => ({
-      ...prev,
-      wechatMpAppId: result.data.wechatMpAppId || prev.wechatMpAppId,
-      wechatMpAppSecret: result.data.wechatMpAppSecret || '',
-      wechatOpenAppId: result.data.wechatOpenAppId || prev.wechatOpenAppId,
-      wechatOpenAppSecret: result.data.wechatOpenAppSecret || '',
-      wechatToken: result.data.wechatToken || '',
-      wechatEncodingAESKey: result.data.wechatEncodingAESKey || '',
     }));
   };
 
@@ -196,6 +163,23 @@ export default function AdminSettingsPage() {
     setAgreements(result.data || []);
   };
 
+  const getSettingsPayload = () => ({
+    commissionRate: settings.commissionRate,
+    minCommission: settings.minCommission,
+    maxCommission: settings.maxCommission,
+    withdrawalFee: settings.withdrawalFee,
+    minRentalPrice: settings.minRentalPrice,
+    depositRatio: settings.depositRatio,
+    coinsPerDay: settings.coinsPerDay,
+    minRentalHours: settings.minRentalHours,
+    maxCoinsPerAccount: settings.maxCoinsPerAccount,
+    maxDeposit: settings.maxDeposit,
+    requireManualReview: settings.requireManualReview,
+    autoApproveVerified: settings.autoApproveVerified,
+    listingDepositAmount: settings.listingDepositAmount,
+    orderPaymentTimeout: settings.orderPaymentTimeout,
+  });
+
   const saveSettings = async () => {
     try {
       setSavingSettings(true);
@@ -203,12 +187,12 @@ export default function AdminSettingsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(settings),
+        body: JSON.stringify(getSettingsPayload()),
       });
       const result = await response.json();
       if (!result.success) throw new Error(result.error || '保存配置失败');
       toast.success('配置已保存');
-      await Promise.all([loadSettings(), loadWechatConfig()]);
+      await loadSettings();
     } catch (error: any) {
       toast.error(error.message || '保存配置失败');
     } finally {
@@ -358,10 +342,8 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <Card><CardHeader className="pb-2"><CardDescription>业务规则</CardDescription><CardTitle className="text-base">佣金与订单</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground"><div>基础佣金：{settings.commissionRate}%</div><div>订单押金：由卖家上架时手动填写</div><div>上架保证金：¥{settings.listingDepositAmount}</div><div>支付超时：{settings.orderPaymentTimeout} 秒</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>微信登录</CardDescription><CardTitle className="text-base">公众号与开放平台</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm"><span className="text-muted-foreground">{settings.wechatMpAppId || settings.wechatOpenAppId ? '已配置' : '待配置'}</span><Badge variant={settings.wechatMpAppId || settings.wechatOpenAppId ? 'default' : 'outline'}>{settings.wechatMpAppId || settings.wechatOpenAppId ? '正常' : '未完成'}</Badge></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>微信服务器</CardDescription><CardTitle className="text-base">Token 与 AES Key</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm"><span className="text-muted-foreground">{settings.wechatToken && settings.wechatEncodingAESKey ? '已配置' : '待配置'}</span><Badge variant={settings.wechatToken && settings.wechatEncodingAESKey ? 'default' : 'outline'}>{settings.wechatToken && settings.wechatEncodingAESKey ? '正常' : '未完成'}</Badge></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardDescription>微信支付运行时</CardDescription><CardTitle className="text-base">Railway 环境变量</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm"><span className="text-muted-foreground">{paymentStatus?.configured ? '基础项已就绪' : '存在缺项'}</span><Badge variant={paymentStatus?.configured ? 'default' : 'outline'}>{paymentStatus?.configured ? '运行中' : '待补齐'}</Badge></CardContent></Card>
       </div>
 
@@ -376,7 +358,7 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Settings2 className="h-5 w-5" />业务规则</CardTitle>
-              <CardDescription>保留最常改的业务参数，其余字段会随同一起保存。</CardDescription>
+              <CardDescription>这里只保留当前真实生效的业务参数。微信登录和微信服务器配置已从这里移除。</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div className="space-y-2"><Label>佣金比例 (%)</Label><Input type="number" value={settings.commissionRate} onChange={(e) => setSettings((prev) => ({ ...prev, commissionRate: toNumber(e.target.value, prev.commissionRate) }))} /></div>
@@ -390,34 +372,14 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5" />微信登录配置</CardTitle>
-                <CardDescription>这里维护数据库中的登录参数。</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2"><Label>公众号 AppID</Label><Input value={settings.wechatMpAppId} onChange={(e) => setSettings((prev) => ({ ...prev, wechatMpAppId: e.target.value }))} placeholder="wx..." /></div>
-                <div className="space-y-2"><Label>公众号 AppSecret</Label><Input type="password" value={settings.wechatMpAppSecret} onChange={(e) => setSettings((prev) => ({ ...prev, wechatMpAppSecret: e.target.value }))} placeholder="请输入公众号 AppSecret" /></div>
-                <div className="space-y-2"><Label>开放平台 AppID</Label><Input value={settings.wechatOpenAppId} onChange={(e) => setSettings((prev) => ({ ...prev, wechatOpenAppId: e.target.value }))} placeholder="wx..." /></div>
-                <div className="space-y-2"><Label>开放平台 AppSecret</Label><Input type="password" value={settings.wechatOpenAppSecret} onChange={(e) => setSettings((prev) => ({ ...prev, wechatOpenAppSecret: e.target.value }))} placeholder="请输入开放平台 AppSecret" /></div>
-                <div className="md:col-span-2 rounded-xl border bg-muted/30 p-4"><div className="flex items-center justify-between gap-3"><div><div className="font-medium">微信回调地址</div><div className="mt-1 break-all text-sm text-muted-foreground">{redirectUri || '尚未生成'}</div></div><Button variant="outline" size="icon" onClick={() => copyText(redirectUri, '微信回调地址')}><Copy className="h-4 w-4" /></Button></div></div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Server className="h-5 w-5" />微信服务器配置</CardTitle>
-                <CardDescription>用于服务器验证与消息推送。</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2"><Label>服务器地址</Label><div className="flex gap-2"><Input value={serverVerifyUrl} readOnly /><Button variant="outline" size="icon" onClick={() => copyText(serverVerifyUrl, '服务器地址')}><Copy className="h-4 w-4" /></Button></div></div>
-                <div className="space-y-2"><Label>Token</Label><Input value={settings.wechatToken} onChange={(e) => setSettings((prev) => ({ ...prev, wechatToken: e.target.value }))} placeholder="3-32 位自定义字符串" /></div>
-                <div className="space-y-2"><Label>EncodingAESKey</Label><div className="flex gap-2"><Input value={settings.wechatEncodingAESKey} onChange={(e) => setSettings((prev) => ({ ...prev, wechatEncodingAESKey: e.target.value }))} placeholder="43 位随机字符串" /><Button variant="outline" onClick={() => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; let text = ''; for (let i = 0; i < 43; i += 1) text += chars[Math.floor(Math.random() * chars.length)]; setSettings((prev) => ({ ...prev, wechatEncodingAESKey: text })); }}>生成</Button></div></div>
-                <div className="flex flex-wrap gap-2"><Link href="/admin/wechat/verify-file"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />域名校验文件</Button></Link></div>
-              </CardContent>
-            </Card>
-          </div>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>微信配置已移出此页</AlertTitle>
+            <AlertDescription>
+              微信登录配置仍由现有登录链路读取，但不再放在配置中心编辑，避免和当前真实业务设置混在一起。
+              微信服务器配置只用于公众号服务器验证或消息推送，当前项目主交易链路不依赖它。
+            </AlertDescription>
+          </Alert>
         </TabsContent>
 
         <TabsContent value="payment" className="space-y-6">

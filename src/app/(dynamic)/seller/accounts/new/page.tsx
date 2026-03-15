@@ -1415,7 +1415,7 @@ function NewAccountPage() {
                       min="0"
                       max="10000"
                       step="10"
-                      placeholder="0-1000"
+                      placeholder="0-10000"
                       value={formData.deposit}
                       onChange={(e) => setFormData({...formData, deposit: e.target.value})}
                       className="mt-1.5"
