@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Save, Search } from 'lucide-react';
+import { ExternalLink, RefreshCw, Save, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { buildAutoAccountSeo } from '@/lib/seo-auto';
 
 type AccountSeoItem = {
   id: string;
   account_id: string;
   title: string;
   description: string | null;
+  coins_m?: string | null;
   account_value: string | null;
   recommended_rental: string | null;
   deposit: string;
@@ -62,7 +64,7 @@ function trimPreviewText(value: string, maxLength: number) {
     return '';
   }
 
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
 function toFormState(item?: AccountSeoItem | null): FormState {
@@ -96,16 +98,20 @@ export default function AccountSeoPage() {
     [items, selectedKey],
   );
 
+  const autoSeo = useMemo(
+    () => (selectedItem ? buildAutoAccountSeo(selectedItem) : null),
+    [selectedItem],
+  );
+
   const previewPath = form.entityKey ? `/accounts/${form.entityKey}` : '';
-  const searchPreviewTitle = form.title.trim() || selectedItem?.title || '商品标题预览';
+  const searchPreviewTitle = form.title.trim() || autoSeo?.title || '商品标题预览';
   const searchPreviewDescription =
-    form.description.trim() ||
-    selectedItem?.description ||
-    '这里会显示商品详情页的搜索结果摘要。';
-  const sharePreviewTitle = form.ogTitle.trim() || searchPreviewTitle;
-  const sharePreviewDescription = form.ogDescription.trim() || searchPreviewDescription;
+    form.description.trim() || autoSeo?.description || '这里会显示商品详情页的搜索结果摘要。';
+  const sharePreviewTitle = form.ogTitle.trim() || autoSeo?.ogTitle || searchPreviewTitle;
+  const sharePreviewDescription =
+    form.ogDescription.trim() || autoSeo?.ogDescription || searchPreviewDescription;
   const aiPreviewSummary =
-    form.summary.trim() || form.description.trim() || selectedItem?.description || '这里会显示 AI / GEO 摘要。';
+    form.summary.trim() || autoSeo?.summary || form.description.trim() || '这里会显示 AI / GEO 摘要。';
 
   const loadItems = async (keyword = '') => {
     setLoading(true);
@@ -142,9 +148,27 @@ export default function AccountSeoPage() {
   };
 
   const handleSearch = async () => {
-    setQuery(search.trim());
+    const keyword = search.trim();
+    setQuery(keyword);
     setSelectedKey('');
-    await loadItems(search.trim());
+    await loadItems(keyword);
+  };
+
+  const handleApplyAutoSeo = () => {
+    if (!autoSeo) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      title: autoSeo.title,
+      description: autoSeo.description,
+      summary: autoSeo.summary,
+      ogTitle: autoSeo.ogTitle,
+      ogDescription: autoSeo.ogDescription,
+      ogImage: current.ogImage || autoSeo.ogImage,
+    }));
+    toast.success('已应用自动 SEO 建议');
   };
 
   const handleSave = async () => {
@@ -180,7 +204,7 @@ export default function AccountSeoPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">商品详情 SEO</h1>
           <p className="text-sm text-gray-600">
-            为公开商品详情页 `/accounts/[accountId]` 配置独立标题、描述和收录策略，不影响现有首页弹窗与购买流程。
+            公开商品详情页会自动生成 SEO 文案，后台填写的内容会优先覆盖自动结果。
           </p>
         </div>
         <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -231,7 +255,7 @@ export default function AccountSeoPage() {
                       <span>{`状态：${item.status || '-'}`}</span>
                     </div>
                     <div className="mt-2 text-xs text-gray-500">
-                      {item.seo_override_id ? '已配置独立 SEO' : '使用默认商品信息'}
+                      {item.seo_override_id ? '已配置手动覆盖' : '当前使用自动 SEO'}
                     </div>
                   </button>
                 ))
@@ -244,7 +268,7 @@ export default function AccountSeoPage() {
           <CardHeader>
             <CardTitle>{selectedItem ? '编辑商品 SEO' : '请选择一个账号'}</CardTitle>
             <CardDescription>
-              未填写的字段会自动回退到商品标题、商品描述和默认截图。
+              留空时系统会自动生成标题、描述、OG 和 AI 摘要；手动填写后优先使用手动值。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -256,12 +280,18 @@ export default function AccountSeoPage() {
                       <div className="font-medium text-gray-900">{selectedItem.title}</div>
                       <div className="text-sm text-gray-600">{`${siteUrl}${previewPath}`}</div>
                     </div>
-                    <Button asChild variant="outline">
-                      <Link href={previewPath} target="_blank">
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        打开预览
-                      </Link>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={handleApplyAutoSeo}>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        应用自动 SEO
+                      </Button>
+                      <Button asChild variant="outline">
+                        <Link href={previewPath} target="_blank">
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          打开预览
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -343,7 +373,7 @@ export default function AccountSeoPage() {
                     <div className="text-sm font-medium text-gray-900">社交分享预览</div>
                     <div className="mt-4 overflow-hidden rounded-xl border bg-gray-50">
                       <div className="flex h-32 items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-sm text-gray-500">
-                        {form.ogImage.trim() ? '已配置 OG 图片' : '未配置 OG 图片'}
+                        {(form.ogImage.trim() || autoSeo?.ogImage) ? '已配置 OG 图片' : '未配置 OG 图片'}
                       </div>
                       <div className="space-y-2 p-4">
                         <div className="font-medium text-gray-900">{trimPreviewText(sharePreviewTitle, 48)}</div>
@@ -364,6 +394,14 @@ export default function AccountSeoPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-dashed bg-gray-50 p-4 text-sm text-gray-600">
+                  <div className="font-medium text-gray-900">自动 SEO 规则</div>
+                  <p className="mt-2">
+                    系统会自动组合商品标题、哈夫币、租金、押金和商品说明生成默认 SEO 文案。
+                    你也可以点击“应用自动 SEO”把建议回填到表单后再微调。
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-lg border p-4">

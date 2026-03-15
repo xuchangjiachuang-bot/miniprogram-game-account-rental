@@ -8,6 +8,7 @@ import {
   listLatestPublishedContentPages,
   listPublicAccountLinks,
 } from '@/lib/search-content-service';
+import { buildAutoAccountSeo, resolveAccountSeo } from '@/lib/seo-auto';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -49,26 +50,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const seoOverride = await getEntitySeoOverride('account', account.accountId);
-  const title = seoOverride?.title || account.title;
-  const description =
-    seoOverride?.description ||
-    account.description ||
-    `哈夫币 ${account.coinsM}M，押金 ${account.deposit}，支持下单前查看详情。`;
-  const images = seoOverride?.og_image
-    ? [seoOverride.og_image]
-    : getAccountImages(account.screenshots).slice(0, 1);
+  const resolvedSeo = resolveAccountSeo(account, seoOverride);
+  const images = resolvedSeo.ogImage ? [resolvedSeo.ogImage] : getAccountImages(account.screenshots).slice(0, 1);
   const indexable = seoOverride?.indexable ?? true;
 
   return {
-    title,
-    description,
+    title: resolvedSeo.title,
+    description: resolvedSeo.description,
     robots: {
       index: Boolean(indexable),
       follow: Boolean(indexable),
     },
     openGraph: {
-      title: seoOverride?.og_title || title,
-      description: seoOverride?.og_description || description,
+      title: resolvedSeo.ogTitle,
+      description: resolvedSeo.ogDescription,
       images,
       type: 'website',
       url: `${siteUrl}/accounts/${account.accountId}`,
@@ -85,9 +80,9 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
   }
 
   const seoOverride = await getEntitySeoOverride('account', account.accountId);
+  const resolvedSeo = resolveAccountSeo(account, seoOverride);
   const images = getAccountImages(account.screenshots);
   const price = account.accountValue || account.recommendedRental || '0';
-  const description = seoOverride?.summary || seoOverride?.description || account.description || '';
   const latestPages = await listLatestPublishedContentPages(6);
   const relatedAccounts = await listPublicAccountLinks(4, account.accountId);
 
@@ -116,7 +111,9 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
               <div className="space-y-3">
                 <p className="text-sm text-gray-500">商品详情页</p>
                 <h1 className="text-3xl font-bold text-gray-900">{account.title}</h1>
-                {description ? <p className="text-base leading-7 text-gray-600">{description}</p> : null}
+                {resolvedSeo.summary ? (
+                  <p className="text-base leading-7 text-gray-600">{resolvedSeo.summary}</p>
+                ) : null}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -189,19 +186,19 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {relatedAccounts.map((item) => {
                 const relatedPrice = item.account_value || item.recommended_rental || '0';
+                const accountSeo = buildAutoAccountSeo(item);
+
                 return (
                   <Link
                     key={item.id}
                     href={`/accounts/${item.account_id}`}
                     className="rounded-xl border bg-gray-50 p-4 transition-colors hover:border-gray-300 hover:bg-white"
                   >
-                    <div className="font-medium text-gray-900">{item.seo_title || item.title}</div>
+                    <div className="font-medium text-gray-900">{accountSeo.title}</div>
                     <p className="mt-2 text-sm text-gray-600">{`哈夫币 ${item.coins_m}M · 租金 ¥${relatedPrice} · 押金 ¥${item.deposit}`}</p>
-                    {(item.seo_description || item.description) ? (
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
-                        {item.seo_description || item.description}
-                      </p>
-                    ) : null}
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
+                      {accountSeo.description}
+                    </p>
                   </Link>
                 );
               })}
@@ -233,9 +230,9 @@ export default async function PublicAccountDetailPage({ params }: PageProps) {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'Product',
-            name: seoOverride?.title || account.title,
-            description,
-            image: images,
+            name: resolvedSeo.title,
+            description: resolvedSeo.description,
+            image: resolvedSeo.ogImage ? [resolvedSeo.ogImage] : images,
             sku: account.accountId,
             offers: {
               '@type': 'Offer',

@@ -7,10 +7,13 @@ import {
   listPublicAccountLinks,
   listRelatedPublishedContentPages,
 } from '@/lib/search-content-service';
+import { buildAutoAccountSeo, resolveContentPageSeo } from '@/lib/seo-auto';
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
 
 function splitParagraphs(content: string) {
   return content
@@ -30,20 +33,19 @@ export async function generateContentPageMetadata(
     return {};
   }
 
-  const title = page.seo_title || page.title;
-  const description = page.seo_description || page.summary || '';
+  const resolvedSeo = resolveContentPageSeo(page);
 
   return {
-    title,
-    description,
+    title: resolvedSeo.title,
+    description: resolvedSeo.description,
     robots: {
       index: Boolean(page.indexable),
       follow: Boolean(page.indexable),
     },
     openGraph: {
-      title: page.og_title || title,
-      description: page.og_description || description,
-      images: page.og_image ? [page.og_image] : undefined,
+      title: resolvedSeo.ogTitle,
+      description: resolvedSeo.ogDescription,
+      images: resolvedSeo.ogImage ? [resolvedSeo.ogImage] : undefined,
       type: 'article',
     },
   };
@@ -57,6 +59,7 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
     notFound();
   }
 
+  const resolvedSeo = resolveContentPageSeo(page);
   const faqItems = Array.isArray(page.faq_json) ? page.faq_json : [];
   const relatedPages = await listRelatedPublishedContentPages(pageType, page.slug, 4);
   const latestPages = await listLatestPublishedContentPages(6);
@@ -97,7 +100,9 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
               更新于 {new Date(page.updated_at).toLocaleDateString('zh-CN')}
             </p>
             <h1 className="text-3xl font-bold text-gray-900">{page.title}</h1>
-            {page.summary ? <p className="text-base leading-7 text-gray-600">{page.summary}</p> : null}
+            {resolvedSeo.summary ? (
+              <p className="text-base leading-7 text-gray-600">{resolvedSeo.summary}</p>
+            ) : null}
           </header>
 
           <div className="space-y-5 pt-6 text-[15px] leading-8 text-gray-700">
@@ -132,8 +137,10 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
                   className="rounded-xl border bg-gray-50 p-4 transition-colors hover:border-gray-300 hover:bg-white"
                 >
                   <div className="font-medium text-gray-900">{item.title}</div>
-                  {item.summary ? (
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{item.summary}</p>
+                  {resolveContentPageSeo(item).summary ? (
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      {resolveContentPageSeo(item).summary}
+                    </p>
                   ) : null}
                 </Link>
               ))}
@@ -152,19 +159,19 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {featuredAccounts.map((item) => {
                 const price = item.account_value || item.recommended_rental || '0';
+                const accountSeo = buildAutoAccountSeo(item);
+
                 return (
                   <Link
                     key={item.id}
                     href={`/accounts/${item.account_id}`}
                     className="rounded-xl border bg-gray-50 p-4 transition-colors hover:border-gray-300 hover:bg-white"
                   >
-                    <div className="font-medium text-gray-900">{item.seo_title || item.title}</div>
+                    <div className="font-medium text-gray-900">{accountSeo.title}</div>
                     <p className="mt-2 text-sm text-gray-600">{`哈夫币 ${item.coins_m}M · 租金 ¥${price} · 押金 ¥${item.deposit}`}</p>
-                    {(item.seo_description || item.description) ? (
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
-                        {item.seo_description || item.description}
-                      </p>
-                    ) : null}
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
+                      {accountSeo.description}
+                    </p>
                   </Link>
                 );
               })}
@@ -214,13 +221,13 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
                 '@type': 'ListItem',
                 position: 1,
                 name: '首页',
-                item: process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top',
+                item: siteUrl,
               },
               {
                 '@type': 'ListItem',
                 position: 2,
-                name: page.title,
-                item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top'}/${page.page_type}/${page.slug}`,
+                name: resolvedSeo.title,
+                item: `${siteUrl}/${page.page_type}/${page.slug}`,
               },
             ],
           }),

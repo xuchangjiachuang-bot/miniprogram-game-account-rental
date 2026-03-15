@@ -53,6 +53,7 @@ export type AccountSeoListItem = {
   account_id: string;
   title: string;
   description: string | null;
+  coins_m: string | null;
   account_value: string | null;
   recommended_rental: string | null;
   deposit: string;
@@ -405,6 +406,7 @@ export async function listAccountSeoOverrides(search?: string) {
         a.account_id,
         a.title,
         a.description,
+        a.coins_m,
         a.account_value,
         a.recommended_rental,
         a.deposit,
@@ -442,6 +444,7 @@ export async function listAccountSeoOverrides(search?: string) {
       a.account_id,
       a.title,
       a.description,
+      a.coins_m,
       a.account_value,
       a.recommended_rental,
       a.deposit,
