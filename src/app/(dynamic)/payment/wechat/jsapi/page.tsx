@@ -39,7 +39,32 @@ interface JsapiDebugState {
   createPaymentResponse?: unknown;
 }
 
+interface ApiResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 type PaymentMode = 'order' | 'recharge';
+
+async function parseJsonResponse<T>(response: Response): Promise<ApiResult<T>> {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('[wechat-jsapi] expected JSON response but received:', {
+      status: response.status,
+      contentType,
+      preview: text.slice(0, 200),
+    });
+    return {
+      success: false,
+      error: response.ok ? '接口暂时返回了非 JSON 响应，请稍后重试' : `请求失败，状态码 ${response.status}`,
+    };
+  }
+
+  return response.json();
+}
 
 function WechatJSAPIPaymentContent() {
   const router = useRouter();
@@ -53,6 +78,7 @@ function WechatJSAPIPaymentContent() {
     loading: sdkLoading,
     error: sdkError,
     isWechat,
+    isDesktopWechat,
     configWechatSDK,
     checkPaymentPermission,
   } = useWechatJSAPI();
@@ -70,10 +96,31 @@ function WechatJSAPIPaymentContent() {
   const [polling, setPolling] = useState(false);
   const [paymentPermissionReady, setPaymentPermissionReady] = useState(false);
   const [jsapiDebug, setJsapiDebug] = useState<JsapiDebugState>({});
+  const [desktopRedirecting, setDesktopRedirecting] = useState(false);
 
   useEffect(() => {
     setCurrentRechargeId(rechargeId || '');
   }, [rechargeId]);
+
+  useEffect(() => {
+    if (!isDesktopWechat) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (orderId) {
+      params.set('orderId', orderId);
+    }
+    if (currentRechargeId) {
+      params.set('rechargeId', currentRechargeId);
+    } else if (rechargeAmount) {
+      params.set('rechargeAmount', rechargeAmount);
+    }
+
+    const target = `/payment/wechat/native${params.toString() ? `?${params.toString()}` : ''}`;
+    setDesktopRedirecting(true);
+    router.replace(target);
+  }, [currentRechargeId, isDesktopWechat, orderId, rechargeAmount, router]);
 
   useEffect(() => {
     if (mode === 'order' && !orderId) {
@@ -160,8 +207,8 @@ function WechatJSAPIPaymentContent() {
       };
 
       const userResponse = await fetch('/api/auth/me', { headers: authHeaders, cache: 'no-store' });
-      const userResult = await userResponse.json();
-      if (!userResult.success) {
+      const userResult = await parseJsonResponse<CurrentUserInfo & { id: string; wechatOpenid: string | null }>(userResponse);
+      if (!userResult.success || !userResult.data) {
         setError(userResult.error || '加载用户信息失败');
         return;
       }
@@ -173,9 +220,9 @@ function WechatJSAPIPaymentContent() {
 
       if (mode === 'order' && orderId) {
         const orderResponse = await fetch(`/api/orders/${orderId}`, { headers: authHeaders, cache: 'no-store' });
-        const orderResult = await orderResponse.json();
+        const orderResult = await parseJsonResponse<any>(orderResponse);
 
-        if (!orderResult.success) {
+        if (!orderResult.success || !orderResult.data) {
           setError(orderResult.error || '加载订单失败');
           return;
         }
@@ -198,9 +245,9 @@ function WechatJSAPIPaymentContent() {
             headers: authHeaders,
             cache: 'no-store',
           });
-          const rechargeResult = await rechargeResponse.json();
+          const rechargeResult = await parseJsonResponse<RechargeInfo>(rechargeResponse);
 
-          if (!rechargeResult.success) {
+          if (!rechargeResult.success || !rechargeResult.data) {
             setError(rechargeResult.error || '加载充值单失败');
             return;
           }
@@ -240,14 +287,14 @@ function WechatJSAPIPaymentContent() {
       });
 
       const signatureResponse = await fetch(`/api/wechat/jsapi-signature?url=${encodeURIComponent(pageUrl)}`);
-      const signatureResult = await signatureResponse.json();
+      const signatureResult = await parseJsonResponse<any>(signatureResponse);
       setJsapiDebug((current) => ({
         ...current,
         signatureResponse: signatureResult,
         signatureNormalizedUrl: signatureResult?.data?.debug?.normalizedUrl,
       }));
 
-      if (!signatureResult.success) {
+      if (!signatureResult.success || !signatureResult.data) {
         throw new Error(signatureResult.error || '获取微信支付签名失败');
       }
 
@@ -264,7 +311,7 @@ function WechatJSAPIPaymentContent() {
         checkJsApiResult: permissionResult,
       }));
 
-      if (!permissionResult.chooseWXPay) {
+      if (!permissionResult.chooseWXPay || permissionResult.chooseWXPay === 'false') {
         throw new Error('当前公众号或当前网页环境未获得 chooseWXPay 权限，请检查微信 JS 接口安全域名、支付授权目录及商户号绑定关系');
       }
 
@@ -295,9 +342,9 @@ function WechatJSAPIPaymentContent() {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
-        const result = await response.json();
+        const result = await parseJsonResponse<any>(response);
 
-        if (result.success && ['paid', 'completed'].includes(result.data.status || '')) {
+        if (result.success && result.data && ['paid', 'completed'].includes(result.data.status || '')) {
           setPolling(false);
           router.push(`/orders/${orderId}`);
           return true;
@@ -309,9 +356,9 @@ function WechatJSAPIPaymentContent() {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
-        const result = await response.json();
+        const result = await parseJsonResponse<any>(response);
 
-        if (result.success && result.data.status === 'success') {
+        if (result.success && result.data?.status === 'success') {
           setPolling(false);
           router.push('/user-center');
           return true;
@@ -374,13 +421,13 @@ function WechatJSAPIPaymentContent() {
         body: JSON.stringify(payload),
       });
 
-      const createResult = await createResponse.json();
+      const createResult = await parseJsonResponse<any>(createResponse);
       setJsapiDebug((current) => ({
         ...current,
         createPaymentResponse: createResult,
       }));
 
-      if (!createResult.success) {
+      if (!createResult.success || !createResult.data) {
         setError(createResult.error || '创建支付失败');
         return;
       }
@@ -441,6 +488,28 @@ function WechatJSAPIPaymentContent() {
   const bindWechatUrl = typeof window === 'undefined'
     ? '/api/auth/wechat/authorize?state=payment_bind'
     : `/api/auth/wechat/authorize?state=payment_bind&returnTo=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+
+  if (desktopRedirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white px-4 py-12">
+        <div className="mx-auto max-w-md">
+          <Card>
+            <CardHeader>
+              <CardTitle>{title}</CardTitle>
+              <CardDescription>请在微信内完成支付确认</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertTitle>正在准备支付环境</AlertTitle>
+                <AlertDescription>当前是桌面微信环境，正在自动切换到扫码支付页面。</AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

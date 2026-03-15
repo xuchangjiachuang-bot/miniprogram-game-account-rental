@@ -21,12 +21,39 @@ interface RechargeInfo {
   status: string;
 }
 
+interface ApiResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 type PaymentMode = 'order' | 'recharge';
 type ExternalWechatChannel = 'h5' | 'native';
 
 function appendRedirectUrl(mwebUrl: string, redirectUrl: string) {
   const separator = mwebUrl.includes('?') ? '&' : '?';
   return `${mwebUrl}${separator}redirect_url=${encodeURIComponent(redirectUrl)}`;
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<ApiResult<T>> {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('[WeChat External Payment] expected JSON response but received:', {
+      status: response.status,
+      contentType,
+      preview: text.slice(0, 200),
+    });
+    return {
+      success: false,
+      error: response.ok
+        ? '支付状态查询暂时返回了非 JSON 响应，请稍后重试'
+        : `请求失败，状态码 ${response.status}`,
+    };
+  }
+
+  return response.json();
 }
 
 function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChannel }) {
@@ -133,14 +160,14 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           headers: authHeaders,
           cache: 'no-store',
         });
-        const orderResult = await orderResponse.json();
+        const orderResult = await parseJsonResponse<OrderInfo>(orderResponse);
 
-        if (!orderResult.success) {
+        if (!orderResult.success || !orderResult.data) {
           setError(orderResult.error || '加载订单失败');
           return;
         }
 
-        const order = orderResult.data;
+        const order = orderResult.data as any;
         setOrderInfo({
           id: order.id,
           totalPrice: Number(order.totalPrice || 0),
@@ -159,9 +186,9 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
             headers: authHeaders,
             cache: 'no-store',
           });
-          const rechargeResult = await rechargeResponse.json();
+          const rechargeResult = await parseJsonResponse<RechargeInfo>(rechargeResponse);
 
-          if (!rechargeResult.success) {
+          if (!rechargeResult.success || !rechargeResult.data) {
             setError(rechargeResult.error || '加载充值单失败');
             return;
           }
@@ -199,9 +226,9 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
-        const result = await response.json();
+        const result = await parseJsonResponse<any>(response);
 
-        if (result.success && (result.data.status === 'paid' || result.data.status === 'completed')) {
+        if (result.success && result.data && (result.data.status === 'paid' || result.data.status === 'completed')) {
           setPolling(false);
           setPaymentStatus('success');
           router.push(`/orders/${orderId}`);
@@ -215,13 +242,13 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
-        const result = await response.json();
+        const result = await parseJsonResponse<RechargeInfo & { transactionId?: string; failureReason?: string }>(response);
 
-        if (result.success && result.data.status === 'success') {
+        if (result.success && result.data?.status === 'success') {
           setPolling(false);
           setPaymentStatus('success');
           router.push('/user-center?tab=wallet');
-        } else if (result.success && result.data.status === 'failed') {
+        } else if (result.success && result.data?.status === 'failed') {
           setPolling(false);
           setPaymentStatus('failed');
           setError(result.data.failureReason || '微信支付未成功，请重新发起支付');
@@ -230,7 +257,7 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
         }
       }
     } catch (statusError) {
-      console.error('检查支付状态失败:', statusError);
+      console.error('[WeChat External Payment] check payment status failed:', statusError);
     }
   }
 
@@ -261,8 +288,8 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
         body: JSON.stringify(payload),
       });
 
-      const createResult = await createResponse.json();
-      if (!createResult.success) {
+      const createResult = await parseJsonResponse<any>(createResponse);
+      if (!createResult.success || !createResult.data) {
         setPaymentStatus('failed');
         setError(createResult.error || '创建支付失败');
         return;
