@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, ShieldCheck, ShoppingCart, Users, Settings, LogOut, Menu, X, MessageSquare, Headset, MessageSquareText, CreditCard, Wallet, RefreshCw, Building, GripVertical, Check, X as XIcon, AlertCircle, Lock, User, Key, Shield, Copy, Loader2 } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, ShoppingCart, Users, Settings, LogOut, Menu, X, MessageSquare, Headset, MessageSquareText, Wallet, RefreshCw, Building, GripVertical, Check, X as XIcon, AlertCircle, Lock, User, Key, Shield, Copy, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -76,12 +76,6 @@ const defaultMenuItems = [
     title: '短信服务',
     href: '/admin/sms',
     icon: MessageSquareText
-  },
-  {
-    id: 'payments',
-    title: '支付管理',
-    href: '/admin/payments',
-    icon: CreditCard
   },
   {
     id: 'withdrawals',

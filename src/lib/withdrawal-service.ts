@@ -26,7 +26,14 @@ export async function getWithdrawalRequests(params: {
     );
 
     const userList = userIds.length
-      ? await db.select().from(users).where(sql`id = ANY(${userIds})`)
+      ? await db
+          .select({
+            id: users.id,
+            phone: users.phone,
+            nickname: users.nickname,
+          })
+          .from(users)
+          .where(sql`id = ANY(${userIds})`)
       : [];
 
     const userMap = new Map(userList.map((user) => [user.id, user]));
