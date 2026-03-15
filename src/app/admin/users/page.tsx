@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Ban, CheckCircle, Loader2, RefreshCw, Search } from 'lucide-react';
+import { Ban, CheckCircle, Loader2, RefreshCw, Search, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,12 @@ interface User {
   createdAt: string;
 }
 
+interface WalletAdjustFormState {
+  userId: string;
+  amount: string;
+  reason: string;
+}
+
 const PAGE_SIZE = 20;
 
 export default function AdminUsers() {
@@ -35,6 +41,8 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [walletAdjustForm, setWalletAdjustForm] = useState<WalletAdjustFormState | null>(null);
+  const [walletAdjusting, setWalletAdjusting] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -103,6 +111,55 @@ export default function AdminUsers() {
     } catch (error) {
       console.error('更新用户状态失败:', error);
       toast.error('操作失败');
+    }
+  };
+
+  const openWalletAdjust = (user: User) => {
+    setWalletAdjustForm({
+      userId: user.id,
+      amount: '100',
+      reason: '联调测试充值',
+    });
+  };
+
+  const submitWalletAdjust = async () => {
+    if (!walletAdjustForm) {
+      return;
+    }
+
+    const amount = Number(walletAdjustForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('请输入大于 0 的充值金额');
+      return;
+    }
+
+    try {
+      setWalletAdjusting(true);
+      const response = await fetch('/api/admin/wallet/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: walletAdjustForm.userId,
+          amount,
+          reason: walletAdjustForm.reason.trim() || '联调测试充值',
+        }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || '测试充值失败');
+        return;
+      }
+
+      toast.success(`测试充值成功，余额已增加 ¥${Number(result.data?.amount || amount).toFixed(2)}`);
+      setWalletAdjustForm(null);
+      await loadUsers();
+    } catch (error) {
+      console.error('测试充值失败:', error);
+      toast.error('测试充值失败');
+    } finally {
+      setWalletAdjusting(false);
     }
   };
 
@@ -274,7 +331,52 @@ export default function AdminUsers() {
                       </>
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openWalletAdjust(user)}
+                  >
+                    <Wallet className="mr-2 h-4 w-4" />
+                    测试充值
+                  </Button>
                 </div>
+                {walletAdjustForm?.userId === user.id ? (
+                  <div className="mt-4 rounded-lg border bg-slate-50 p-4">
+                    <div className="mb-3 text-sm font-medium text-slate-900">
+                      为当前用户充值测试余额
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                      <Input
+                        value={walletAdjustForm.amount}
+                        onChange={(e) => setWalletAdjustForm((current) => current ? {
+                          ...current,
+                          amount: e.target.value,
+                        } : current)}
+                        placeholder="充值金额"
+                        inputMode="decimal"
+                      />
+                      <Input
+                        value={walletAdjustForm.reason}
+                        onChange={(e) => setWalletAdjustForm((current) => current ? {
+                          ...current,
+                          reason: e.target.value,
+                        } : current)}
+                        placeholder="备注，如：联调测试充值"
+                      />
+                      <Button onClick={submitWalletAdjust} disabled={walletAdjusting}>
+                        {walletAdjusting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        确认充值
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setWalletAdjustForm(null)}
+                        disabled={walletAdjusting}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ))}
