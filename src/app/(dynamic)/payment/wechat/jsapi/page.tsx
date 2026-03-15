@@ -46,6 +46,7 @@ interface ApiResult<T> {
 }
 
 type PaymentMode = 'order' | 'recharge';
+const SHOW_JSAPI_DEBUG = process.env.NEXT_PUBLIC_SHOW_WECHAT_JSAPI_DEBUG === 'true';
 
 async function parseJsonResponse<T>(response: Response): Promise<ApiResult<T>> {
   const contentType = response.headers.get('content-type') || '';
@@ -360,7 +361,7 @@ function WechatJSAPIPaymentContent() {
 
         if (result.success && result.data?.status === 'success') {
           setPolling(false);
-          router.push('/user-center');
+          router.push('/user-center?tab=wallet');
           return true;
         }
       }
@@ -554,7 +555,7 @@ function WechatJSAPIPaymentContent() {
                 <h2 className="mb-2 text-2xl font-bold text-slate-900">支付请求已提交</h2>
                 <p className="mb-6 text-slate-600">正在确认支付状态，稍后会自动跳转。</p>
                 <Button
-                  onClick={() => router.push(mode === 'order' && orderId ? `/orders/${orderId}` : '/user-center')}
+                  onClick={() => router.push(mode === 'order' && orderId ? `/orders/${orderId}` : '/user-center?tab=wallet')}
                   className="w-full"
                 >
                   {mode === 'order' ? '查看订单' : '返回钱包'}
@@ -640,7 +641,7 @@ function WechatJSAPIPaymentContent() {
                 </Alert>
               ) : null}
 
-              {isWechat ? (
+              {SHOW_JSAPI_DEBUG && isWechat ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">JSAPI Debug</div>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-slate-700">

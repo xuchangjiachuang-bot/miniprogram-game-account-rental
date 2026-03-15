@@ -13,6 +13,8 @@ export interface WechatPayConfig {
   certP12Path?: string;
   certP12Password?: string;
   certSerialNo?: string;
+  callbackVerificationMode?: 'public_key' | 'platform_certificate' | 'unknown';
+  publicKeyId?: string;
 }
 
 function maskValue(value: string) {
@@ -52,6 +54,8 @@ export async function getWechatPayConfig(): Promise<WechatPayConfig> {
     mpSecret: config.mpSecret,
     apiVersion: 'v3',
     certSerialNo: config.serialNo,
+    callbackVerificationMode: config.publicKey ? 'public_key' : 'platform_certificate',
+    publicKeyId: config.publicKeyId,
   };
 }
 
@@ -71,10 +75,34 @@ export async function checkCertConfig(): Promise<{ valid: boolean; missing: stri
   };
 }
 
+export async function checkCallbackVerificationConfig(): Promise<{ valid: boolean; missing: string[]; mode: 'public_key' | 'platform_certificate' }> {
+  const config = await getWechatPayV3Config();
+
+  if (config.publicKey) {
+    const missing = [];
+    if (!config.publicKeyId) {
+      missing.push('Wechat Pay Public Key ID');
+    }
+
+    return {
+      valid: missing.length === 0,
+      missing,
+      mode: 'public_key',
+    };
+  }
+
+  return {
+    valid: true,
+    missing: [],
+    mode: 'platform_certificate',
+  };
+}
+
 export async function getWechatPayConfigStatus() {
   const config = await getWechatPayV3Config();
   const check = await checkWechatPayConfig();
   const certCheck = await checkCertConfig();
+  const callbackCheck = await checkCallbackVerificationConfig();
   const appIdMatch = Boolean(config.appid && config.mpAppId && config.appid === config.mpAppId);
 
   return {
@@ -82,6 +110,9 @@ export async function getWechatPayConfigStatus() {
     missingFields: check.missing,
     certConfigured: certCheck.valid,
     certMissing: certCheck.missing,
+    callbackVerificationConfigured: callbackCheck.valid,
+    callbackVerificationMissing: callbackCheck.missing,
+    callbackVerificationMode: callbackCheck.mode,
     appId: maskValue(config.appid),
     mpAppId: maskValue(config.mpAppId),
     appIdMatch,
@@ -91,5 +122,6 @@ export async function getWechatPayConfigStatus() {
     keyPath: 'Using environment variable private key',
     apiVersion: 'v3',
     transferConfigured: Boolean(config.transferSceneId),
+    publicKeyId: maskValue(config.publicKeyId),
   };
 }

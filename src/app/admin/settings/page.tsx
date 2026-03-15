@@ -63,11 +63,15 @@ interface PaymentStatus {
   missingFields: string[];
   certConfigured: boolean;
   certMissing: string[];
+  callbackVerificationConfigured?: boolean;
+  callbackVerificationMissing?: string[];
+  callbackVerificationMode?: 'public_key' | 'platform_certificate' | 'unknown';
   appId?: string;
   mchId?: string;
   notifyUrl?: string;
   apiVersion?: 'v2' | 'v3';
   transferConfigured?: boolean;
+  publicKeyId?: string;
 }
 
 const DEFAULT_SETTINGS: PlatformSettings = {
@@ -300,6 +304,22 @@ export default function AdminSettingsPage() {
         value: '',
       },
       {
+        key: 'WECHAT_PAY_PUBLIC_KEY',
+        label: '微信支付公钥',
+        ready: paymentStatus?.callbackVerificationMode === 'public_key'
+          ? Boolean(paymentStatus.callbackVerificationConfigured)
+          : true,
+        value: '',
+      },
+      {
+        key: 'WECHAT_PAY_PUBLIC_KEY_ID',
+        label: '微信支付公钥 ID',
+        ready: paymentStatus?.callbackVerificationMode === 'public_key'
+          ? Boolean(paymentStatus.callbackVerificationConfigured)
+          : true,
+        value: paymentStatus?.publicKeyId || '',
+      },
+      {
         key: 'WECHAT_PAY_TRANSFER_SCENE_ID',
         label: '商家转账场景 ID',
         ready: Boolean(paymentStatus?.transferConfigured),
@@ -426,7 +446,7 @@ export default function AdminSettingsPage() {
                   <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">基础配置</div><div className="mt-2 flex items-center gap-2">{paymentStatus?.configured ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-amber-600" />}<span className="font-medium">{paymentStatus?.configured ? '已完整' : '存在缺项'}</span></div></div>
                   <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">证书配置</div><div className="mt-2 flex items-center gap-2">{paymentStatus?.certConfigured ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-amber-600" />}<span className="font-medium">{paymentStatus?.certConfigured ? '已完整' : '待补齐'}</span></div></div>
                   <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">转账场景</div><div className="mt-2 flex items-center gap-2">{paymentStatus?.transferConfigured ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-amber-600" />}<span className="font-medium">{paymentStatus?.transferConfigured ? '已配置' : '未配置'}</span></div></div>
-                  <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">接口版本</div><div className="mt-2 font-medium">{paymentStatus?.apiVersion || 'v3'}</div></div>
+                  <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">回调验签</div><div className="mt-2 flex items-center gap-2">{paymentStatus?.callbackVerificationConfigured !== false ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-amber-600" />}<span className="font-medium">{paymentStatus?.callbackVerificationMode === 'public_key' ? '公钥模式' : paymentStatus?.callbackVerificationMode === 'platform_certificate' ? '平台证书模式' : '未知'}</span></div></div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">支付 AppID</div><div className="mt-2 break-all font-mono text-sm">{paymentStatus?.appId || '未读取到'}</div></div>
@@ -434,6 +454,7 @@ export default function AdminSettingsPage() {
                   <div className="rounded-xl border p-4"><div className="text-sm text-muted-foreground">支付回调地址</div><div className="mt-2 break-all font-mono text-sm">{paymentStatus?.notifyUrl || '未读取到'}</div></div>
                 </div>
                 {!!paymentStatus?.missingFields?.length && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>当前运行时缺少以下字段</AlertTitle><AlertDescription><ul className="mt-2 list-disc space-y-1 pl-4">{paymentStatus.missingFields.map((field) => <li key={field}>{field}</li>)}</ul></AlertDescription></Alert>}
+                {!!paymentStatus?.callbackVerificationMissing?.length && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>回调验签配置不完整</AlertTitle><AlertDescription><ul className="mt-2 list-disc space-y-1 pl-4">{paymentStatus.callbackVerificationMissing.map((field) => <li key={field}>{field}</li>)}</ul></AlertDescription></Alert>}
               </CardContent>
             </Card>
 

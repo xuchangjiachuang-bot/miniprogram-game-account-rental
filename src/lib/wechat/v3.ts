@@ -12,6 +12,8 @@ export interface WechatPayV3Config {
   apiV3Key: string;
   serialNo: string;
   privateKey: string;
+  publicKey: string;
+  publicKeyId: string;
   transferSceneId: string;
   transferSceneInfoType: string;
   transferSceneInfoContent: string;
@@ -131,7 +133,7 @@ function normalizePemBody(body: string) {
   return body.replace(/[\s\u00a0]+/g, '');
 }
 
-function normalizeMultilineSecret(value: string) {
+function normalizeMultilineSecret(value: string, defaultLabel = 'PRIVATE KEY') {
   const normalized = stripWrappingQuotes(value).replace(/\r/g, '').replace(/\\n/g, '\n');
   const pemMatch = normalized.match(/-----BEGIN ([A-Z ]+)-----([\s\S]+?)-----END \1-----/);
 
@@ -143,14 +145,14 @@ function normalizeMultilineSecret(value: string) {
 
   const compact = normalizePemBody(normalized);
   if (compact.length > 128 && /^[A-Za-z0-9+/=]+$/.test(compact)) {
-    return wrapPem('PRIVATE KEY', compact);
+    return wrapPem(defaultLabel, compact);
   }
 
   return normalized.trim();
 }
 
 function buildPrivateKeyCandidates(privateKey: string) {
-  const normalized = normalizeMultilineSecret(privateKey);
+  const normalized = normalizeMultilineSecret(privateKey, 'PRIVATE KEY');
   const candidates = new Set<string>([normalized]);
   const body = normalizePemBody(
     normalized
@@ -161,6 +163,22 @@ function buildPrivateKeyCandidates(privateKey: string) {
   if (body && /^[A-Za-z0-9+/=]+$/.test(body)) {
     candidates.add(wrapPem('PRIVATE KEY', body));
     candidates.add(wrapPem('RSA PRIVATE KEY', body));
+  }
+
+  return Array.from(candidates);
+}
+
+function buildPublicKeyCandidates(publicKey: string) {
+  const normalized = normalizeMultilineSecret(publicKey, 'PUBLIC KEY');
+  const candidates = new Set<string>([normalized]);
+  const body = normalizePemBody(
+    normalized
+      .replace(/-----BEGIN [A-Z ]+-----/g, '')
+      .replace(/-----END [A-Z ]+-----/g, '')
+  );
+
+  if (body && /^[A-Za-z0-9+/=]+$/.test(body)) {
+    candidates.add(wrapPem('PUBLIC KEY', body));
   }
 
   return Array.from(candidates);
@@ -189,6 +207,8 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     apiV3Key,
     serialNo,
     privateKey,
+    publicKey,
+    publicKeyId,
     transferSceneId,
     transferSceneInfoType,
     transferSceneInfoContent,
@@ -218,6 +238,15 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
       getRuntimeEnv('WECHAT_PAY_PRIVATE_KEY'),
     ]),
     getConfiguredValue([
+      getRuntimeEnv('WECHAT_PAY_PUBLIC_KEY'),
+      getRuntimeEnv('WECHAT_PAY_PUBLIC_KEY_PEM'),
+    ]),
+    getConfiguredValue([
+      getRuntimeEnv('WECHAT_PAY_PUBLIC_KEY_ID'),
+      getRuntimeEnv('WECHAT_PAY_PUBLIC_KEY_SERIAL'),
+      getRuntimeEnv('WECHAT_PAY_PUBLIC_KEY_SERIAL_NO'),
+    ]),
+    getConfiguredValue([
       getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_ID'),
     ]),
     getConfiguredValue([
@@ -236,7 +265,9 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     notifyUrl,
     apiV3Key,
     serialNo,
-    privateKey: normalizeMultilineSecret(privateKey),
+    privateKey: normalizeMultilineSecret(privateKey, 'PRIVATE KEY'),
+    publicKey: normalizeMultilineSecret(publicKey, 'PUBLIC KEY'),
+    publicKeyId,
     transferSceneId,
     transferSceneInfoType,
     transferSceneInfoContent,
@@ -281,6 +312,30 @@ function getPrivateKeyObject(privateKey: string) {
     length: privateKey.length,
     hasBeginMarker: privateKey.includes('BEGIN'),
     hasEndMarker: privateKey.includes('END'),
+    candidateCount: candidates.length,
+  });
+  throw lastError;
+}
+
+function getPublicKeyObject(publicKey: string) {
+  const candidates = buildPublicKeyCandidates(publicKey);
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      return crypto.createPublicKey({
+        key: candidate,
+        format: 'pem',
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  console.error('[wechat-pay-v3] Failed to parse public key', {
+    length: publicKey.length,
+    hasBeginMarker: publicKey.includes('BEGIN'),
+    hasEndMarker: publicKey.includes('END'),
     candidateCount: candidates.length,
   });
   throw lastError;
@@ -408,6 +463,17 @@ export async function getWechatPlatformCertificate(forceRefresh = false): Promis
   return cert;
 }
 
+function hasConfiguredWechatPayPublicKey(config: WechatPayV3Config) {
+  return Boolean(config.publicKey && config.publicKey.trim());
+}
+
+function verifySignatureWithPublicKey(message: string, signature: string, publicKey: string) {
+  return crypto
+    .createVerify('RSA-SHA256')
+    .update(message)
+    .verify(getPublicKeyObject(publicKey), signature, 'base64');
+}
+
 export async function verifyWechatPaySignature(rawBody: string, headers: Headers) {
   const serial = headers.get('Wechatpay-Serial') || headers.get('wechatpay-serial');
   const signature = headers.get('Wechatpay-Signature') || headers.get('wechatpay-signature');
@@ -419,6 +485,24 @@ export async function verifyWechatPaySignature(rawBody: string, headers: Headers
   }
 
   const message = `${timestamp}\n${nonce}\n${rawBody}\n`;
+  const config = await getWechatPayV3Config();
+
+  if (hasConfiguredWechatPayPublicKey(config)) {
+    const publicKeyId = config.publicKeyId?.trim();
+    if (!publicKeyId || publicKeyId === serial) {
+      const verified = verifySignatureWithPublicKey(message, signature, config.publicKey);
+      if (!verified) {
+        throw new Error('微信支付回调验签失败');
+      }
+      return;
+    }
+
+    console.warn('[wechat-pay-v3] Public key id does not match callback serial, falling back to platform certificate', {
+      callbackSerial: serial,
+      configuredPublicKeyId: publicKeyId,
+    });
+  }
+
   let cert = await getWechatPlatformCertificate();
   if (cert.serialNo !== serial) {
     cert = await getWechatPlatformCertificate(true);
@@ -581,13 +665,36 @@ function encryptWithPlatformCertificate(content: string, certificatePem: string)
     .toString('base64');
 }
 
+async function getWechatPayEncryptMaterial() {
+  const config = await getWechatPayV3Config();
+
+  if (hasConfiguredWechatPayPublicKey(config)) {
+    if (!config.publicKeyId) {
+      throw new Error('缺少 WECHAT_PAY_PUBLIC_KEY_ID 配置');
+    }
+
+    return {
+      serialNo: config.publicKeyId,
+      certificatePem: config.publicKey,
+      mode: 'public_key' as const,
+    };
+  }
+
+  const platformCert = await getWechatPlatformCertificate();
+  return {
+    serialNo: platformCert.serialNo,
+    certificatePem: platformCert.certificatePem,
+    mode: 'platform_certificate' as const,
+  };
+}
+
 export async function createTransferBill(params: CreateTransferBillParams) {
   const config = await getWechatPayV3Config();
   if (!config.transferSceneId) {
     throw new Error('缺少 WECHAT_PAY_TRANSFER_SCENE_ID 配置');
   }
 
-  const platformCert = await getWechatPlatformCertificate();
+  const encryptMaterial = await getWechatPayEncryptMaterial();
   const payload: Record<string, any> = {
     appid: params.appid || config.mpAppId || config.appid,
     out_bill_no: params.outBillNo,
@@ -605,7 +712,7 @@ export async function createTransferBill(params: CreateTransferBillParams) {
   };
 
   if (params.userName) {
-    payload.user_name = encryptWithPlatformCertificate(params.userName, platformCert.certificatePem);
+    payload.user_name = encryptWithPlatformCertificate(params.userName, encryptMaterial.certificatePem);
   }
   if (params.userRecvPerception) {
     payload.user_recv_perception = params.userRecvPerception;
@@ -620,7 +727,7 @@ export async function createTransferBill(params: CreateTransferBillParams) {
   }>('POST', '/v3/fund-app/mch-transfer/transfer-bills', {
     body: payload,
     extraHeaders: {
-      'Wechatpay-Serial': platformCert.serialNo,
+      'Wechatpay-Serial': encryptMaterial.serialNo,
     },
   });
 }
