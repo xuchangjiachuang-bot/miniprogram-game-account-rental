@@ -170,7 +170,7 @@ export default function SellerAccounts() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
         <div className="max-w-7xl mx-auto">
           <Card>
             <CardContent className="p-12 text-center">
@@ -184,16 +184,16 @@ export default function SellerAccounts() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* 头部 */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">我的账号</h1>
             <p className="text-gray-600 mt-1">管理您的游戏账号</p>
           </div>
-          <Link href="/seller/accounts/new">
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+          <Link href="/seller/accounts/new" className="w-full sm:w-auto">
+            <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               上架新账号
             </Button>
@@ -201,15 +201,15 @@ export default function SellerAccounts() {
         </div>
 
         {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="text-2xl font-bold text-gray-900">{accounts.length}</div>
               <div className="text-sm text-gray-600 mt-1">总账号数</div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="text-2xl font-bold text-orange-500">
                 {accounts.filter(a => a.auditStatus === 'pending').length}
               </div>
@@ -217,7 +217,7 @@ export default function SellerAccounts() {
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="text-2xl font-bold text-green-500">
                 {accounts.filter(a => a.auditStatus === 'approved' && a.status === 'available').length}
               </div>
@@ -225,7 +225,7 @@ export default function SellerAccounts() {
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 {accounts.filter(a => a.tradeCount > 0).length}
               </div>
@@ -236,9 +236,9 @@ export default function SellerAccounts() {
 
         {/* 筛选和搜索 */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex gap-4 flex-wrap">
-              <div className="flex-1 min-w-[200px]">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+              <div className="flex-1 min-w-0 sm:min-w-[200px]">
                 <Input
                   placeholder="搜索账号名称或ID"
                   value={searchQuery}
@@ -246,7 +246,7 @@ export default function SellerAccounts() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="账号状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,7 +258,7 @@ export default function SellerAccounts() {
                 </SelectContent>
               </Select>
               <Select value={auditStatusFilter} onValueChange={(value: any) => setAuditStatusFilter(value)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="审核状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,11 +302,11 @@ export default function SellerAccounts() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 sm:gap-6">
                 {filteredAccounts.map((account) => (
                   <Card key={account.id} className="overflow-hidden">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
+                    <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <CardTitle className="text-lg line-clamp-2">{account.title}</CardTitle>
                           <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
@@ -327,7 +327,7 @@ export default function SellerAccounts() {
                         </div>
                       )}
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600">买家支付</span>
                         <span className="font-semibold text-gray-900">

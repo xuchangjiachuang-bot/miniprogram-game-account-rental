@@ -1,6 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { balanceTransactions, db, userBalances, users, withdrawals } from './db';
 import { createTransferBill } from '@/lib/wechat/v3';
+import { balanceTransactions, db, userBalances, users, withdrawals } from './db';
+
+function isValidWithdrawalRecord(withdrawal: any) {
+  return Number(withdrawal?.amount || 0) > 0 && Number(withdrawal?.actualAmount || 0) > 0;
+}
 
 export async function getWithdrawalRequests(params: {
   page: number;
@@ -20,10 +25,10 @@ export async function getWithdrawalRequests(params: {
       baseQuery = baseQuery.where(and(...conditions)) as any;
     }
 
-    const allWithdrawals = (await baseQuery.orderBy(desc(withdrawals.createdAt))) as any[];
-    const userIds = Array.from(
-      new Set(allWithdrawals.map((withdrawal) => withdrawal.userId).filter(Boolean))
+    const allWithdrawals = ((await baseQuery.orderBy(desc(withdrawals.createdAt))) as any[]).filter(
+      isValidWithdrawalRecord,
     );
+    const userIds = Array.from(new Set(allWithdrawals.map((item) => item.userId).filter(Boolean)));
 
     const userList = userIds.length
       ? await db
@@ -42,9 +47,10 @@ export async function getWithdrawalRequests(params: {
 
     const formattedWithdrawals = paginatedWithdrawals.map((withdrawal) => {
       const user = userMap.get(withdrawal.userId);
-      const accountInfo = typeof withdrawal.accountInfo === 'string'
-        ? JSON.parse(withdrawal.accountInfo || '{}')
-        : ((withdrawal.accountInfo || {}) as Record<string, any>);
+      const accountInfo =
+        typeof withdrawal.accountInfo === 'string'
+          ? JSON.parse(withdrawal.accountInfo || '{}')
+          : ((withdrawal.accountInfo || {}) as Record<string, any>);
 
       return {
         id: withdrawal.id,
@@ -56,7 +62,12 @@ export async function getWithdrawalRequests(params: {
         fee: Number(withdrawal.feeAmount) || 0,
         actualAmount: Number(withdrawal.actualAmount) || 0,
         type: withdrawal.withdrawalType || 'wechat',
-        accountNumber: accountInfo.accountNumber || accountInfo.alipayAccount || accountInfo.wechatAccount || accountInfo.openid || '',
+        accountNumber:
+          accountInfo.accountNumber ||
+          accountInfo.alipayAccount ||
+          accountInfo.wechatAccount ||
+          accountInfo.openid ||
+          '',
         accountName: accountInfo.accountName || '',
         bankName: accountInfo.bankName || '',
         status: withdrawal.status,
@@ -77,10 +88,10 @@ export async function getWithdrawalRequests(params: {
       pageSize,
     };
   } catch (error: any) {
-    console.error('获取提现申请列表失败:', error);
+    console.error('Failed to load withdrawal requests:', error);
     return {
       success: false,
-      error: error.message || '获取提现申请列表失败',
+      error: error.message || 'FAILED_TO_LOAD_WITHDRAWALS',
       data: [],
       total: 0,
       page,
@@ -105,7 +116,7 @@ async function approveWithdrawalByWechatTransfer(params: {
   if (rows.length === 0) {
     return {
       success: false,
-      error: '提现申请不存在',
+      error: 'WITHDRAWAL_NOT_FOUND',
     };
   }
 
@@ -113,18 +124,26 @@ async function approveWithdrawalByWechatTransfer(params: {
   if (withdrawal.status !== 'pending') {
     return {
       success: false,
-      error: `提现状态不正确，当前状态：${withdrawal.status}`,
+      error: `WITHDRAWAL_STATUS_INVALID:${withdrawal.status}`,
     };
   }
 
-  const accountInfo = typeof withdrawal.accountInfo === 'string'
-    ? JSON.parse(withdrawal.accountInfo || '{}')
-    : ((withdrawal.accountInfo || {}) as Record<string, any>);
+  if (!isValidWithdrawalRecord(withdrawal)) {
+    return {
+      success: false,
+      error: 'INVALID_WITHDRAWAL_AMOUNT',
+    };
+  }
+
+  const accountInfo =
+    typeof withdrawal.accountInfo === 'string'
+      ? JSON.parse(withdrawal.accountInfo || '{}')
+      : ((withdrawal.accountInfo || {}) as Record<string, any>);
 
   if (!accountInfo.openid) {
     return {
       success: false,
-      error: '提现用户缺少微信 openid，无法发起新版商家转账',
+      error: 'WITHDRAWAL_OPENID_MISSING',
     };
   }
 
@@ -136,9 +155,9 @@ async function approveWithdrawalByWechatTransfer(params: {
     outBillNo: withdrawal.withdrawalNo,
     openid: accountInfo.openid,
     transferAmountFen: Math.round(actualAmount * 100),
-    transferRemark: `用户提现 ${withdrawal.withdrawalNo}`,
+    transferRemark: `Withdrawal ${withdrawal.withdrawalNo}`,
     userName: accountInfo.accountName || undefined,
-    userRecvPerception: '平台提现到账',
+    userRecvPerception: 'Balance withdrawal',
   });
 
   const now = new Date().toISOString();
@@ -153,14 +172,14 @@ async function approveWithdrawalByWechatTransfer(params: {
       .where(eq(userBalances.userId, withdrawal.userId));
 
     await tx.insert(balanceTransactions).values({
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       userId: withdrawal.userId,
       withdrawalId: withdrawal.id,
       transactionType: 'withdraw',
       amount: amount.toFixed(2),
       balanceBefore: '0.00',
       balanceAfter: '0.00',
-      description: `微信提现 ${actualAmount.toFixed(2)} 元`,
+      description: `Withdrawal completed ${actualAmount.toFixed(2)}`,
       createdAt: now,
     });
 
@@ -170,7 +189,7 @@ async function approveWithdrawalByWechatTransfer(params: {
         status: 'approved',
         reviewerId,
         reviewTime: now,
-        reviewRemark: reviewComment || '已发起微信商家转账',
+        reviewRemark: reviewComment || 'Transfer initiated',
         thirdPartyTransactionId: transferResult.transfer_bill_no || transferResult.out_bill_no,
         failureReason: null,
         updatedAt: now,
@@ -208,17 +227,12 @@ export async function reviewWithdrawalRequest(params: {
     }
 
     const { reviewWithdrawal } = await import('./user-balance-service');
-    const result = await reviewWithdrawal(
-      withdrawalId,
-      false,
-      reviewerId,
-      reviewComment || ''
-    );
+    const result = await reviewWithdrawal(withdrawalId, false, reviewerId, reviewComment || '');
 
     if (!result.success) {
       return {
         success: false,
-        error: result.message || '审核提现申请失败',
+        error: result.message || 'WITHDRAWAL_REVIEW_FAILED',
       };
     }
 
@@ -231,10 +245,10 @@ export async function reviewWithdrawalRequest(params: {
       },
     };
   } catch (error: any) {
-    console.error('审核提现申请失败:', error);
+    console.error('Failed to review withdrawal request:', error);
     return {
       success: false,
-      error: error.message || '审核提现申请失败',
+      error: error.message || 'WITHDRAWAL_REVIEW_FAILED',
     };
   }
 }
