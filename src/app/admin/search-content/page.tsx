@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { buildAutoContentPageSeo } from '@/lib/seo-auto';
+import { buildAutoContentPageSeo, buildContentPageSeoSuggestions } from '@/lib/seo-auto';
 
 type ContentPage = {
   id: string;
@@ -175,6 +175,17 @@ export default function SearchContentPage() {
       }),
     [form.content, form.faqItems, form.ogImage, form.pageType, form.summary, form.title],
   );
+  const suggestionBundle = useMemo(
+    () =>
+      buildContentPageSeoSuggestions({
+        page_type: form.pageType,
+        title: form.title,
+        summary: form.summary,
+        content: form.content,
+        faq_json: form.faqItems,
+      }),
+    [form.content, form.faqItems, form.pageType, form.summary, form.title],
+  );
 
   const searchPreviewTitle = form.seoTitle.trim() || autoSeo.title || '页面标题预览';
   const searchPreviewDescription =
@@ -239,6 +250,19 @@ export default function SearchContentPage() {
       ogImage: current.ogImage || autoSeo.ogImage,
     }));
     toast.success('已应用自动 SEO 建议');
+  };
+
+  const handleResetToAutoSeo = () => {
+    setForm((current) => ({
+      ...current,
+      seoTitle: '',
+      seoDescription: '',
+      seoSummary: '',
+      ogTitle: '',
+      ogDescription: '',
+      ogImage: '',
+    }));
+    toast.success('已重置为自动 SEO 模式');
   };
 
   const handleSave = async () => {
@@ -439,6 +463,9 @@ export default function SearchContentPage() {
                     <RefreshCw className="mr-2 h-4 w-4" />
                     应用自动 SEO
                   </Button>
+                  <Button type="button" variant="outline" onClick={handleResetToAutoSeo}>
+                    重置为自动 SEO
+                  </Button>
                   {previewPath ? (
                     <Button asChild variant="outline">
                       <Link href={previewPath} target="_blank">
@@ -584,6 +611,34 @@ export default function SearchContentPage() {
               <p className="mt-2">
                 系统会自动组合页面标题、摘要、正文和 FAQ 生成默认 SEO 文案。你也可以点击“应用自动 SEO”，把建议回填到表单后再微调。
               </p>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-xl border bg-white p-4">
+                <div className="text-sm font-medium text-gray-900">自动关键词建议</div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {suggestionBundle.keywords.map((keyword) => (
+                    <span
+                      key={keyword}
+                      className="rounded-full border px-3 py-1 text-xs text-gray-700"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-white p-4">
+                <div className="text-sm font-medium text-gray-900">FAQ 建议</div>
+                <div className="mt-4 space-y-3">
+                  {suggestionBundle.faqSuggestions.map((item, index) => (
+                    <div key={`${item.question}-${index}`} className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-sm font-medium text-gray-900">{item.question}</div>
+                      <p className="mt-1 text-sm leading-6 text-gray-600">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">

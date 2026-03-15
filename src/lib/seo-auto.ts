@@ -36,6 +36,11 @@ export type ResolvedSeoFields = {
   ogImage: string;
 };
 
+export type SeoSuggestionBundle = {
+  keywords: string[];
+  faqSuggestions: Array<{ question: string; answer: string }>;
+};
+
 const PAGE_TYPE_LABELS: Record<string, string> = {
   help: '帮助中心',
   rules: '规则说明',
@@ -78,6 +83,16 @@ function faqCount(value: unknown) {
 function priceText(value: string | number | null | undefined) {
   const text = cleanText(value == null ? '' : String(value));
   return text || '0';
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(
+    new Set(
+      values
+        .map((item) => cleanText(item))
+        .filter(Boolean),
+    ),
+  );
 }
 
 export function buildAutoContentPageSeo(page: ContentPageLike): ResolvedSeoFields {
@@ -171,5 +186,74 @@ export function resolveAccountSeo(
     ogTitle: cleanText(override?.og_title) || autoSeo.ogTitle,
     ogDescription: cleanText(override?.og_description) || autoSeo.ogDescription,
     ogImage: cleanText(override?.og_image) || autoSeo.ogImage,
+  };
+}
+
+export function buildContentPageSeoSuggestions(page: ContentPageLike): SeoSuggestionBundle {
+  const pageTypeLabel = PAGE_TYPE_LABELS[page.page_type] || '内容页面';
+  const keywords = uniqueValues([
+    page.title,
+    `${page.title}攻略`,
+    `${page.title}说明`,
+    `${page.title}常见问题`,
+    `${pageTypeLabel}`,
+    `${pageTypeLabel}指引`,
+    '游戏账号租赁',
+    '租号平台',
+  ]).slice(0, 8);
+
+  return {
+    keywords,
+    faqSuggestions: [
+      {
+        question: `${page.title}适合哪些用户查看？`,
+        answer: `适合想快速了解${page.title}相关规则、流程和注意事项的用户。`,
+      },
+      {
+        question: `${page.title}里通常包含哪些信息？`,
+        answer: `通常会包含核心说明、操作指引、交易注意事项以及常见问题。`,
+      },
+      {
+        question: `查看${page.title}后还需要做什么？`,
+        answer: '建议继续查看相关规则、帮助内容或商品详情页，完成后续操作。',
+      },
+    ],
+  };
+}
+
+export function buildAccountSeoSuggestions(account: AccountLike): SeoSuggestionBundle {
+  const coins = priceText(account.coinsM ?? account.coins_m);
+  const deposit = priceText(account.deposit);
+  const price = priceText(
+    account.accountValue ?? account.account_value ?? account.recommendedRental ?? account.recommended_rental,
+  );
+
+  const keywords = uniqueValues([
+    account.title,
+    `${account.title}租号`,
+    `${account.title}账号详情`,
+    `哈夫币${coins}M`,
+    `押金${deposit}`,
+    `租金${price}`,
+    '游戏账号租赁',
+    '账号交易平台',
+  ]).slice(0, 8);
+
+  return {
+    keywords,
+    faqSuggestions: [
+      {
+        question: `${account.title}的核心配置是什么？`,
+        answer: `核心信息包括哈夫币 ${coins}M、参考租金 ¥${price}、押金 ¥${deposit}。`,
+      },
+      {
+        question: `下单前需要重点确认什么？`,
+        answer: '建议重点确认商品说明、账号配置、押金和租金，再进入现有下单流程。',
+      },
+      {
+        question: `这个商品详情页的作用是什么？`,
+        answer: '主要用于公开展示、搜索收录和帮助用户在下单前快速了解商品信息。',
+      },
+    ],
   };
 }
