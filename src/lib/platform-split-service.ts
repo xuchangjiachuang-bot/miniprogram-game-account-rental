@@ -5,6 +5,7 @@
 
 import { db, orders, userBalances, balanceTransactions, splitRecords, platformSettings } from './db';
 import { eq, and } from 'drizzle-orm';
+import { getEffectiveCommissionRate } from './commission-activity-service';
 
 // ==================== 类型定义 ====================
 
@@ -71,7 +72,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
       commissionRate: 5
     };
 
-    const commissionRate = Number(settings.commissionRate) || 5;
+    const baseCommissionRate = Number(settings.commissionRate) || 5;
+    const { effectiveRate: commissionRate } = await getEffectiveCommissionRate(baseCommissionRate);
 
     // 3. 计算分账金额
     const rentalPrice = Number(order.rentalPrice) || 0;

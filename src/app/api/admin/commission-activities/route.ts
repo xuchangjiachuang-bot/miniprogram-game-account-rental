@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, admins, commissionActivities } from '@/lib/db';
 
+function normalizeDiscountRate(value: unknown) {
+  return Math.max(0, Number(value) || 0).toFixed(2);
+}
+
 /**
  * 获取优惠活动
  * GET /api/admin/commission-activities
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
       .values({
         name: body.name,
         description: body.description,
-        discountRate: body.discountRate,
+        discountRate: normalizeDiscountRate(body.discountRate),
         startTime: body.startTime,
         endTime: body.endTime,
         enabled: body.enabled ?? false,

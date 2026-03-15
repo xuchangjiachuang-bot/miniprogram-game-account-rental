@@ -1,15 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { Calendar, Edit, Loader2, Percent, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, Loader2, Calendar, Percent } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface CommissionActivity {
   id: string;
@@ -25,6 +32,7 @@ interface CommissionActivity {
 
 export default function CommissionActivitiesPage() {
   const [activities, setActivities] = useState<CommissionActivity[]>([]);
+  const [baseCommissionRate, setBaseCommissionRate] = useState(5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -35,23 +43,40 @@ export default function CommissionActivitiesPage() {
     discountRate: 0,
     startTime: '',
     endTime: '',
-    enabled: false
+    enabled: false,
   });
 
   useEffect(() => {
-    loadActivities();
+    void Promise.all([loadActivities(), loadPlatformSettings()]);
   }, []);
+
+  const loadPlatformSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/platform-settings', { cache: 'no-store' });
+      const result = await res.json();
+      if (result.success) {
+        setBaseCommissionRate(Number(result.data?.commissionRate) || 5);
+      }
+    } catch {
+      // Keep fallback display value.
+    }
+  };
 
   const loadActivities = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/commission-activities');
+      const res = await fetch('/api/admin/commission-activities', { cache: 'no-store' });
       const result = await res.json();
       if (result.success) {
-        setActivities(result.data);
+        setActivities(
+          (result.data || []).map((activity: CommissionActivity) => ({
+            ...activity,
+            discountRate: Number(activity.discountRate) || 0,
+          }))
+        );
       }
-    } catch (error) {
-      toast.error('加载优惠活动失败');
+    } catch {
+      toast.error('加载佣金活动失败');
     } finally {
       setLoading(false);
     }
@@ -63,10 +88,10 @@ export default function CommissionActivitiesPage() {
       setFormData({
         name: activity.name,
         description: activity.description,
-        discountRate: activity.discountRate,
+        discountRate: Number(activity.discountRate) || 0,
         startTime: activity.startTime.slice(0, 16),
         endTime: activity.endTime.slice(0, 16),
-        enabled: activity.enabled
+        enabled: activity.enabled,
       });
     } else {
       setEditingActivity(null);
@@ -76,7 +101,7 @@ export default function CommissionActivitiesPage() {
         discountRate: 0,
         startTime: '',
         endTime: '',
-        enabled: false
+        enabled: false,
       });
     }
     setDialogOpen(true);
@@ -93,8 +118,9 @@ export default function CommissionActivitiesPage() {
 
       const data = {
         ...formData,
+        discountRate: Math.max(0, Number(formData.discountRate) || 0),
         startTime: new Date(formData.startTime).toISOString(),
-        endTime: new Date(formData.endTime).toISOString()
+        endTime: new Date(formData.endTime).toISOString(),
       };
 
       const url = editingActivity
@@ -104,7 +130,7 @@ export default function CommissionActivitiesPage() {
       const res = await fetch(url, {
         method: editingActivity ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
 
       const result = await res.json();
@@ -112,11 +138,11 @@ export default function CommissionActivitiesPage() {
       if (result.success) {
         toast.success(editingActivity ? '活动已更新' : '活动已创建');
         setDialogOpen(false);
-        loadActivities();
+        await loadActivities();
       } else {
         toast.error(result.error || '操作失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('操作失败');
     } finally {
       setSaving(false);
@@ -124,28 +150,28 @@ export default function CommissionActivitiesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个活动吗？')) return;
+    if (!confirm('确定要删除这个活动吗？')) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/admin/commission-activities/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       const result = await res.json();
 
       if (result.success) {
         toast.success('活动已删除');
-        loadActivities();
+        await loadActivities();
       } else {
         toast.error(result.error || '删除失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('删除失败');
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN');
-  };
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleString('zh-CN');
 
   const isActive = (activity: CommissionActivity) => {
     const now = new Date();
@@ -154,9 +180,11 @@ export default function CommissionActivitiesPage() {
     return activity.enabled && now >= start && now <= end;
   };
 
+  const effectiveRate = Math.max(0, baseCommissionRate - (Number(formData.discountRate) || 0));
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -166,20 +194,30 @@ export default function CommissionActivitiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">抽佣优惠活动</h1>
-          <p className="text-sm text-gray-600 mt-1">管理佣金优惠活动，活动期间上架的账号享受优惠</p>
+          <h1 className="text-2xl font-bold text-gray-900">佣金优惠活动</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            按“基础佣金 - 减免佣金点数”生效。比如基础佣金 10%，这里填 10%，活动期佣金就是 0%。
+          </p>
         </div>
         <Button onClick={() => openDialog()}>
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           新建活动
         </Button>
       </div>
+
+      <Card className="border-dashed">
+        <CardContent className="py-4 text-sm text-muted-foreground">
+          当前基础佣金是 <span className="font-semibold text-foreground">{baseCommissionRate}%</span>。
+          这里填写的是减免的佣金点数，不是折扣系数。
+          例如：减免 5%，代表 10% 佣金降为 5%；减免 10%，代表 10% 佣金降为 0%。
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4">
         {activities.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              暂无优惠活动，点击上方按钮创建
+              暂无佣金活动，点击上方按钮创建。
             </CardContent>
           </Card>
         ) : (
@@ -190,12 +228,12 @@ export default function CommissionActivitiesPage() {
                   <div className="flex items-center gap-3">
                     <CardTitle>{activity.name}</CardTitle>
                     {isActive(activity) && (
-                      <span className="px-2 py-0.5 text-xs font-medium bg-green-500 text-white rounded">
+                      <span className="rounded bg-green-500 px-2 py-0.5 text-xs font-medium text-white">
                         进行中
                       </span>
                     )}
                     {!activity.enabled && (
-                      <span className="px-2 py-0.5 text-xs font-medium bg-gray-500 text-white rounded">
+                      <span className="rounded bg-gray-500 px-2 py-0.5 text-xs font-medium text-white">
                         已禁用
                       </span>
                     )}
@@ -208,13 +246,16 @@ export default function CommissionActivitiesPage() {
                           const res = await fetch(`/api/admin/commission-activities/${activity.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ...activity, enabled: checked })
+                            body: JSON.stringify({ ...activity, enabled: checked }),
                           });
-                          if (res.ok) {
-                            loadActivities();
+                          const result = await res.json();
+                          if (result.success) {
+                            await loadActivities();
                             toast.success(checked ? '活动已启用' : '活动已禁用');
+                          } else {
+                            toast.error(result.error || '操作失败');
                           }
-                        } catch (error) {
+                        } catch {
                           toast.error('操作失败');
                         }
                       }}
@@ -227,30 +268,26 @@ export default function CommissionActivitiesPage() {
                     </Button>
                   </div>
                 </div>
-                {activity.description && (
-                  <CardDescription>{activity.description}</CardDescription>
-                )}
+                {activity.description && <CardDescription>{activity.description}</CardDescription>}
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                   <div className="flex items-center gap-2">
-                    <Percent className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">优惠比例：</span>
+                    <Percent className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">减免佣金点数：</span>
                     <span className="font-semibold text-green-600">{activity.discountRate}%</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">开始时间：</span>
                     <span>{formatDate(activity.startTime)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">结束时间：</span>
                     <span>{formatDate(activity.endTime)}</span>
                   </div>
-                  <div className="text-muted-foreground">
-                    创建于：{formatDate(activity.createdAt)}
-                  </div>
+                  <div className="text-muted-foreground">创建于：{formatDate(activity.createdAt)}</div>
                 </div>
               </CardContent>
             </Card>
@@ -258,13 +295,12 @@ export default function CommissionActivitiesPage() {
         )}
       </div>
 
-      {/* 创建/编辑对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingActivity ? '编辑优惠活动' : '新建优惠活动'}</DialogTitle>
+            <DialogTitle>{editingActivity ? '编辑佣金活动' : '新建佣金活动'}</DialogTitle>
             <DialogDescription>
-              设置活动名称、优惠比例、活动时间等信息
+              设置活动名称、减免佣金点数和生效时间。实际佣金 = 基础佣金 - 减免佣金点数，最低为 0%。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -273,8 +309,8 @@ export default function CommissionActivitiesPage() {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="例如：新用户优惠活动"
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="例如：新用户免佣活动"
               />
             </div>
             <div>
@@ -282,13 +318,13 @@ export default function CommissionActivitiesPage() {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                placeholder="描述活动详情"
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="描述活动适用范围或说明"
                 rows={3}
               />
             </div>
             <div>
-              <Label htmlFor="discountRate">优惠比例 (%) *</Label>
+              <Label htmlFor="discountRate">减免佣金点数 (%) *</Label>
               <Input
                 id="discountRate"
                 type="number"
@@ -296,9 +332,12 @@ export default function CommissionActivitiesPage() {
                 max="100"
                 step="0.01"
                 value={formData.discountRate}
-                onChange={(e) => setFormData({...formData, discountRate: parseFloat(e.target.value) || 0})}
-                placeholder="例如：5，表示佣金减免5%"
+                onChange={(e) => setFormData({ ...formData, discountRate: parseFloat(e.target.value) || 0 })}
+                placeholder="例如：10，表示基础佣金 10% 时活动佣金降到 0%"
               />
+              <p className="mt-2 text-xs text-muted-foreground">
+                当前基础佣金 {baseCommissionRate}% ，本活动实际佣金将为 {effectiveRate}%。
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -307,7 +346,7 @@ export default function CommissionActivitiesPage() {
                   id="startTime"
                   type="datetime-local"
                   value={formData.startTime}
-                  onChange={(e) => setFormData({...formData, startTime: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                 />
               </div>
               <div>
@@ -316,7 +355,7 @@ export default function CommissionActivitiesPage() {
                   id="endTime"
                   type="datetime-local"
                   value={formData.endTime}
-                  onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                 />
               </div>
             </div>
@@ -324,23 +363,19 @@ export default function CommissionActivitiesPage() {
               <Switch
                 id="enabled"
                 checked={formData.enabled}
-                onCheckedChange={(checked) => setFormData({...formData, enabled: checked})}
+                onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
               />
               <Label htmlFor="enabled">启用活动</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-              disabled={saving}
-            >
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               取消
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   保存中...
                 </>
               ) : (

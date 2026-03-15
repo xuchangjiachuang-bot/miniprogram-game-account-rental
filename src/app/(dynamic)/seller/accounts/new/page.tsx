@@ -1447,11 +1447,11 @@ function NewAccountPage() {
                             <span className="font-semibold">{pricing.originalCommissionRate}%</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>优惠减免</span>
+                            <span>减免佣金点数</span>
                             <span className="font-semibold">-{pricing.discountRate}%</span>
                           </div>
                           <div className="flex justify-between font-bold">
-                            <span>活动期间佣金</span>
+                            <span>活动佣金</span>
                             <span className="text-green-600">{pricing.commissionRate}%</span>
                           </div>
                         </div>

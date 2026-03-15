@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, admins, commissionActivities } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 
+function normalizeDiscountRate(value: unknown) {
+  return Math.max(0, Number(value) || 0).toFixed(2);
+}
+
 /**
  * 更新优惠活动
  * PUT /api/admin/commission-activities/[id]
@@ -42,7 +46,7 @@ export async function PUT(
       .set({
         name: body.name,
         description: body.description,
-        discountRate: body.discountRate,
+        discountRate: normalizeDiscountRate(body.discountRate),
         startTime: body.startTime,
         endTime: body.endTime,
         enabled: body.enabled
