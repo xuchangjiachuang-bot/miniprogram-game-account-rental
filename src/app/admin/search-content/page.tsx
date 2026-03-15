@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Plus, Save, Trash2 } from 'lucide-react';
+import { ExternalLink, Plus, Save, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -287,10 +287,18 @@ export default function SearchContentPage() {
             管理帮助页、规则页和基础 SEO/GEO 内容，不影响现有业务页面。
           </p>
         </div>
-        <Button onClick={handleCreate} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          新建内容页
-        </Button>
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          <Button onClick={handleCreate} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            新建内容页
+          </Button>
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+            <Link href="/admin/search-content/accounts">
+              <Search className="mr-2 h-4 w-4" />
+              商品详情 SEO
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -344,6 +352,7 @@ export default function SearchContentPage() {
                     <SelectItem value="help">帮助页</SelectItem>
                     <SelectItem value="rules">规则页</SelectItem>
                     <SelectItem value="topics">专题页</SelectItem>
+                    <SelectItem value="games">类目页</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

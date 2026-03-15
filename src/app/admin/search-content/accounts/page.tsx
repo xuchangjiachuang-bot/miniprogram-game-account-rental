@@ -1,0 +1,338 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { ExternalLink, Save, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+
+type AccountSeoItem = {
+  id: string;
+  account_id: string;
+  title: string;
+  description: string | null;
+  account_value: string | null;
+  recommended_rental: string | null;
+  deposit: string;
+  screenshots: unknown;
+  status: string | null;
+  audit_status: string | null;
+  seo_override_id: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_summary: string | null;
+  seo_og_title: string | null;
+  seo_og_description: string | null;
+  seo_og_image: string | null;
+  seo_indexable: boolean | null;
+};
+
+type FormState = {
+  entityKey: string;
+  title: string;
+  description: string;
+  summary: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  indexable: boolean;
+};
+
+const emptyForm: FormState = {
+  entityKey: '',
+  title: '',
+  description: '',
+  summary: '',
+  ogTitle: '',
+  ogDescription: '',
+  ogImage: '',
+  indexable: true,
+};
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
+
+function toFormState(item?: AccountSeoItem | null): FormState {
+  if (!item) {
+    return emptyForm;
+  }
+
+  return {
+    entityKey: item.account_id,
+    title: item.seo_title || '',
+    description: item.seo_description || '',
+    summary: item.seo_summary || '',
+    ogTitle: item.seo_og_title || '',
+    ogDescription: item.seo_og_description || '',
+    ogImage: item.seo_og_image || '',
+    indexable: item.seo_indexable ?? true,
+  };
+}
+
+export default function AccountSeoPage() {
+  const [items, setItems] = useState<AccountSeoItem[]>([]);
+  const [selectedKey, setSelectedKey] = useState('');
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm);
+
+  const selectedItem = useMemo(
+    () => items.find((item) => item.account_id === selectedKey) || null,
+    [items, selectedKey],
+  );
+
+  const previewPath = form.entityKey ? `/accounts/${form.entityKey}` : '';
+
+  const loadItems = async (keyword = '') => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (keyword.trim()) {
+        params.set('search', keyword.trim());
+      }
+      const response = await fetch(`/api/admin/search-content/accounts?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'FAILED_TO_LOAD_ACCOUNT_SEO_OVERRIDES');
+      }
+      setItems(result.data || []);
+    } catch (error: any) {
+      toast.error(error.message || 'FAILED_TO_LOAD_ACCOUNT_SEO_OVERRIDES');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadItems();
+  }, []);
+
+  useEffect(() => {
+    setForm(toFormState(selectedItem));
+  }, [selectedItem]);
+
+  const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSearch = async () => {
+    setQuery(search.trim());
+    setSelectedKey('');
+    await loadItems(search.trim());
+  };
+
+  const handleSave = async () => {
+    if (!form.entityKey) {
+      toast.error('请选择账号');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/search-content/accounts/${form.entityKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'FAILED_TO_SAVE_ACCOUNT_SEO_OVERRIDE');
+      }
+      toast.success('商品 SEO 已保存');
+      await loadItems(query);
+      setSelectedKey(form.entityKey);
+    } catch (error: any) {
+      toast.error(error.message || 'FAILED_TO_SAVE_ACCOUNT_SEO_OVERRIDE');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">商品详情 SEO</h1>
+          <p className="text-sm text-gray-600">
+            为公开商品详情页 `/accounts/[accountId]` 配置独立标题、描述和收录策略，不影响现有首页弹窗与购买流程。
+          </p>
+        </div>
+        <Button asChild variant="outline" className="w-full sm:w-auto">
+          <Link href="/admin/search-content">返回内容与搜索</Link>
+        </Button>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle>账号列表</CardTitle>
+            <CardDescription>搜索账号 ID、标题或描述，选择后编辑 SEO 覆盖字段。</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索账号 ID / 标题"
+              />
+              <Button type="button" variant="outline" onClick={handleSearch}>
+                <Search className="mr-2 h-4 w-4" />
+                搜索
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {loading ? (
+                <div className="text-sm text-gray-500">加载中...</div>
+              ) : items.length === 0 ? (
+                <div className="text-sm text-gray-500">暂无可管理的账号</div>
+              ) : (
+                items.map((item) => (
+                  <button
+                    key={item.account_id}
+                    type="button"
+                    onClick={() => setSelectedKey(item.account_id)}
+                    className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                      item.account_id === selectedKey ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium text-gray-900">{item.title}</span>
+                      <span className="shrink-0 text-xs text-gray-500">{item.account_id}</span>
+                    </div>
+                    <div className="mt-2 flex gap-2 text-xs text-gray-500">
+                      <span>{`审核：${item.audit_status || '-'}`}</span>
+                      <span>{`状态：${item.status || '-'}`}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {item.seo_override_id ? '已配置独立 SEO' : '使用默认商品信息'}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{selectedItem ? '编辑商品 SEO' : '请选择一个账号'}</CardTitle>
+            <CardDescription>
+              未填写的字段会自动回退到商品标题、商品描述和默认截图。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {selectedItem ? (
+              <>
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="font-medium text-gray-900">{selectedItem.title}</div>
+                      <div className="text-sm text-gray-600">{`${siteUrl}${previewPath}`}</div>
+                    </div>
+                    <Button asChild variant="outline">
+                      <Link href={previewPath} target="_blank">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        打开预览
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="seoTitle">SEO 标题</Label>
+                    <Input
+                      id="seoTitle"
+                      value={form.title}
+                      onChange={(e) => updateForm('title', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ogTitle">OG 标题</Label>
+                    <Input
+                      id="ogTitle"
+                      value={form.ogTitle}
+                      onChange={(e) => updateForm('ogTitle', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="seoDescription">SEO 描述</Label>
+                    <Textarea
+                      id="seoDescription"
+                      rows={4}
+                      value={form.description}
+                      onChange={(e) => updateForm('description', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ogDescription">OG 描述</Label>
+                    <Textarea
+                      id="ogDescription"
+                      rows={4}
+                      value={form.ogDescription}
+                      onChange={(e) => updateForm('ogDescription', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="summary">AI / 搜索摘要</Label>
+                    <Textarea
+                      id="summary"
+                      rows={5}
+                      value={form.summary}
+                      onChange={(e) => updateForm('summary', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ogImage">OG 图片</Label>
+                    <Input
+                      id="ogImage"
+                      value={form.ogImage}
+                      onChange={(e) => updateForm('ogImage', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <div className="font-medium text-gray-900">允许搜索引擎收录</div>
+                    <div className="text-sm text-gray-500">关闭后将输出 noindex，并从公开索引列表中排除。</div>
+                  </div>
+                  <Switch
+                    checked={form.indexable}
+                    onCheckedChange={(checked) => updateForm('indexable', checked)}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={handleSave} disabled={saving}>
+                    <Save className="mr-2 h-4 w-4" />
+                    {saving ? '保存中...' : '保存商品 SEO'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-gray-500">
+                先从左侧选择一个商品账号，再配置该详情页的 SEO 信息。
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

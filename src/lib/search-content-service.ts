@@ -21,6 +21,56 @@ export type ContentPageRecord = {
   updated_at: string;
 };
 
+export type EntitySeoOverrideRecord = {
+  id: string;
+  entity_type: string;
+  entity_key: string;
+  title: string;
+  description: string;
+  summary: string;
+  og_title: string;
+  og_description: string;
+  og_image: string;
+  indexable: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EntitySeoOverrideInput = {
+  entityType: string;
+  entityKey: string;
+  title: string;
+  description: string;
+  summary: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  indexable: boolean;
+};
+
+export type AccountSeoListItem = {
+  id: string;
+  account_id: string;
+  title: string;
+  description: string | null;
+  account_value: string | null;
+  recommended_rental: string | null;
+  deposit: string;
+  screenshots: unknown;
+  status: string | null;
+  audit_status: string | null;
+  is_deleted: boolean | null;
+  updated_at: string | null;
+  seo_override_id: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_summary: string | null;
+  seo_og_title: string | null;
+  seo_og_description: string | null;
+  seo_og_image: string | null;
+  seo_indexable: boolean | null;
+};
+
 export type ContentPageInput = {
   slug: string;
   pageType: string;
@@ -71,6 +121,14 @@ function normalizeFaqJson(value: unknown) {
   }
 
   return [];
+}
+
+function normalizeEntityType(entityType: string) {
+  return entityType.trim().toLowerCase();
+}
+
+function normalizeEntityKey(entityKey: string) {
+  return entityKey.trim();
 }
 
 export async function listContentPages() {
@@ -231,5 +289,139 @@ export async function deleteContentPage(id: string) {
   await sqlClient`
     DELETE FROM content_pages
     WHERE id = ${id}
+  `;
+}
+
+export async function getEntitySeoOverride(entityType: string, entityKey: string) {
+  const rows = await sqlClient<EntitySeoOverrideRecord[]>`
+    SELECT *
+    FROM seo_entity_overrides
+    WHERE entity_type = ${normalizeEntityType(entityType)}
+      AND entity_key = ${normalizeEntityKey(entityKey)}
+    LIMIT 1
+  `;
+
+  return rows[0] || null;
+}
+
+export async function upsertEntitySeoOverride(input: EntitySeoOverrideInput) {
+  const entityType = normalizeEntityType(input.entityType);
+  const entityKey = normalizeEntityKey(input.entityKey);
+
+  if (!entityType || !entityKey) {
+    throw new SearchContentError('INVALID_ENTITY_KEY');
+  }
+
+  const rows = await sqlClient<EntitySeoOverrideRecord[]>`
+    INSERT INTO seo_entity_overrides (
+      entity_type,
+      entity_key,
+      title,
+      description,
+      summary,
+      og_title,
+      og_description,
+      og_image,
+      indexable,
+      created_at,
+      updated_at
+    ) VALUES (
+      ${entityType},
+      ${entityKey},
+      ${input.title},
+      ${input.description},
+      ${input.summary},
+      ${input.ogTitle},
+      ${input.ogDescription},
+      ${input.ogImage},
+      ${input.indexable},
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (entity_type, entity_key)
+    DO UPDATE SET
+      title = EXCLUDED.title,
+      description = EXCLUDED.description,
+      summary = EXCLUDED.summary,
+      og_title = EXCLUDED.og_title,
+      og_description = EXCLUDED.og_description,
+      og_image = EXCLUDED.og_image,
+      indexable = EXCLUDED.indexable,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING *
+  `;
+
+  return rows[0] || null;
+}
+
+export async function listAccountSeoOverrides(search?: string) {
+  const keyword = search?.trim();
+  if (keyword) {
+    return sqlClient<AccountSeoListItem[]>`
+      SELECT
+        a.id,
+        a.account_id,
+        a.title,
+        a.description,
+        a.account_value,
+        a.recommended_rental,
+        a.deposit,
+        a.screenshots,
+        a.status,
+        a.audit_status,
+        a.is_deleted,
+        a.updated_at,
+        s.id AS seo_override_id,
+        s.title AS seo_title,
+        s.description AS seo_description,
+        s.summary AS seo_summary,
+        s.og_title AS seo_og_title,
+        s.og_description AS seo_og_description,
+        s.og_image AS seo_og_image,
+        s.indexable AS seo_indexable
+      FROM accounts a
+      LEFT JOIN seo_entity_overrides s
+        ON s.entity_type = 'account'
+       AND s.entity_key = a.account_id
+      WHERE a.is_deleted = false
+        AND (
+          a.account_id ILIKE ${`%${keyword}%`}
+          OR a.title ILIKE ${`%${keyword}%`}
+          OR COALESCE(a.description, '') ILIKE ${`%${keyword}%`}
+        )
+      ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  return sqlClient<AccountSeoListItem[]>`
+    SELECT
+      a.id,
+      a.account_id,
+      a.title,
+      a.description,
+      a.account_value,
+      a.recommended_rental,
+      a.deposit,
+      a.screenshots,
+      a.status,
+      a.audit_status,
+      a.is_deleted,
+      a.updated_at,
+      s.id AS seo_override_id,
+      s.title AS seo_title,
+      s.description AS seo_description,
+      s.summary AS seo_summary,
+      s.og_title AS seo_og_title,
+      s.og_description AS seo_og_description,
+      s.og_image AS seo_og_image,
+      s.indexable AS seo_indexable
+    FROM accounts a
+    LEFT JOIN seo_entity_overrides s
+      ON s.entity_type = 'account'
+     AND s.entity_key = a.account_id
+    WHERE a.is_deleted = false
+    ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
+    LIMIT 100
   `;
 }
