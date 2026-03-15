@@ -1307,125 +1307,131 @@ export default function UserCenterPage() {
 
             {/* 我的钱包 */}
             <TabsContent value="wallet">
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {balance && (
                   <>
-                    {/* 余额卡片 */}
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium text-gray-600">可用余额</CardTitle>
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] md:items-start">
+                      {/* 充值与提现 */}
+                      <Card className="order-1">
+                        <CardHeader className="pb-3 sm:pb-6">
+                          <CardTitle>充值与提现</CardTitle>
+                          <CardDescription className="sm:hidden">
+                            常用操作放在前面，首屏可直接充值
+                          </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-gray-900">
-                            {formatBalance(balance.available_balance)}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">可提现金额</p>
+                        <CardContent className="pt-0 sm:pt-6">
+                          <Tabs defaultValue="recharge">
+                            <TabsList className="grid h-auto w-full grid-cols-2">
+                              <TabsTrigger value="recharge">充值</TabsTrigger>
+                              <TabsTrigger value="withdraw">提现</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="recharge" className="space-y-3 sm:space-y-4">
+                              <div className="space-y-2">
+                                <Label>充值金额</Label>
+                                <Input
+                                  type="number"
+                                  placeholder="请输入充值金额"
+                                  value={rechargeAmount}
+                                  onChange={(e) => setRechargeAmount(e.target.value)}
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[100, 200, 500, 1000].map((amount) => (
+                                  <Button
+                                    key={amount}
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-0"
+                                    onClick={() => setRechargeAmount(amount.toString())}
+                                  >
+                                    ¥{amount}
+                                  </Button>
+                                ))}
+                              </div>
+                              <Button onClick={handleRecharge} className="w-full">
+                                立即充值
+                              </Button>
+                            </TabsContent>
+
+                            <TabsContent value="withdraw" className="space-y-3 sm:space-y-4">
+                              <div className="space-y-2">
+                                <Label>提现金额</Label>
+                                <Input
+                                  type="number"
+                                  placeholder="请输入提现金额"
+                                  value={withdrawAmount}
+                                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>提现账户</Label>
+                                <Input
+                                  placeholder="提现将直接打款到当前绑定微信"
+                                  value={withdrawAccountDisplayValue}
+                                  disabled={hasBoundWechatWithdrawAccount}
+                                  onChange={(e) => setWithdrawAccount(e.target.value)}
+                                />
+                              </div>
+                              {hasBoundWechatWithdrawAccount ? (
+                                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                  已绑定微信账号，提现时会直接打款到当前微信，无需手动输入微信号。
+                                </div>
+                              ) : (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                                  当前账号未绑定微信，请先使用微信授权登录后再提现。
+                                </div>
+                              )}
+                              <Button onClick={handleWechatWithdraw} className="w-full" disabled={!hasBoundWechatWithdrawAccount}>
+                                申请提现
+                              </Button>
+                              <p className="text-center text-xs text-gray-500">
+                                {`* 提现手续费 ${walletUiSettings.withdrawalFee}%`}
+                              </p>
+                            </TabsContent>
+                          </Tabs>
                         </CardContent>
                       </Card>
 
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium text-gray-600">冻结余额</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                            {formatBalance(balance.frozen_balance)}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">订单押金等</p>
-                        </CardContent>
-                      </Card>
+                      {/* 余额卡片 */}
+                      <div className="order-2 grid gap-3 grid-cols-2 md:grid-cols-1">
+                        <Card className="col-span-2 md:col-span-1">
+                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                            <CardTitle className="text-sm font-medium text-gray-600">可用余额</CardTitle>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
+                            <div className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                              {formatBalance(balance.available_balance)}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">可提现金额</p>
+                          </CardContent>
+                        </Card>
 
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium text-gray-600">总余额</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-green-600">
-                            {formatBalance(balance.total_balance)}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">可用 + 冻结</p>
-                        </CardContent>
-                      </Card>
+                        <Card>
+                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                            <CardTitle className="text-sm font-medium text-gray-600">冻结余额</CardTitle>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
+                            <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-3xl">
+                              {formatBalance(balance.frozen_balance)}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">订单押金等</p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                            <CardTitle className="text-sm font-medium text-gray-600">总余额</CardTitle>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
+                            <div className="text-xl font-bold text-green-600 sm:text-3xl">
+                              {formatBalance(balance.total_balance)}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">可用 + 冻结</p>
+                          </CardContent>
+                        </Card>
+                      </div>
                     </div>
-
-                    {/* 充值与提现 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>充值与提现</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Tabs defaultValue="recharge">
-                          <TabsList className="grid h-auto w-full grid-cols-2">
-                            <TabsTrigger value="recharge">充值</TabsTrigger>
-                            <TabsTrigger value="withdraw">提现</TabsTrigger>
-                          </TabsList>
-
-                          <TabsContent value="recharge" className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>充值金额</Label>
-                              <Input
-                                type="number"
-                                placeholder="请输入充值金额"
-                                value={rechargeAmount}
-                                onChange={(e) => setRechargeAmount(e.target.value)}
-                              />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {[100, 200, 500, 1000].map((amount) => (
-                                <Button
-                                  key={amount}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setRechargeAmount(amount.toString())}
-                                >
-                                  ¥{amount}
-                                </Button>
-                              ))}
-                            </div>
-                            <Button onClick={handleRecharge} className="w-full">
-                              立即充值
-                            </Button>
-                          </TabsContent>
-
-                          <TabsContent value="withdraw" className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>提现金额</Label>
-                              <Input
-                                type="number"
-                                placeholder="请输入提现金额"
-                                value={withdrawAmount}
-                                onChange={(e) => setWithdrawAmount(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>提现账户</Label>
-                              <Input
-                                placeholder="提现将直接打款到当前绑定微信"
-                                value={withdrawAccountDisplayValue}
-                                disabled={hasBoundWechatWithdrawAccount}
-                                onChange={(e) => setWithdrawAccount(e.target.value)}
-                              />
-                            </div>
-                            {hasBoundWechatWithdrawAccount ? (
-                              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                已绑定微信账号，提现时会直接打款到当前微信，无需手动输入微信号。
-                              </div>
-                            ) : (
-                              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                                当前账号未绑定微信，请先使用微信授权登录后再提现。
-                              </div>
-                            )}
-                            <Button onClick={handleWechatWithdraw} className="w-full" disabled={!hasBoundWechatWithdrawAccount}>
-                              申请提现
-                            </Button>
-                            <p className="text-xs text-gray-500 text-center">
-                              {`* 提现手续费 ${walletUiSettings.withdrawalFee}%`}
-                            </p>
-                          </TabsContent>
-                        </Tabs>
-                      </CardContent>
-                    </Card>
                   </>
                 )}
 
