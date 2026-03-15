@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { initAdminTable } from './init-admin';
 import { initAgreementsTable } from './init-agreements';
+import { initSearchContentTables } from './init-search-content';
 import { ensureUserBalanceSchema } from './init-user-balance';
 import { smsConfigManager } from '../storage/database/smsConfigManager';
 import * as adminSchema from '../storage/database/shared/admin-schema';
@@ -62,6 +63,7 @@ export async function ensureDatabaseInitialized() {
         await Promise.all([
           ensureAdminInitialized(),
           ensureAgreementsInitialized(),
+          initSearchContentTables(),
           ensureUserBalanceSchema(),
           ensureSmsConfigsInitialized(),
         ]);

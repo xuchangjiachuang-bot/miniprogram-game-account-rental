@@ -14,6 +14,7 @@ import {
   MessageSquare,
   MessageSquareText,
   RefreshCw,
+  Search,
   Settings,
   Shield,
   ShieldCheck,
@@ -59,6 +60,7 @@ const defaultMenuItems = [
   { id: 'skins', title: '皮肤管理', href: '/admin/skins', icon: LayoutDashboard },
   { id: 'commission-activities', title: '优惠活动', href: '/admin/commission-activities', icon: RefreshCw },
   { id: 'settings', title: '配置中心', href: '/admin/settings', icon: Settings },
+  { id: 'search-content', title: '\u5185\u5bb9\u4e0e\u641c\u7d22', href: '/admin/search-content', icon: Search },
 ] as const;
 
 type MenuItem = (typeof defaultMenuItems)[number];
