@@ -57,6 +57,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: resolvedSeo.title,
     description: resolvedSeo.description,
+    alternates: {
+      canonical: `${siteUrl}/accounts/${account.accountId}`,
+    },
     robots: {
       index: Boolean(indexable),
       follow: Boolean(indexable),

@@ -38,6 +38,9 @@ export async function generateContentPageMetadata(
   return {
     title: resolvedSeo.title,
     description: resolvedSeo.description,
+    alternates: {
+      canonical: `${siteUrl}/${page.page_type}/${page.slug}`,
+    },
     robots: {
       index: Boolean(page.indexable),
       follow: Boolean(page.indexable),
@@ -47,6 +50,7 @@ export async function generateContentPageMetadata(
       description: resolvedSeo.ogDescription,
       images: resolvedSeo.ogImage ? [resolvedSeo.ogImage] : undefined,
       type: 'article',
+      url: `${siteUrl}/${page.page_type}/${page.slug}`,
     },
   };
 }

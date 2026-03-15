@@ -51,6 +51,10 @@ function cleanText(value: string | null | undefined) {
 
 function trimText(value: string, maxLength: number) {
   const text = cleanText(value);
+  if (!text) {
+    return '';
+  }
+
   if (text.length <= maxLength) {
     return text;
   }
@@ -67,11 +71,11 @@ function firstImage(value: unknown) {
   return typeof image === 'string' ? image : '';
 }
 
-function safeFaqCount(value: unknown) {
+function faqCount(value: unknown) {
   return Array.isArray(value) ? value.length : 0;
 }
 
-function toPriceText(value: string | number | null | undefined) {
+function priceText(value: string | number | null | undefined) {
   const text = cleanText(value == null ? '' : String(value));
   return text || '0';
 }
@@ -80,24 +84,24 @@ export function buildAutoContentPageSeo(page: ContentPageLike): ResolvedSeoField
   const pageTypeLabel = PAGE_TYPE_LABELS[page.page_type] || '内容页面';
   const summary = cleanText(page.summary);
   const contentSnippet = trimText(page.content, 80);
-  const faqCount = safeFaqCount(page.faq_json);
+  const totalFaq = faqCount(page.faq_json);
 
   const title = trimText(`${page.title} - ${pageTypeLabel} - 游戏账号租赁平台`, 60);
   const description = trimText(
     summary ||
-      `${page.title}，为你提供${pageTypeLabel}说明、交易指引和常见问题解答。${contentSnippet}`,
+      `${page.title}，提供${pageTypeLabel}说明、交易指引和常见问题解答。${contentSnippet}`,
     140,
   );
-  const aiSummary = trimText(
+  const autoSummary = trimText(
     summary ||
-      `${page.title}属于${pageTypeLabel}内容，用于帮助用户快速理解规则、流程和常见问题。${faqCount > 0 ? `包含 ${faqCount} 个常见问题。` : ''} ${contentSnippet}`,
+      `${page.title}属于${pageTypeLabel}内容，用于帮助用户快速理解规则、流程和常见问题。${totalFaq > 0 ? `包含 ${totalFaq} 个常见问题。` : ''} ${contentSnippet}`,
     150,
   );
 
   return {
     title,
     description,
-    summary: aiSummary,
+    summary: autoSummary,
     ogTitle: trimText(`${page.title} | ${pageTypeLabel}`, 48),
     ogDescription: trimText(description, 110),
     ogImage: cleanText(page.og_image),
@@ -118,9 +122,11 @@ export function resolveContentPageSeo(page: ContentPageLike): ResolvedSeoFields 
 }
 
 export function buildAutoAccountSeo(account: AccountLike): ResolvedSeoFields {
-  const coins = toPriceText(account.coinsM ?? account.coins_m);
-  const deposit = toPriceText(account.deposit);
-  const price = toPriceText(account.accountValue ?? account.account_value ?? account.recommendedRental ?? account.recommended_rental);
+  const coins = priceText(account.coinsM ?? account.coins_m);
+  const deposit = priceText(account.deposit);
+  const price = priceText(
+    account.accountValue ?? account.account_value ?? account.recommendedRental ?? account.recommended_rental,
+  );
   const accountId = cleanText(account.accountId ?? account.account_id);
   const descriptionText = cleanText(account.description);
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Plus, Save, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { ExternalLink, Plus, RefreshCw, Save, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { buildAutoContentPageSeo } from '@/lib/seo-auto';
 
 type ContentPage = {
   id: string;
@@ -80,7 +81,7 @@ function trimPreviewText(value: string, maxLength: number) {
     return '';
   }
 
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
 function normalizeFaqItems(value: unknown): FaqItem[] {
@@ -162,13 +163,26 @@ export default function SearchContentPage() {
     return `/${form.pageType}/${normalizedSlug}`;
   }, [form.pageType, normalizedSlug]);
 
-  const searchPreviewTitle = form.seoTitle.trim() || form.title.trim() || '页面标题预览';
+  const autoSeo = useMemo(
+    () =>
+      buildAutoContentPageSeo({
+        page_type: form.pageType,
+        title: form.title,
+        summary: form.summary,
+        content: form.content,
+        faq_json: form.faqItems,
+        og_image: form.ogImage,
+      }),
+    [form.content, form.faqItems, form.ogImage, form.pageType, form.summary, form.title],
+  );
+
+  const searchPreviewTitle = form.seoTitle.trim() || autoSeo.title || '页面标题预览';
   const searchPreviewDescription =
-    form.seoDescription.trim() || form.summary.trim() || '这里会显示搜索结果中的描述摘要。';
-  const sharePreviewTitle = form.ogTitle.trim() || searchPreviewTitle;
-  const sharePreviewDescription = form.ogDescription.trim() || searchPreviewDescription;
-  const aiPreviewSummary =
-    form.seoSummary.trim() || form.summary.trim() || '这里会显示 AI / GEO 摘要，用于搜索和内容理解。';
+    form.seoDescription.trim() || autoSeo.description || '这里会显示搜索结果中的描述摘要。';
+  const sharePreviewTitle = form.ogTitle.trim() || autoSeo.ogTitle || searchPreviewTitle;
+  const sharePreviewDescription =
+    form.ogDescription.trim() || autoSeo.ogDescription || searchPreviewDescription;
+  const aiPreviewSummary = form.seoSummary.trim() || autoSeo.summary || '这里会显示 AI / GEO 摘要。';
 
   const slugConflict = useMemo(
     () =>
@@ -212,6 +226,19 @@ export default function SearchContentPage() {
   const handleCreate = () => {
     setSelectedId('');
     setForm(emptyForm);
+  };
+
+  const handleApplyAutoSeo = () => {
+    setForm((current) => ({
+      ...current,
+      seoTitle: autoSeo.title,
+      seoDescription: autoSeo.description,
+      seoSummary: autoSeo.summary,
+      ogTitle: autoSeo.ogTitle,
+      ogDescription: autoSeo.ogDescription,
+      ogImage: current.ogImage || autoSeo.ogImage,
+    }));
+    toast.success('已应用自动 SEO 建议');
   };
 
   const handleSave = async () => {
@@ -301,7 +328,7 @@ export default function SearchContentPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">内容与搜索</h1>
           <p className="text-sm text-gray-600">
-            管理帮助页、规则页和基础 SEO/GEO 内容，不影响现有业务页面。
+            管理帮助页、规则页、专题页和类目页的 SEO/GEO 内容，不影响现有业务页面。
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -322,7 +349,7 @@ export default function SearchContentPage() {
         <Card>
           <CardHeader>
             <CardTitle>内容页列表</CardTitle>
-            <CardDescription>先从帮助页、规则页和专题页开始。</CardDescription>
+            <CardDescription>先从帮助页、规则页、专题页和类目页开始。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? (
@@ -354,7 +381,7 @@ export default function SearchContentPage() {
           <CardHeader>
             <CardTitle>{form.id ? '编辑内容页' : '新建内容页'}</CardTitle>
             <CardDescription>
-              公开内容页会用于搜索引擎收录、FAQ 摘要和 sitemap。
+              公开内容页会用于搜索收录、FAQ 摘要和 sitemap。留空的 SEO 字段会自动生成。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -392,9 +419,7 @@ export default function SearchContentPage() {
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
                 <Input id="slug" value={form.slug} onChange={(e) => updateForm('slug', e.target.value)} />
-                {normalizedSlug ? (
-                  <p className="text-xs text-gray-500">{`规范化后：${normalizedSlug}`}</p>
-                ) : null}
+                {normalizedSlug ? <p className="text-xs text-gray-500">{`规范化后：${normalizedSlug}`}</p> : null}
                 {slugConflict ? (
                   <p className="text-xs text-red-500">{`slug 冲突：已存在《${slugConflict.title}》`}</p>
                 ) : null}
@@ -409,14 +434,20 @@ export default function SearchContentPage() {
                     {previewPath ? `${siteUrl}${previewPath}` : '填写 slug 后生成预览链接'}
                   </div>
                 </div>
-                {previewPath ? (
-                  <Button asChild variant="outline">
-                    <Link href={previewPath} target="_blank">
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      打开预览
-                    </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={handleApplyAutoSeo}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    应用自动 SEO
                   </Button>
-                ) : null}
+                  {previewPath ? (
+                    <Button asChild variant="outline">
+                      <Link href={previewPath} target="_blank">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        打开预览
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -434,7 +465,7 @@ export default function SearchContentPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>FAQ</Label>
-                  <p className="text-xs text-gray-500">建议维护用户真实会问的问题，方便搜索和 AI 引用。</p>
+                  <p className="text-xs text-gray-500">维护真实用户常见问题，方便搜索和 AI 引用。</p>
                 </div>
                 <Button type="button" variant="outline" onClick={addFaqItem}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -498,7 +529,7 @@ export default function SearchContentPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="seoSummary">AI 摘要友好简介</Label>
+                <Label htmlFor="seoSummary">AI / 搜索摘要</Label>
                 <Textarea id="seoSummary" value={form.seoSummary} onChange={(e) => updateForm('seoSummary', e.target.value)} rows={4} />
               </div>
               <div className="space-y-2">
@@ -525,7 +556,7 @@ export default function SearchContentPage() {
                 <div className="text-sm font-medium text-gray-900">社交分享预览</div>
                 <div className="mt-4 overflow-hidden rounded-xl border bg-gray-50">
                   <div className="flex h-32 items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-sm text-gray-500">
-                    {form.ogImage.trim() ? '已配置 OG 图片' : '未配置 OG 图片'}
+                    {(form.ogImage.trim() || autoSeo.ogImage) ? '已配置 OG 图片' : '未配置 OG 图片'}
                   </div>
                   <div className="space-y-2 p-4">
                     <div className="font-medium text-gray-900">{trimPreviewText(sharePreviewTitle, 48)}</div>
@@ -546,6 +577,13 @@ export default function SearchContentPage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-dashed bg-gray-50 p-4 text-sm text-gray-600">
+              <div className="font-medium text-gray-900">自动 SEO 规则</div>
+              <p className="mt-2">
+                系统会自动组合页面标题、摘要、正文和 FAQ 生成默认 SEO 文案。你也可以点击“应用自动 SEO”，把建议回填到表单后再微调。
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">
