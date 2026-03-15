@@ -223,6 +223,7 @@ export const userBalances = pgTable("user_balances", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: varchar("user_id", { length: 36 }).notNull(),
 	availableBalance: numeric("available_balance", { precision: 10, scale:  2 }).default('0'),
+	nonWithdrawableBalance: numeric("non_withdrawable_balance", { precision: 10, scale:  2 }).default('0'),
 	frozenBalance: numeric("frozen_balance", { precision: 10, scale:  2 }).default('0'),
 	totalWithdrawn: numeric("total_withdrawn", { precision: 10, scale:  2 }).default('0'),
 	totalEarned: numeric("total_earned", { precision: 10, scale:  2 }).default('0'),

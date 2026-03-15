@@ -10,6 +10,8 @@ function mapWithdrawalMessage(message: string) {
       return '提现金额过小，扣除手续费后实际到账金额必须大于 0';
     case 'INSUFFICIENT_AVAILABLE_BALANCE':
       return '提现金额超过可用余额';
+    case 'NON_WITHDRAWABLE_BALANCE_LIMIT':
+      return '当前可用余额中包含测试充值金额，测试充值不可提现';
     case 'WITHDRAWAL_CREATED':
       return '提现申请已提交，等待审核';
     case 'WITHDRAWAL_APPROVED':
@@ -49,14 +51,14 @@ export async function POST(request: NextRequest) {
     if (requestedType !== 'wechat') {
       return NextResponse.json(
         { success: false, error: '当前仅支持微信提现，请先使用微信授权登录' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!user.wechat_openid) {
       return NextResponse.json(
         { success: false, error: '当前账号未绑定微信，无法发起微信提现' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error.message || '申请提现失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -131,7 +133,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error.message || '获取提现记录失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

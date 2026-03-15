@@ -11,6 +11,7 @@ import {
 export interface UserBalance {
   userId: string;
   availableBalance: number;
+  nonWithdrawableBalance: number;
   frozenBalance: number;
   totalWithdrawn: number;
   totalEarned: number;
@@ -40,6 +41,7 @@ function toUserBalance(record: typeof userBalances.$inferSelect): UserBalance {
   return {
     userId: record.userId,
     availableBalance: toNumber(record.availableBalance),
+    nonWithdrawableBalance: toNumber(record.nonWithdrawableBalance),
     frozenBalance: toNumber(record.frozenBalance),
     totalWithdrawn: toNumber(record.totalWithdrawn),
     totalEarned: toNumber(record.totalEarned),
@@ -96,6 +98,7 @@ export async function ensureUserBalance(userId: string): Promise<UserBalance> {
       id: randomUUID(),
       userId,
       availableBalance: '0',
+      nonWithdrawableBalance: '0',
       frozenBalance: '0',
       totalWithdrawn: '0',
       totalEarned: '0',
@@ -154,6 +157,54 @@ export async function addAvailableBalance(
     };
   } catch (error: any) {
     console.error('[user-balance] addAvailableBalance failed:', error);
+    return {
+      success: false,
+      message: error?.message || 'BALANCE_UPDATE_FAILED',
+      oldBalance: 0,
+      newBalance: 0,
+    };
+  }
+}
+
+export async function addNonWithdrawableBalance(
+  userId: string,
+  amount: number,
+  description = 'Test balance adjusted',
+): Promise<BalanceUpdateResult> {
+  try {
+    const balance = await ensureUserBalance(userId);
+    const oldBalance = balance.availableBalance;
+    const newBalance = oldBalance + amount;
+    const newTotalEarned = balance.totalEarned + amount;
+    const newNonWithdrawableBalance = balance.nonWithdrawableBalance + amount;
+
+    await db
+      .update(userBalances)
+      .set({
+        availableBalance: newBalance.toFixed(2),
+        nonWithdrawableBalance: newNonWithdrawableBalance.toFixed(2),
+        totalEarned: newTotalEarned.toFixed(2),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(userBalances.userId, userId));
+
+    await insertBalanceTransaction({
+      userId,
+      transactionType: 'test_deposit',
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      description,
+    });
+
+    return {
+      success: true,
+      message: 'BALANCE_UPDATED',
+      oldBalance,
+      newBalance,
+    };
+  } catch (error: any) {
+    console.error('[user-balance] addNonWithdrawableBalance failed:', error);
     return {
       success: false,
       message: error?.message || 'BALANCE_UPDATE_FAILED',
@@ -300,10 +351,16 @@ export async function requestWithdrawal(
     }
 
     const balance = await ensureUserBalance(userId);
-    if (balance.availableBalance < amount) {
+    const withdrawableBalance = Math.max(
+      balance.availableBalance - balance.nonWithdrawableBalance,
+      0,
+    );
+    if (withdrawableBalance < amount) {
       return {
         success: false,
-        message: 'INSUFFICIENT_AVAILABLE_BALANCE',
+        message: balance.availableBalance >= amount
+          ? 'NON_WITHDRAWABLE_BALANCE_LIMIT'
+          : 'INSUFFICIENT_AVAILABLE_BALANCE',
       };
     }
 

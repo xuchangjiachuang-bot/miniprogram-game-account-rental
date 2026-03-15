@@ -3,6 +3,7 @@ import postgres from 'postgres';
 import { initAdminTable } from './init-admin';
 import { initAgreementsTable } from './init-agreements';
 import { initDefaultPaymentConfigs } from './payment/config';
+import { ensureUserBalanceSchema } from './init-user-balance';
 import { smsConfigManager } from '../storage/database/smsConfigManager';
 import * as adminSchema from '../storage/database/shared/admin-schema';
 
@@ -72,6 +73,7 @@ export async function ensureDatabaseInitialized() {
           ensureAdminInitialized(),
           ensureAgreementsInitialized(),
           ensurePaymentConfigsInitialized(),
+          ensureUserBalanceSchema(),
           ensureSmsConfigsInitialized(),
         ]);
         console.log('[Database] 初始化完成');

@@ -2,7 +2,7 @@
 import { eq } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/admin-auth';
 import { db, users } from '@/lib/db';
-import { addAvailableBalance, ensureUserBalance } from '@/lib/user-balance-service';
+import { addNonWithdrawableBalance, ensureUserBalance } from '@/lib/user-balance-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const user = userList[0];
     await ensureUserBalance(user.id);
 
-    const result = await addAvailableBalance(
+    const result = await addNonWithdrawableBalance(
       user.id,
       amount,
       `${reason}（管理员：${auth.admin.username}）`,
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
         nickname: user.nickname,
         amount,
+        nonWithdrawable: true,
         oldBalance: result.oldBalance,
         newBalance: result.newBalance,
       },
