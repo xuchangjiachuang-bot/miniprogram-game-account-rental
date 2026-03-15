@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { accounts, chatMessages, db, groupChatMembers, groupChats, orders, users } from '@/lib/db';
+import { ensurePlatformCustomerServiceMember } from '@/lib/platform-customer-service-user';
 
 export interface ChatGroupMemberSummary {
   id: string;
@@ -37,7 +38,7 @@ type ChatMemberRole = 'buyer' | 'seller' | 'admin';
 
 function formatUserName(
   user?: { nickname?: string | null; phone?: string | null },
-  role?: string
+  role?: string,
 ) {
   if (role === 'system') {
     return '系统';
@@ -74,10 +75,7 @@ async function getMembershipRecord(groupId: string, userId: string) {
   const result = await db
     .select()
     .from(groupChatMembers)
-    .where(and(
-      eq(groupChatMembers.groupChatId, groupId),
-      eq(groupChatMembers.userId, userId),
-    ))
+    .where(and(eq(groupChatMembers.groupChatId, groupId), eq(groupChatMembers.userId, userId)))
     .limit(1);
 
   return result[0] || null;
@@ -148,6 +146,21 @@ async function loadLastMessages(groupIds: string[]) {
   return map;
 }
 
+async function ensureSupportMemberForExistingGroup(groupId: string) {
+  const supportMember = await ensurePlatformCustomerServiceMember({ groupChatId: groupId });
+
+  if (supportMember.inserted) {
+    await db.insert(chatMessages).values({
+      groupChatId: groupId,
+      senderId: supportMember.user.id,
+      senderType: 'system',
+      content: `${supportMember.user.nickname}已加入群聊，将协助处理交易、售后和纠纷问题。`,
+      messageType: 'system',
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
 export async function ensureOrderGroupChat(orderId: string): Promise<{
   id: string;
   orderId: string;
@@ -155,13 +168,10 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
   createdAt: string;
   updatedAt: string;
 }> {
-  const existing = await db
-    .select()
-    .from(groupChats)
-    .where(eq(groupChats.orderId, orderId))
-    .limit(1);
+  const existing = await db.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
 
   if (existing[0]) {
+    await ensureSupportMemberForExistingGroup(existing[0].id);
     return {
       ...existing[0],
       createdAt: existing[0].createdAt || '',
@@ -191,11 +201,7 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
   const title = buildOrderChatTitle(order.accountTitle, order.orderNo);
 
   const inserted = await db.transaction(async (tx) => {
-    const duplicated = await tx
-      .select()
-      .from(groupChats)
-      .where(eq(groupChats.orderId, orderId))
-      .limit(1);
+    const duplicated = await tx.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
 
     if (duplicated[0]) {
       return {
@@ -215,6 +221,12 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
       })
       .returning();
 
+    const supportMember = await ensurePlatformCustomerServiceMember({
+      groupChatId: group.id,
+      executor: tx,
+      joinedAt: now,
+    });
+
     await tx.insert(groupChatMembers).values([
       {
         groupChatId: group.id,
@@ -228,13 +240,23 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
         role: 'seller',
         joinedAt: now,
       },
+      ...(supportMember.inserted
+        ? [
+            {
+              groupChatId: group.id,
+              userId: supportMember.user.id,
+              role: 'admin' as const,
+              joinedAt: now,
+            },
+          ]
+        : []),
     ]);
 
     await tx.insert(chatMessages).values({
       groupChatId: group.id,
-      senderId: order.sellerId,
+      senderId: supportMember.user.id,
       senderType: 'system',
-      content: '订单群聊已创建，买卖双方可在这里沟通交付、使用和验号问题。',
+      content: `${supportMember.user.nickname}已加入群聊，买卖双方可在这里沟通交易、使用、验号和售后问题。`,
       messageType: 'system',
       createdAt: now,
     });
@@ -259,14 +281,12 @@ export async function isUserInGroup(groupId: string, userId: string): Promise<bo
 }
 
 export async function getGroupMembers(groupId: string): Promise<ChatGroupMemberSummary[]> {
+  await ensureSupportMemberForExistingGroup(groupId);
   return loadGroupMembers(groupId);
 }
 
 export async function getUserGroups(userId: string): Promise<ChatGroupSummary[]> {
-  const memberships = await db
-    .select()
-    .from(groupChatMembers)
-    .where(eq(groupChatMembers.userId, userId));
+  const memberships = await db.select().from(groupChatMembers).where(eq(groupChatMembers.userId, userId));
 
   if (memberships.length === 0) {
     return [];
@@ -279,17 +299,21 @@ export async function getUserGroups(userId: string): Promise<ChatGroupSummary[]>
     .where(inArray(groupChats.id, groupIds))
     .orderBy(desc(groupChats.updatedAt));
 
+  await Promise.all(groups.map((group) => ensureSupportMemberForExistingGroup(group.id)));
+
   const lastMessageMap = await loadLastMessages(groupIds);
 
-  const summaries = await Promise.all(groups.map(async (group) => ({
-    id: group.id,
-    orderId: group.orderId,
-    orderTitle: group.title,
-    members: await loadGroupMembers(group.id),
-    createdAt: group.createdAt || '',
-    updatedAt: group.updatedAt || group.createdAt || '',
-    lastMessage: lastMessageMap.get(group.id),
-  })));
+  const summaries = await Promise.all(
+    groups.map(async (group) => ({
+      id: group.id,
+      orderId: group.orderId,
+      orderTitle: group.title,
+      members: await loadGroupMembers(group.id),
+      createdAt: group.createdAt || '',
+      updatedAt: group.updatedAt || group.createdAt || '',
+      lastMessage: lastMessageMap.get(group.id),
+    })),
+  );
 
   return summaries;
 }
@@ -300,12 +324,9 @@ export async function getGroupForUser(groupId: string, userId: string): Promise<
     return null;
   }
 
-  const groups = await db
-    .select()
-    .from(groupChats)
-    .where(eq(groupChats.id, groupId))
-    .limit(1);
+  await ensureSupportMemberForExistingGroup(groupId);
 
+  const groups = await db.select().from(groupChats).where(eq(groupChats.id, groupId)).limit(1);
   const group = groups[0];
   if (!group) {
     return null;
@@ -362,12 +383,14 @@ export async function getMessage(messageId: string): Promise<ChatMessageSummary 
 export async function getGroupMessagesForUser(
   groupId: string,
   userId: string,
-  limit = 50
+  limit = 50,
 ): Promise<ChatMessageSummary[]> {
   const membership = await getMembershipRecord(groupId, userId);
   if (!membership) {
     throw new Error('CHAT_GROUP_FORBIDDEN');
   }
+
+  await ensureSupportMemberForExistingGroup(groupId);
 
   const messages = await db
     .select({
@@ -428,10 +451,7 @@ export async function sendGroupMessageForUser(params: {
     })
     .returning();
 
-  await db
-    .update(groupChats)
-    .set({ updatedAt: now })
-    .where(eq(groupChats.id, params.groupId));
+  await db.update(groupChats).set({ updatedAt: now }).where(eq(groupChats.id, params.groupId));
 
   const senderRows = await db
     .select({

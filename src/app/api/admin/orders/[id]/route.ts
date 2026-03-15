@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, orders } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { db, orders } from '@/lib/db';
+import { getOrderDispute } from '@/lib/dispute-service';
 import { requireAdmin } from '@/lib/admin-auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await requireAdmin(request);
@@ -25,15 +26,21 @@ export async function GET(
       return NextResponse.json({ success: false, error: '订单不存在' }, { status: 404 });
     }
 
+    const order = orderList[0];
+    const dispute = await getOrderDispute(order.id);
+
     return NextResponse.json({
       success: true,
-      data: orderList[0],
+      data: {
+        ...order,
+        dispute,
+      },
     });
   } catch (error: any) {
     console.error('获取订单详情失败:', error);
     return NextResponse.json(
       { success: false, error: error.message || '获取订单详情失败' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

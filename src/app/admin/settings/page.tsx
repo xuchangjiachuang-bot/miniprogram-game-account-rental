@@ -39,12 +39,6 @@ interface PlatformSettings {
   autoApproveVerified: boolean;
   listingDepositAmount: number;
   orderPaymentTimeout: number;
-  wechatMpAppId: string;
-  wechatMpAppSecret: string;
-  wechatOpenAppId: string;
-  wechatOpenAppSecret: string;
-  wechatToken: string;
-  wechatEncodingAESKey: string;
 }
 
 interface AgreementData {
@@ -85,12 +79,6 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   autoApproveVerified: false,
   listingDepositAmount: 50,
   orderPaymentTimeout: 1800,
-  wechatMpAppId: '',
-  wechatMpAppSecret: '',
-  wechatOpenAppId: '',
-  wechatOpenAppSecret: '',
-  wechatToken: '',
-  wechatEncodingAESKey: '',
 };
 
 function toNumber(value: string, fallback: number) {
@@ -327,7 +315,7 @@ export default function AdminSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">配置中心</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            业务参数和微信登录配置保存在数据库，可随时修改；微信支付密钥只读 Railway 环境变量，避免互相覆盖。
+            这里只保留当前真实生效的业务参数；微信支付密钥只读 Railway 环境变量，避免后台配置和线上运行时互相覆盖。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -349,7 +337,7 @@ export default function AdminSettingsPage() {
 
       <Tabs defaultValue="business" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="business">业务与登录</TabsTrigger>
+          <TabsTrigger value="business">业务设置</TabsTrigger>
           <TabsTrigger value="payment">微信支付</TabsTrigger>
           <TabsTrigger value="agreements">协议内容</TabsTrigger>
         </TabsList>
@@ -374,10 +362,9 @@ export default function AdminSettingsPage() {
 
           <Alert>
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>微信配置已移出此页</AlertTitle>
+            <AlertTitle>微信登录调试入口已移除</AlertTitle>
             <AlertDescription>
-              微信登录配置仍由现有登录链路读取，但不再放在配置中心编辑，避免和当前真实业务设置混在一起。
-              微信服务器配置只用于公众号服务器验证或消息推送，当前项目主交易链路不依赖它。
+              后台中与微信登录相关的检测、调试和服务器配置入口已经移除，避免继续和当前真实业务配置混用。支付运行状态仍保留在本页，只用于检查 Railway 环境变量是否生效。
             </AlertDescription>
           </Alert>
         </TabsContent>

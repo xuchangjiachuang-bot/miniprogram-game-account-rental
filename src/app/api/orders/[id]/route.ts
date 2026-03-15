@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
+import { getOrderDispute } from '@/lib/dispute-service';
 import { transformDbOrderToApiFormat } from '@/lib/order-service';
 import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
@@ -8,7 +9,7 @@ import { getServerUserId } from '@/lib/server-auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const userId = getServerUserId(request);
@@ -46,9 +47,14 @@ export async function GET(
       return NextResponse.json({ success: false, error: '无权查看该订单' }, { status: 403 });
     }
 
+    const dispute = await getOrderDispute(order.id);
+
     return NextResponse.json({
       success: true,
-      data: transformDbOrderToApiFormat(order),
+      data: {
+        ...transformDbOrderToApiFormat(order),
+        dispute,
+      },
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -56,14 +62,14 @@ export async function GET(
         success: false,
         error: error.message || '获取订单详情失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const userId = getServerUserId(request);
@@ -97,14 +103,17 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: `订单状态不正确，当前状态：${order.status}，只有进行中的订单才能归还`,
+          error: `当前订单状态不能归还：${order.status}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (order.isSettled) {
-      return NextResponse.json({ success: false, error: '订单已经分账，不能重复操作' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: '订单已分账，不能重复操作' },
+        { status: 400 },
+      );
     }
 
     const now = new Date().toISOString();
@@ -124,13 +133,13 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: '账号归还成功，等待卖家验号（48 小时内完成验号）',
+      message: '账号归还成功，等待卖家验号',
       data: {
         orderId: id,
         orderNo: order.orderNo,
         status: 'pending_verification',
         verificationDeadline: deadline,
-        note: '卖家验号通过后，订单将自动完成并分账；若发现异常可发起纠纷。',
+        note: '卖家验号通过后将自动完成并分账，若发现异常可发起纠纷。',
       },
     });
   } catch (error: any) {
@@ -140,7 +149,7 @@ export async function POST(
         success: false,
         error: error.message || '完成订单失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

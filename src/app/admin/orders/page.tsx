@@ -9,6 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+interface OrderDispute {
+  id: string;
+  status: string;
+  disputeType: string;
+  reason: string;
+  resolution?: string | null;
+  initiatorName: string;
+  respondentName: string;
+  createdAt?: string | null;
+  resolvedAt?: string | null;
+}
+
 interface Order {
   id: string;
   orderNo: string;
@@ -32,6 +44,7 @@ interface Order {
   verificationResult?: string;
   verificationRemark?: string;
   disputeReason?: string;
+  dispute?: OrderDispute | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,7 +52,9 @@ interface Order {
 const PAGE_SIZE = 20;
 
 export default function AdminOrders() {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending_payment' | 'pending_verification' | 'active' | 'completed' | 'cancelled' | 'disputed'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'pending_payment' | 'pending_verification' | 'active' | 'completed' | 'cancelled' | 'disputed'
+  >('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,6 +62,8 @@ export default function AdminOrders() {
   const [total, setTotal] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [disputeRemark, setDisputeRemark] = useState('');
+  const [disputeActionLoading, setDisputeActionLoading] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -99,11 +116,45 @@ export default function AdminOrders() {
       }
 
       setSelectedOrder({ ...order, ...result.data });
+      setDisputeRemark(result.data?.dispute?.reason || '');
     } catch (error: any) {
       console.error('加载订单详情失败:', error);
       toast.error(error.message || '加载订单详情失败');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleDisputeDecision = async (decision: 'refund_buyer_full' | 'resume_order' | 'complete_order') => {
+    if (!selectedOrder) {
+      return;
+    }
+
+    try {
+      setDisputeActionLoading(true);
+      const response = await fetch(`/api/admin/orders/${selectedOrder.id}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          decision,
+          remark: disputeRemark,
+        }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || '处理纠纷失败');
+      }
+
+      toast.success(result.message || '纠纷处理成功');
+      await loadOrders();
+      await openOrderDetail(selectedOrder);
+    } catch (error: any) {
+      console.error('处理纠纷失败:', error);
+      toast.error(error.message || '处理纠纷失败');
+    } finally {
+      setDisputeActionLoading(false);
     }
   };
 
@@ -121,6 +172,10 @@ export default function AdminOrders() {
         return <Badge variant="destructive">已取消</Badge>;
       case 'disputed':
         return <Badge className="bg-red-500">争议中</Badge>;
+      case 'refunding':
+        return <Badge className="bg-orange-500">退款中</Badge>;
+      case 'refunded':
+        return <Badge className="bg-slate-500">已退款</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -131,7 +186,7 @@ export default function AdminOrders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">订单管理</h1>
-          <p className="mt-1 text-sm text-gray-600">管理平台的所有订单</p>
+          <p className="mt-1 text-sm text-gray-600">查看订单状态、验收结果与纠纷处理。</p>
         </div>
         <Button variant="outline" onClick={loadOrders} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -156,10 +211,13 @@ export default function AdminOrders() {
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={(value: any) => {
-              setPage(1);
-              setStatusFilter(value);
-            }}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value: typeof statusFilter) => {
+                setPage(1);
+                setStatusFilter(value);
+              }}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="状态筛选" />
               </SelectTrigger>
@@ -215,7 +273,7 @@ export default function AdminOrders() {
                         <p className="text-sm">{order.accountTitle}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">金币数</p>
+                        <p className="text-xs text-gray-500">哈夫币</p>
                         <p className="text-sm">{order.coinsM}M</p>
                       </div>
                     </div>
@@ -268,7 +326,7 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {selectedOrder && (
+      {selectedOrder ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
             <CardHeader>
@@ -283,7 +341,7 @@ export default function AdminOrders() {
                   <p><span className="text-gray-500">买家：</span>{selectedOrder.buyerName}</p>
                   <p><span className="text-gray-500">卖家：</span>{selectedOrder.sellerName}</p>
                   <p><span className="text-gray-500">账号：</span>{selectedOrder.accountTitle}</p>
-                  <p><span className="text-gray-500">金币数：</span>{selectedOrder.coinsM}M</p>
+                  <p><span className="text-gray-500">哈夫币：</span>{selectedOrder.coinsM}M</p>
                 </div>
               </div>
 
@@ -301,23 +359,75 @@ export default function AdminOrders() {
                 <h3 className="mb-2 font-semibold">时间信息</h3>
                 <div className="space-y-1 text-sm">
                   <p><span className="text-gray-500">创建时间：</span>{new Date(selectedOrder.createdAt).toLocaleString('zh-CN')}</p>
-                  {selectedOrder.paymentTime && <p><span className="text-gray-500">支付时间：</span>{new Date(selectedOrder.paymentTime).toLocaleString('zh-CN')}</p>}
-                  {selectedOrder.startTime && <p><span className="text-gray-500">开始时间：</span>{new Date(selectedOrder.startTime).toLocaleString('zh-CN')}</p>}
-                  {selectedOrder.endTime && <p><span className="text-gray-500">结束时间：</span>{new Date(selectedOrder.endTime).toLocaleString('zh-CN')}</p>}
-                  {selectedOrder.verificationDeadline && <p><span className="text-gray-500">验收截止：</span>{new Date(selectedOrder.verificationDeadline).toLocaleString('zh-CN')}</p>}
+                  {selectedOrder.paymentTime ? <p><span className="text-gray-500">支付时间：</span>{new Date(selectedOrder.paymentTime).toLocaleString('zh-CN')}</p> : null}
+                  {selectedOrder.startTime ? <p><span className="text-gray-500">开始时间：</span>{new Date(selectedOrder.startTime).toLocaleString('zh-CN')}</p> : null}
+                  {selectedOrder.endTime ? <p><span className="text-gray-500">结束时间：</span>{new Date(selectedOrder.endTime).toLocaleString('zh-CN')}</p> : null}
+                  {selectedOrder.verificationDeadline ? <p><span className="text-gray-500">验收截止：</span>{new Date(selectedOrder.verificationDeadline).toLocaleString('zh-CN')}</p> : null}
                 </div>
               </div>
 
-              {(selectedOrder.verificationResult || selectedOrder.verificationRemark || selectedOrder.disputeReason) && (
+              {(selectedOrder.verificationResult || selectedOrder.verificationRemark || selectedOrder.disputeReason) ? (
                 <div>
                   <h3 className="mb-2 font-semibold">验收 / 纠纷信息</h3>
                   <div className="space-y-1 text-sm">
-                    {selectedOrder.verificationResult && <p><span className="text-gray-500">验收结果：</span>{selectedOrder.verificationResult}</p>}
-                    {selectedOrder.verificationRemark && <p><span className="text-gray-500">验收备注：</span>{selectedOrder.verificationRemark}</p>}
-                    {selectedOrder.disputeReason && <p><span className="text-gray-500">纠纷原因：</span>{selectedOrder.disputeReason}</p>}
+                    {selectedOrder.verificationResult ? <p><span className="text-gray-500">验收结果：</span>{selectedOrder.verificationResult}</p> : null}
+                    {selectedOrder.verificationRemark ? <p><span className="text-gray-500">验收备注：</span>{selectedOrder.verificationRemark}</p> : null}
+                    {selectedOrder.disputeReason ? <p><span className="text-gray-500">纠纷原因：</span>{selectedOrder.disputeReason}</p> : null}
                   </div>
                 </div>
-              )}
+              ) : null}
+
+              {selectedOrder.dispute ? (
+                <div className="space-y-3 rounded-lg border bg-slate-50 p-4">
+                  <div>
+                    <h3 className="mb-2 font-semibold">纠纷单</h3>
+                    <div className="space-y-1 text-sm">
+                      <p><span className="text-gray-500">状态：</span>{selectedOrder.dispute.status}</p>
+                      <p><span className="text-gray-500">类型：</span>{selectedOrder.dispute.disputeType}</p>
+                      <p><span className="text-gray-500">发起人：</span>{selectedOrder.dispute.initiatorName}</p>
+                      <p><span className="text-gray-500">对方：</span>{selectedOrder.dispute.respondentName}</p>
+                      <p><span className="text-gray-500">原因：</span>{selectedOrder.dispute.reason}</p>
+                      {selectedOrder.dispute.createdAt ? <p><span className="text-gray-500">创建时间：</span>{new Date(selectedOrder.dispute.createdAt).toLocaleString('zh-CN')}</p> : null}
+                      {selectedOrder.dispute.resolution ? <p><span className="text-gray-500">处理结果：</span>{selectedOrder.dispute.resolution}</p> : null}
+                    </div>
+                  </div>
+
+                  {selectedOrder.dispute.status === 'pending' ? (
+                    <div className="space-y-3 border-t pt-3">
+                      <Input
+                        value={disputeRemark}
+                        onChange={(e) => setDisputeRemark(e.target.value)}
+                        placeholder="填写处理备注，例如判定依据或资金说明"
+                      />
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleDisputeDecision('refund_buyer_full')}
+                          disabled={disputeActionLoading}
+                        >
+                          {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          全额退款
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDisputeDecision('resume_order')}
+                          disabled={disputeActionLoading}
+                        >
+                          {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          恢复订单
+                        </Button>
+                        <Button
+                          onClick={() => handleDisputeDecision('complete_order')}
+                          disabled={disputeActionLoading}
+                        >
+                          {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          完成并分账
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <Button onClick={() => setSelectedOrder(null)} className="w-full">
                 关闭
@@ -325,7 +435,7 @@ export default function AdminOrders() {
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
+import { createOrderDispute } from '@/lib/dispute-service';
 import { executeAutoSplit } from '@/lib/platform-split-service';
 import { getServerUserId } from '@/lib/server-auth';
 import { requireAdmin } from '@/lib/admin-auth';
 
-/**
- * 卖家验收 API
- * POST /api/orders/[id]/verify
- */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -21,10 +18,7 @@ export async function POST(
 
     const orderList = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
     if (orderList.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '订单不存在',
-      }, { status: 404 });
+      return NextResponse.json({ success: false, error: '订单不存在' }, { status: 404 });
     }
 
     const order = orderList[0];
@@ -36,40 +30,39 @@ export async function POST(
       }
     } else {
       if (!userId) {
-        return NextResponse.json({
-          success: false,
-          error: '请先登录',
-        }, { status: 401 });
+        return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
       }
 
       if (order.sellerId !== userId) {
-        return NextResponse.json({
-          success: false,
-          error: '只有卖家可以执行验收操作',
-        }, { status: 403 });
+        return NextResponse.json({ success: false, error: '只有卖家可以执行验收操作' }, { status: 403 });
       }
     }
 
     if (order.status !== 'pending_verification') {
-      return NextResponse.json({
-        success: false,
-        error: `订单状态不正确，当前状态：${order.status}，只有待验收的订单才能进行验收操作`,
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `当前订单状态不能验收：${order.status}`,
+        },
+        { status: 400 },
+      );
     }
 
     if (order.isSettled) {
-      return NextResponse.json({
-        success: false,
-        error: '订单已经分账，不能重复操作',
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: '订单已分账，不能重复处理',
+        },
+        { status: 400 },
+      );
     }
 
     const now = new Date().toISOString();
 
     if (action === 'pass' || action === 'auto') {
-      const verificationRemark = action === 'auto'
-        ? '超时自动验收通过'
-        : (remark || '验收通过');
+      const verificationRemark =
+        action === 'auto' ? '超时自动验收通过' : remark || '验收通过';
 
       await db
         .update(orders)
@@ -88,9 +81,7 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        message: action === 'auto'
-          ? '超时自动验收通过，订单已完成并分账'
-          : '验收通过，订单已完成并分账',
+        message: action === 'auto' ? '已自动验收通过并完成分账' : '验收通过，订单已完成并分账',
         data: {
           orderId: id,
           orderNo: order.orderNo,
@@ -103,14 +94,22 @@ export async function POST(
     }
 
     if (action === 'reject') {
+      const dispute = await createOrderDispute({
+        orderId: id,
+        initiatorId: userId!,
+        reason: remark || '账号状态异常，申请平台介入处理',
+        evidence: evidence ?? null,
+        disputeType: 'verification_failed',
+      });
+
       await db
         .update(orders)
         .set({
-          status: 'disputed',
           verificationResult: 'rejected',
           verificationRemark: remark || '验收失败，发起纠纷',
           disputeEvidence: evidence ?? null,
           disputeReason: remark || '账号状态异常',
+          disputeId: dispute?.id ?? null,
           updatedAt: now,
         })
         .where(eq(orders.id, id));
@@ -122,20 +121,27 @@ export async function POST(
           orderId: id,
           orderNo: order.orderNo,
           status: 'disputed',
+          disputeId: dispute?.id ?? null,
           note: '平台将在24小时内审核纠纷，并根据结果处理资金',
         },
       });
     }
 
-    return NextResponse.json({
-      success: false,
-      error: '未知的操作类型，必须是 pass、reject 或 auto',
-    }, { status: 400 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: '不支持的验收动作',
+      },
+      { status: 400 },
+    );
   } catch (error: any) {
     console.error('验收操作失败:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || '验收操作失败',
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || '验收操作失败',
+      },
+      { status: 500 },
+    );
   }
 }

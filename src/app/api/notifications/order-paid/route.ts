@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendOrderPaidNotification } from '@/lib/notification-service';
+import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 
 /**
  * 订单支付成功，触发通知
@@ -18,7 +19,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 发送订单支付成功通知
-    const result = await sendOrderPaidNotification(orderId, createChatGroup !== false);
+    const shouldCreateChatGroup = createChatGroup !== false;
+    const result = await sendOrderPaidNotification(orderId, false);
+
+    if (shouldCreateChatGroup) {
+      const group = await ensureOrderGroupChat(orderId);
+      result.chatGroupId = group.id;
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {

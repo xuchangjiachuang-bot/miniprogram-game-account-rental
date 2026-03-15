@@ -52,13 +52,15 @@ interface WalletUiSettings {
 }
 
 export default function UserCenterPage() {
-  const { user, loading } = useUser();
+  const { user, loading, refreshUser } = useUser();
   const [activeTab, setActiveTab] = useState('profile');
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [uploadingFront, setUploadingFront] = useState(false);
   const [uploadingBack, setUploadingBack] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [currentUrl, setCurrentUrl] = useState('');
+  const avatarUploaderInputId = 'user-center-avatar-upload';
 
   // 监听URL变化
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function UserCenterPage() {
         setCurrentUrl(url);
         const urlParams = new URLSearchParams(window.location.search);
         const tabParam = urlParams.get('tab');
-        const validTab = tabParam && ['profile', 'verification', 'chats', 'orders', 'wallet', 'notifications'].includes(tabParam);
+        const validTab = tabParam && ['profile', 'verification', 'chats', 'orders', 'accounts', 'wallet', 'notifications'].includes(tabParam);
         if (validTab) {
           setActiveTab(tabParam);
         } else if (tabParam === null) {
@@ -763,20 +765,70 @@ export default function UserCenterPage() {
   };
 
   const handleAvatarUpload = async (url: string, key: string) => {
-    // 更新本地状态
-    setProfileForm({
-      ...profileForm,
+    setProfileForm((current) => ({
+      ...current,
       avatar: url,
       avatarKey: key
-    });
+    }));
 
     toast.success('头像上传成功');
   };
 
   // 提交个人资料
   const handleSaveProfile = async () => {
-    // TODO: 实现保存个人资料逻辑
-    toast.info('保存个人资料功能待实现');
+    const nickname = profileForm.username.trim();
+    const phone = profileForm.phone.trim();
+    const email = profileForm.email.trim();
+
+    if (!nickname) {
+      toast.error('请输入用户名');
+      return;
+    }
+
+    if (!phone) {
+      toast.error('请输入手机号');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const token = getToken();
+      const response = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          nickname,
+          phone,
+          email: email || null,
+          avatar: profileForm.avatar || null,
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '保存个人资料失败');
+      }
+
+      setProfileForm((current) => ({
+        ...current,
+        username: result.data.nickname || '',
+        phone: result.data.phone || '',
+        email: result.data.email || '',
+        avatar: result.data.avatar || '',
+        avatarKey: '',
+      }));
+
+      await refreshUser(true);
+      toast.success('个人资料已保存');
+    } catch (error) {
+      console.error('保存个人资料失败:', error);
+      toast.error(error instanceof Error ? error.message : '保存个人资料失败，请重试');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   // 处理身份证照片上传
@@ -938,7 +990,7 @@ export default function UserCenterPage() {
           <h1 className="text-2xl font-bold mb-6">个人中心</h1>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid h-auto w-full grid-cols-3 gap-2 md:grid-cols-6">
+            <TabsList className="grid h-auto w-full grid-cols-3 gap-2 md:grid-cols-7">
               <TabsTrigger value="profile" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
                 <User className="h-4 w-4 sm:mr-2" />
                 个人资料
@@ -954,6 +1006,10 @@ export default function UserCenterPage() {
               <TabsTrigger value="orders" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
                 <FileText className="h-4 w-4 sm:mr-2" />
                 我的订单
+              </TabsTrigger>
+              <TabsTrigger value="accounts" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+                <Users className="h-4 w-4 sm:mr-2" />
+                我的账号
               </TabsTrigger>
               <TabsTrigger value="wallet" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
                 <Wallet className="h-4 w-4 sm:mr-2" />
@@ -976,13 +1032,24 @@ export default function UserCenterPage() {
                   {/* 头像 */}
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4">
                     <div className="relative">
-                      <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                      <label
+                        htmlFor={avatarUploaderInputId}
+                        className="group relative block h-24 w-24 cursor-pointer overflow-hidden rounded-full bg-gray-200"
+                      >
                         {profileForm.avatar ? (
                           <img src={profileForm.avatar} alt="头像" className="h-full w-full object-cover" />
                         ) : (
-                          <User className="h-12 w-12 text-gray-400" />
+                          <div className="flex h-full w-full items-center justify-center">
+                            <User className="h-12 w-12 text-gray-400" />
+                          </div>
                         )}
-                      </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 text-white transition group-hover:bg-black/35">
+                          <div className="flex flex-col items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                            <Camera className="h-5 w-5" />
+                            <span className="text-xs">点击上传</span>
+                          </div>
+                        </div>
+                      </label>
                     </div>
                     <div className="w-full flex-1">
                       <ImageUploader
@@ -991,9 +1058,11 @@ export default function UserCenterPage() {
                         currentUrl={profileForm.avatar}
                         maxSize={2}
                         accept="image/jpeg,image/png,image/gif"
+                        inputId={avatarUploaderInputId}
+                        hideDefaultUi
                       />
                       <p className="text-xs text-muted-foreground mt-2">
-                        点击上方按钮上传新头像
+                        点击头像上传新头像
                       </p>
                     </div>
                   </div>
@@ -1012,7 +1081,7 @@ export default function UserCenterPage() {
                       <Label>手机号</Label>
                       <Input
                         value={profileForm.phone}
-                        disabled
+                        onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
                         placeholder="手机号"
                       />
                     </div>
@@ -1026,8 +1095,15 @@ export default function UserCenterPage() {
                     </div>
                   </div>
 
-                  <Button onClick={handleSaveProfile} className="w-full">
-                    保存修改
+                  <Button onClick={handleSaveProfile} className="w-full" disabled={savingProfile}>
+                    {savingProfile ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        保存中...
+                      </>
+                    ) : (
+                      '保存修改'
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -1305,14 +1381,38 @@ export default function UserCenterPage() {
               </Card>
             </TabsContent>
 
+            <TabsContent value="accounts">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>我的账号</CardTitle>
+                    <CardDescription>统一从这里进入账号管理、编辑和继续上架流程。</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
+                      上架账号页中的“返回”将回到这里对应的账号管理链路，避免和个人资料、钱包入口混在一起。
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Button onClick={() => window.location.href = '/seller/accounts'} className="w-full">
+                        查看我的账号
+                      </Button>
+                      <Button variant="outline" onClick={() => window.location.href = '/seller/accounts/new'} className="w-full">
+                        上架新账号
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
             {/* 我的钱包 */}
             <TabsContent value="wallet">
               <div className="space-y-4 sm:space-y-6">
                 {balance && (
                   <>
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] md:items-start">
+                    <div className="grid gap-4">
                       {/* 充值与提现 */}
-                      <Card className="order-1">
+                      <Card className="order-2">
                         <CardHeader className="pb-3 sm:pb-6">
                           <CardTitle>充值与提现</CardTitle>
                           <CardDescription className="sm:hidden">
@@ -1394,13 +1494,13 @@ export default function UserCenterPage() {
                       </Card>
 
                       {/* 余额卡片 */}
-                      <div className="order-2 grid gap-3 grid-cols-2 md:grid-cols-1">
-                        <Card className="col-span-2 md:col-span-1">
-                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                      <div className="order-1 grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+                        <Card className="col-span-1">
+                          <CardHeader className="px-3 pb-2 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pt-6">
                             <CardTitle className="text-sm font-medium text-gray-600">可用余额</CardTitle>
                           </CardHeader>
-                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
-                            <div className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                          <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4 lg:px-6 lg:pb-6">
+                            <div className="text-lg font-bold text-gray-900 sm:text-xl lg:text-3xl">
                               {formatBalance(balance.available_balance)}
                             </div>
                             <p className="mt-1 text-xs text-gray-500">可提现金额</p>
@@ -1408,11 +1508,11 @@ export default function UserCenterPage() {
                         </Card>
 
                         <Card>
-                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                          <CardHeader className="px-3 pb-2 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pt-6">
                             <CardTitle className="text-sm font-medium text-gray-600">冻结余额</CardTitle>
                           </CardHeader>
-                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
-                            <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-3xl">
+                          <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4 lg:px-6 lg:pb-6">
+                            <div className="text-lg font-bold text-blue-600 sm:text-xl lg:text-3xl">
                               {formatBalance(balance.frozen_balance)}
                             </div>
                             <p className="mt-1 text-xs text-gray-500">订单押金等</p>
@@ -1420,11 +1520,11 @@ export default function UserCenterPage() {
                         </Card>
 
                         <Card>
-                          <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
+                          <CardHeader className="px-3 pb-2 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pt-6">
                             <CardTitle className="text-sm font-medium text-gray-600">总余额</CardTitle>
                           </CardHeader>
-                          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
-                            <div className="text-xl font-bold text-green-600 sm:text-3xl">
+                          <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4 lg:px-6 lg:pb-6">
+                            <div className="text-lg font-bold text-green-600 sm:text-xl lg:text-3xl">
                               {formatBalance(balance.total_balance)}
                             </div>
                             <p className="mt-1 text-xs text-gray-500">可用 + 冻结</p>

@@ -19,7 +19,7 @@ import { AccountDetailDialog } from '@/components/AccountDetailDialog';
 import { CustomerServiceButton } from '@/components/customer-service-button';
 import { LoginDialog } from '@/components/LoginDialog';
 import { useUser } from '@/contexts/UserContext';
-import { setToken } from '@/lib/auth-token';
+import { getToken } from '@/lib/auth-token';
 import { loadConfigFromCache, saveConfigToCache } from '@/lib/config-sync';
 import { useConfigUpdate } from '@/lib/config-sync-manager';
 
@@ -74,8 +74,61 @@ export default function Home() {
   const [skinList, setSkinList] = useState<string[]>([]);
   const [carousels, setCarousels] = useState<any[]>([]);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   const router = useRouter();
+
+  const handleOrderRequired = () => {
+    if (!user) {
+      setShowLoginDialog(true);
+      return;
+    }
+
+    router.push('/user-center?tab=verification');
+  };
+
+  const handleCreateOrder = async () => {
+    if (!selectedAccount || creatingOrder) {
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      setShowLoginDialog(true);
+      return;
+    }
+
+    try {
+      setCreatingOrder(true);
+      const rentDays = Number(selectedAccount.rental_duration || 1);
+      const rentHours = Math.max(1, Math.round(rentDays * 24));
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          account_id: selectedAccount.id,
+          rent_hours: rentHours,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '立即下单失败');
+      }
+
+      setShowAccountDetail(false);
+      router.push(`/orders/${result.data.id}`);
+    } catch (error) {
+      console.error('创建订单失败:', error);
+      alert(error instanceof Error ? error.message : '立即下单失败，请重试');
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
 
   const sanitizeAccountImages = (screenshots: unknown) => {
     const sourceList = Array.isArray(screenshots)
@@ -1132,12 +1185,8 @@ export default function Home() {
         account={selectedAccount}
         isLoggedIn={isLoggedIn}
         isVerified={isVerified}
-        onOrder={() => {
-          // 跳转到支付页面
-          if (selectedAccount) {
-            window.location.href = `/orders?accountId=${selectedAccount.id}`;
-          }
-        }}
+        onOrder={handleCreateOrder}
+        onLoginRequired={handleOrderRequired}
       />
 
       {/* 登录弹窗 */}

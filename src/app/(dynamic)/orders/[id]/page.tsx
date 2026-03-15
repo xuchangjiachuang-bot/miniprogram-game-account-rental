@@ -1,780 +1,682 @@
 'use client';
 
+import Link from 'next/link';
+import { use, useEffect, useMemo, useState } from 'react';
+import QRCode from 'react-qr-code';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  Clock,
+  Copy,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Shield,
+  XCircle,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, Clock, ArrowLeft, ArrowRight, Calendar, Package, CheckCircle, AlertCircle, FileText, MessageSquare, User, RefreshCw, Copy, Loader2, XCircle } from 'lucide-react';
-import Link from 'next/link';
-import { useState, useEffect, use } from 'react';
-import { toast } from 'sonner';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
 
+type OrderDispute = {
+  id: string;
+  status: string;
+  disputeType: string;
+  reason: string;
+  resolution?: string | null;
+  initiatorName: string;
+  respondentName: string;
+  createdAt?: string | null;
+  resolvedAt?: string | null;
+};
+
+type OrderDetail = {
+  id: string;
+  orderNo?: string;
+  status: string;
+  buyerId: string;
+  sellerId: string;
+  accountName?: string;
+  accountTitle?: string;
+  rentalPrice?: number;
+  deposit?: number;
+  totalPrice?: number;
+  total_price?: number;
+  rentalDuration?: number;
+  startTime?: string | null;
+  endTime?: string | null;
+  verificationDeadline?: string | null;
+  verificationResult?: string | null;
+  verificationRemark?: string | null;
+  disputeReason?: string | null;
+  dispute?: OrderDispute | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+};
+
+type LoginPayload = {
+  qrCodeContent?: string;
+  qrCodeUrl?: string;
+  loginInfo?: {
+    loginMethod?: string;
+    qqAccount?: string | null;
+    qqPassword?: string | null;
+    accountTitle?: string;
+    expiryTime?: string;
+  };
+};
+
+const statusMeta: Record<string, { label: string; className?: string }> = {
+  pending_payment: { label: '待支付' },
+  paid: { label: '待开始', className: 'bg-blue-600 hover:bg-blue-600' },
+  active: { label: '进行中', className: 'bg-purple-600 hover:bg-purple-600' },
+  pending_verification: { label: '待验收', className: 'bg-yellow-500 hover:bg-yellow-500 text-black' },
+  disputed: { label: '争议中', className: 'bg-red-600 hover:bg-red-600' },
+  completed: { label: '已完成', className: 'bg-green-600 hover:bg-green-600' },
+  refunding: { label: '退款中', className: 'bg-orange-500 hover:bg-orange-500' },
+  refunded: { label: '已退款', className: 'bg-slate-600 hover:bg-slate-600' },
+  cancelled: { label: '已取消', className: 'bg-slate-500 hover:bg-slate-500' },
+};
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '--';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('zh-CN');
+}
+
+function formatMoney(value?: number | string | null) {
+  const amount = Number(value || 0);
+  return `¥${amount.toFixed(2)}`;
+}
+
+function formatCountdown(ms: number) {
+  if (ms <= 0) {
+    return '已到期';
+  }
+
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}天`);
+  if (hours > 0 || days > 0) parts.push(`${hours}小时`);
+  if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分钟`);
+  parts.push(`${seconds}秒`);
+  return parts.join(' ');
+}
+
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const [order, setOrder] = useState<any>(null);
-  const [loginInfo, setLoginInfo] = useState<any>(null);
+  const { id } = use(params);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingQr, setLoadingQr] = useState(false);
+  const [loadingLoginInfo, setLoadingLoginInfo] = useState(false);
+  const [loginPayload, setLoginPayload] = useState<LoginPayload | null>(null);
   const [completingOrder, setCompletingOrder] = useState(false);
-  const [remainingTime, setRemainingTime] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [submittingDispute, setSubmittingDispute] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [verifyingOrder, setVerifyingOrder] = useState<'pass' | 'reject' | null>(null);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
 
-  // 加载订单数据
   useEffect(() => {
-    loadOrderDetail();
-  }, [resolvedParams.id]);
+    void loadOrderDetail();
+  }, [id]);
 
-  const loadOrderDetail = async () => {
+  useEffect(() => {
+    if (!order?.endTime || order.status !== 'active') {
+      setRemainingMs(null);
+      return;
+    }
+
+    const update = () => {
+      setRemainingMs(new Date(order.endTime!).getTime() - Date.now());
+    };
+
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [order?.endTime, order?.status]);
+
+  const statusBadge = useMemo(() => {
+    const meta = statusMeta[order?.status || ''] || { label: order?.status || '--' };
+    return (
+      <Badge className={meta.className} variant={meta.className ? 'default' : 'secondary'}>
+        {meta.label}
+      </Badge>
+    );
+  }, [order?.status]);
+
+  async function loadOrderDetail() {
     try {
       setLoading(true);
-      const response = await fetch(`/api/orders/${resolvedParams.id}`);
-      if (!response.ok) {
-        throw new Error('加载订单失败');
+      const response = await fetch(`/api/orders/${id}`, { credentials: 'include' });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '加载订单失败');
       }
-      const data = await response.json();
-      setOrder(data.data);
-    } catch (error) {
+
+      setOrder(result.data);
+    } catch (error: any) {
       console.error('加载订单失败:', error);
-      toast.error('加载订单失败');
+      toast.error(error.message || '加载订单失败');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // 加载登录信息
-  const loadLoginInfo = async () => {
+  async function loadLoginInfo() {
     try {
-      setLoadingQr(true);
-      const response = await fetch(`/api/orders/${resolvedParams.id}/qrcode`);
-      if (!response.ok) {
-        throw new Error('加载登录信息失败');
+      setLoadingLoginInfo(true);
+      const response = await fetch(`/api/orders/${id}/qrcode`, { credentials: 'include' });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '获取登录信息失败');
       }
-      const data = await response.json();
-      setLoginInfo(data.data);
-      await loadOrderDetail();
-    } catch (error) {
-      console.error('加载登录信息失败:', error);
-      toast.error('加载登录信息失败');
-    } finally {
-      setLoadingQr(false);
-    }
-  };
 
-  // 复制账号密码
-  const handleCopy = async (text: string, label: string) => {
+      setLoginPayload(result.data);
+      await loadOrderDetail();
+    } catch (error: any) {
+      console.error('获取登录信息失败:', error);
+      toast.error(error.message || '获取登录信息失败');
+    } finally {
+      setLoadingLoginInfo(false);
+    }
+  }
+
+  async function handleCopy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success(`${label}复制成功`);
-    } catch (error) {
+      toast.success(`${label}已复制`);
+    } catch {
       toast.error('复制失败');
     }
-  };
+  }
 
-  const handlePayNow = () => {
-    window.location.href = buildWechatPaymentHrefForCurrentEnv({
-      orderId: order.id,
-    });
-  };
+  function handlePayNow() {
+    if (!order) return;
+    window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+  }
 
-  // 归还账号
-  const handleReturnAccount = async () => {
-    if (!confirm('确定要归还账号吗？归还后订单将进入待验收状态，等待卖家检查账号状态（48小时内完成验收）。')) {
+  async function handleReturnAccount() {
+    if (!confirm('确认归还账号吗？归还后订单会进入待验收状态。')) {
       return;
     }
 
     try {
       setCompletingOrder(true);
-      const response = await fetch(`/api/orders/${resolvedParams.id}`, {
+      const response = await fetch(`/api/orders/${id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'complete'
-        })
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'complete' }),
       });
-
-      if (!response.ok) {
-        throw new Error('归还账号失败');
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '归还账号失败');
       }
 
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message || '账号归还成功，等待卖家验收');
-        // 重新加载订单详情
-        await loadOrderDetail();
-      } else {
-        throw new Error(data.error || '归还账号失败');
-      }
+      toast.success(result.message || '已提交归还，等待卖家验收');
+      await loadOrderDetail();
     } catch (error: any) {
       console.error('归还账号失败:', error);
       toast.error(error.message || '归还账号失败');
     } finally {
       setCompletingOrder(false);
     }
-  };
+  }
 
-  // 卖家验收
-  const handleVerifyOrder = async (action: 'pass' | 'reject', remark?: string) => {
+  async function handleVerifyOrder(action: 'pass' | 'reject') {
     try {
-      const response = await fetch(`/api/orders/${resolvedParams.id}/verify`, {
+      setVerifyingOrder(action);
+      const response = await fetch(`/api/orders/${id}/verify`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           action,
-          remark: remark || (action === 'pass' ? '验收通过' : '验收失败')
-        })
+          remark:
+            action === 'pass'
+              ? '卖家验收通过，账号状态正常'
+              : '卖家验收未通过，申请平台介入处理',
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error('验收操作失败');
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '验收操作失败');
       }
 
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message || '验收成功');
-        // 重新加载订单详情
-        await loadOrderDetail();
-      } else {
-        throw new Error(data.error || '验收操作失败');
-      }
+      toast.success(result.message || '验收结果已提交');
+      await loadOrderDetail();
     } catch (error: any) {
       console.error('验收操作失败:', error);
       toast.error(error.message || '验收操作失败');
+    } finally {
+      setVerifyingOrder(null);
     }
-  };
+  }
 
-  // 计算剩余时间
-  useEffect(() => {
-    if (!order || order.status !== 'active' || !order.endTime) {
-      setRemainingTime(null);
+  async function handleCreateDispute() {
+    if (!disputeReason.trim()) {
+      toast.error('请先填写纠纷原因');
       return;
     }
 
-    const calculateRemainingTime = () => {
-      const now = new Date().getTime();
-      const end = new Date(order.endTime).getTime();
-      const diff = end - now;
-
-      if (diff <= 0) {
-        setRemainingTime(null);
-        return;
+    try {
+      setSubmittingDispute(true);
+      const response = await fetch(`/api/orders/${id}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason: disputeReason.trim(),
+          disputeType: 'after_sale',
+        }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '发起纠纷失败');
       }
 
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setRemainingTime({ days, hours, minutes, seconds });
-    };
-
-    // 立即计算一次
-    calculateRemainingTime();
-
-    // 每秒更新一次
-    const interval = setInterval(calculateRemainingTime, 1000);
-
-    return () => clearInterval(interval);
-  }, [order]);
-
-  // 格式化倒计时
-  const formatCountdown = (time: { days: number; hours: number; minutes: number; seconds: number }) => {
-    const parts = [];
-    if (time.days > 0) parts.push(`${time.days}天`);
-    if (time.hours > 0 || time.days > 0) parts.push(`${time.hours}小时`);
-    if (time.minutes > 0 || time.hours > 0 || time.days > 0) parts.push(`${time.minutes}分钟`);
-    parts.push(`${time.seconds}秒`);
-    return parts.join(' ');
-  };
+      toast.success(result.message || '纠纷已提交，平台会尽快处理');
+      setDisputeReason('');
+      await loadOrderDetail();
+    } catch (error: any) {
+      console.error('发起纠纷失败:', error);
+      toast.error(error.message || '发起纠纷失败');
+    } finally {
+      setSubmittingDispute(false);
+    }
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-gray-500">订单不存在</p>
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        订单不存在
       </div>
     );
   }
 
-  const timeline = [
-    { time: '2025-01-14 09:00', event: '订单创建', icon: CheckCircle, color: 'green' },
-    { time: '2025-01-14 09:05', event: '买家支付完成', icon: CheckCircle, color: 'green' },
-    { time: '2025-01-14 09:10', event: '账号密码已展示', icon: CheckCircle, color: 'green' },
-    { time: '2025-01-14 09:15', event: '买家上号成功', icon: CheckCircle, color: 'green' },
-    { time: '2025-01-16 09:00', event: '租期结束', icon: Clock, color: 'gray' }
-  ];
+  const showLoginCard = ['paid', 'active'].includes(order.status);
+  const canCreateDispute =
+    ['active', 'pending_verification', 'disputed'].includes(order.status) &&
+    order.dispute?.status !== 'pending';
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Breadcrumb */}
-      <div className="container mx-auto px-4 py-4 border-b">
-        <div className="max-w-6xl mx-auto flex items-center gap-2">
+      <div className="border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
           <Link href="/orders">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               返回订单列表
             </Button>
           </Link>
-          <span className="text-sm text-muted-foreground">/</span>
-          <span className="text-sm font-medium">{order.id}</span>
-          <Badge variant={order.status_color === 'blue' ? 'default' : 'secondary'} className="ml-2">
-            <order.status_icon className="w-3 h-3 mr-1" />
-            {order.status_text}
-          </Badge>
+          <div className="text-sm text-muted-foreground">订单号</div>
+          <div className="font-mono text-sm">{order.orderNo || order.id}</div>
+          {statusBadge}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
-          {/* Left Column - Order Details */}
-          <div className="md:col-span-2 space-y-6">
-            {/* Order Status */}
+      <div className="container mx-auto max-w-6xl px-4 py-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-xl">订单 {order.id}</CardTitle>
-                    <CardDescription className="mt-1">
-                      创建时间：{order.created_at}
-                    </CardDescription>
-                  </div>
-                  <Badge variant={order.status_color === 'blue' ? 'default' :
-                                order.status_color === 'green' ? 'default' : 'secondary'}>
-                    {order.status_text}
-                  </Badge>
-                </div>
+                <CardTitle>订单概览</CardTitle>
+                <CardDescription>查看租赁状态、时间节点和争议处理结果。</CardDescription>
               </CardHeader>
-              <CardContent>
-                {/* Time Info */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>开始时间</span>
-                    </div>
-                    <p className="font-semibold">{order.start_time}</p>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-1 text-sm text-muted-foreground">创建时间</div>
+                    <div className="font-medium">{formatDateTime(order.createdAt || order.created_at)}</div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>结束时间</span>
-                    </div>
-                    <p className="font-semibold">{order.end_time}</p>
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-1 text-sm text-muted-foreground">租赁时长</div>
+                    <div className="font-medium">{order.rentalDuration || 0} 小时</div>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-1 text-sm text-muted-foreground">开始时间</div>
+                    <div className="font-medium">{formatDateTime(order.startTime)}</div>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-1 text-sm text-muted-foreground">结束时间</div>
+                    <div className="font-medium">{formatDateTime(order.endTime)}</div>
                   </div>
                 </div>
 
-                {order.status === 'active' && remainingTime && (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between">
+                {order.status === 'active' ? (
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-sm text-blue-700 mb-1">剩余租期</p>
-                        <p className="text-2xl font-bold text-purple-600">{formatCountdown(remainingTime)}</p>
+                        <div className="mb-1 flex items-center gap-2 text-sm text-purple-700">
+                          <Clock className="h-4 w-4" />
+                          租赁剩余时间
+                        </div>
+                        <div className="text-2xl font-semibold text-purple-900">
+                          {remainingMs === null ? '--' : formatCountdown(remainingMs)}
+                        </div>
                       </div>
-                      <Clock className="w-12 h-12 text-purple-600" />
+                      <Shield className="h-8 w-8 text-purple-400" />
                     </div>
                   </div>
-                )}
-                {order.status === 'active' && !remainingTime && (
-                  <div className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-orange-700 mb-1">订单状态</p>
-                        <p className="text-2xl font-bold text-orange-600">租期已到期</p>
-                      </div>
-                      <AlertCircle className="w-12 h-12 text-orange-600" />
+                ) : null}
+
+                {order.status === 'pending_verification' ? (
+                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+                    买家已申请归还账号，当前等待卖家验收。
+                    <div className="mt-1 text-yellow-700">
+                      验收截止时间：{formatDateTime(order.verificationDeadline)}
                     </div>
                   </div>
-                )}
-                {order.status === 'pending_verification' && (
-                  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-yellow-700 mb-1">等待卖家验收</p>
-                        <p className="text-2xl font-bold text-yellow-600">
-                          {order.verificationDeadline
-                            ? `${Math.ceil((new Date(order.verificationDeadline).getTime() - new Date().getTime()) / (1000 * 60 * 60))}小时后自动验收`
-                            : '等待验收'
-                          }
-                        </p>
-                      </div>
-                      <AlertCircle className="w-12 h-12 text-yellow-600" />
-                    </div>
-                    <p className="text-sm text-yellow-700 mt-2">
-                      卖家将在验收截止时间前检查账号状态，验收通过后订单将完成并分账
-                    </p>
+                ) : null}
+
+                {order.status === 'refunding' ? (
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+                    平台已发起退款，正在等待微信退款结果回调。
                   </div>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 
-            {/* Account Info */}
             <Card>
               <CardHeader>
                 <CardTitle>账号信息</CardTitle>
+                <CardDescription>当前订单绑定的账号基础信息。</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Basic Info */}
-                <div className="flex items-start gap-4">
-                  <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Package className="w-10 h-10 text-gray-400" />
+              <CardContent className="space-y-3">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <div className="text-sm text-muted-foreground">账号名称</div>
+                    <div className="font-medium">{order.accountName || order.accountTitle || '游戏账号'}</div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold">{order.account_name}</h3>
-                    <p className="text-muted-foreground mt-1">
-                      {order.coins_display} 哈夫币 · {order.region.city}
-                    </p>
-                    <div className="flex gap-2 mt-2">
-                      <Badge variant="outline">{order.login_method}</Badge>
-                      <Badge variant="outline">{order.rental_duration}小时</Badge>
+                  <div>
+                    <div className="text-sm text-muted-foreground">订单状态</div>
+                    <div>{statusBadge}</div>
+                  </div>
+                </div>
+
+                {(order.verificationResult || order.verificationRemark) ? (
+                  <>
+                    <Separator />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <div className="text-sm text-muted-foreground">验收结果</div>
+                        <div className="font-medium">{order.verificationResult || '--'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">验收备注</div>
+                        <div className="font-medium">{order.verificationRemark || '--'}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Attributes */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <span className="text-sm text-muted-foreground">安全箱</span>
-                    <p className="font-semibold">{order.safebox}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">体力等级</span>
-                    <p className="font-semibold">{order.stamina_level}级</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">负重等级</span>
-                    <p className="font-semibold">{order.load_level}级</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">账号等级</span>
-                    <p className="font-semibold">Lv.{order.account_level}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">段位</span>
-                    <p className="font-semibold">{order.rank}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">绝密KD</span>
-                    <p className="font-semibold">{order.kd}</p>
-                  </div>
-                </div>
+                  </>
+                ) : null}
               </CardContent>
             </Card>
 
-            {/* Login Credentials */}
-            {['paid', 'active'].includes(order.status) && (
+            {showLoginCard ? (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle>登录凭证</CardTitle>
-                      <CardDescription>请勿向第三方泄露账号信息</CardDescription>
+                      <CardDescription>仅在已支付或进行中的订单里展示。</CardDescription>
                     </div>
-                    {!loginInfo && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={loadLoginInfo}
-                        disabled={loadingQr}
-                      >
-                        {loadingQr ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                        )}
+                    {!loginPayload ? (
+                      <Button variant="outline" onClick={loadLoginInfo} disabled={loadingLoginInfo}>
+                        {loadingLoginInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                         获取登录信息
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {loadingQr && (
-                    <div className="text-center py-8">
-                      <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-gray-400" />
-                      <p className="text-gray-500">加载中...</p>
+                <CardContent>
+                  {loadingLoginInfo ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-                  )}
-                  {!loadingQr && loginInfo && loginInfo.loginInfo && (
-                    <>
-                      {loginInfo.loginInfo.loginMethod === 'qq' || loginInfo.loginInfo.loginMethod === 'password' ? (
+                  ) : null}
+
+                  {!loadingLoginInfo && !loginPayload ? (
+                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                      点击“获取登录信息”后，这里会直接展示账号密码或二维码。
+                    </div>
+                  ) : null}
+
+                  {!loadingLoginInfo && loginPayload?.loginInfo ? (
+                    <div className="space-y-4">
+                      {['qq', 'password'].includes(loginPayload.loginInfo.loginMethod || '') ? (
                         <div className="space-y-3">
                           <div>
-                            <Label>QQ账号</Label>
-                            <div className="flex gap-2 mt-2">
-                              <Input
-                                type="password"
-                                value={loginInfo.loginInfo.qqAccount}
-                                readOnly
-                                className="flex-1"
-                              />
+                            <Label>账号</Label>
+                            <div className="mt-2 flex gap-2">
+                              <Input readOnly value={loginPayload.loginInfo.qqAccount || ''} />
                               <Button
                                 variant="outline"
-                                size="icon"
-                                onClick={() => handleCopy(loginInfo.loginInfo.qqAccount, '账号')}
+                                onClick={() => handleCopy(loginPayload.loginInfo?.qqAccount || '', '账号')}
                               >
                                 <Copy className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
                           <div>
-                            <Label>QQ密码</Label>
-                            <div className="flex gap-2 mt-2">
-                              <Input
-                                type="password"
-                                value={loginInfo.loginInfo.qqPassword}
-                                readOnly
-                                className="flex-1"
-                              />
+                            <Label>密码</Label>
+                            <div className="mt-2 flex gap-2">
+                              <Input readOnly value={loginPayload.loginInfo.qqPassword || ''} />
                               <Button
                                 variant="outline"
-                                size="icon"
-                                onClick={() => handleCopy(loginInfo.loginInfo.qqPassword, '密码')}
+                                onClick={() => handleCopy(loginPayload.loginInfo?.qqPassword || '', '密码')}
                               >
                                 <Copy className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => {
-                              handleCopy(`${loginInfo.loginInfo.qqAccount}\n${loginInfo.loginInfo.qqPassword}`, '账号密码');
-                            }}
-                          >
-                            复制账号密码
-                          </Button>
                         </div>
                       ) : (
-                        <div className="text-center">
-                          <div className="w-48 h-48 bg-white border mx-auto rounded-lg flex items-center justify-center mb-4 p-2">
-                            <p className="text-xs text-gray-400 break-all text-center">
-                              二维码内容：{loginInfo.qrCodeContent}
-                            </p>
+                        <div className="space-y-4">
+                          <div className="flex flex-col items-center rounded-xl border bg-white p-6">
+                            <QRCode value={loginPayload.qrCodeContent || loginPayload.qrCodeUrl || order.id} size={180} />
+                            <div className="mt-4 text-sm text-muted-foreground">使用微信扫码登录账号</div>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            使用微信扫描二维码登录
-                          </p>
+                          {loginPayload.qrCodeContent ? (
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => handleCopy(loginPayload.qrCodeContent || '', '二维码内容')}
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              复制二维码内容
+                            </Button>
+                          ) : null}
                         </div>
                       )}
 
-                      <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                          <div className="text-sm text-amber-800">
-                            <p className="font-semibold mb-1">重要提醒：</p>
-                            <ul className="list-disc list-inside space-y-1">
-                              <li>请勿修改账号密码</li>
-                              <li>请勿使用外挂或第三方工具</li>
-                              <li>请勿删除或转移账号内道具</li>
-                              <li>租期结束后，请及时退出账号</li>
-                            </ul>
-                          </div>
-                        </div>
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        请勿修改密码、转移资产或使用外挂工具，租期结束后请及时退出账号。
                       </div>
-                    </>
-                  )}
-                  {!loadingQr && !loginInfo && (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>请点击"获取登录信息"按钮获取登录凭证</p>
                     </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
-            )}
+            ) : null}
 
-            {/* Timeline */}
             <Card>
               <CardHeader>
-                <CardTitle>订单进度</CardTitle>
+                <CardTitle>纠纷与售后</CardTitle>
+                <CardDescription>这里展示真实争议单状态，后台处理后会同步回订单。</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {timeline.map((item, index) => (
-                    <div key={index} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          item.color === 'green' ? 'bg-green-100' :
-                          item.color === 'gray' ? 'bg-gray-100' : 'bg-purple-100'
-                        }`}>
-                          <item.icon className={`w-4 h-4 ${
-                            item.color === 'green' ? 'text-green-600' :
-                            item.color === 'gray' ? 'text-gray-400' : 'text-purple-600'
-                          }`} />
-                        </div>
-                        {index < timeline.length - 1 && (
-                          <div className="w-0.5 h-12 bg-gray-200" />
-                        )}
-                      </div>
-                      <div className="flex-1 pb-4">
-                        <div className="flex justify-between items-start">
-                          <p className="font-medium">{item.event}</p>
-                          <span className="text-sm text-muted-foreground">{item.time}</span>
-                        </div>
-                      </div>
+              <CardContent className="space-y-4">
+                {order.dispute ? (
+                  <div className="rounded-xl border p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Badge variant={order.dispute.status === 'pending' ? 'destructive' : 'secondary'}>
+                        {order.dispute.status === 'pending' ? '处理中' : '已处理'}
+                      </Badge>
+                      <div className="text-sm text-muted-foreground">{order.dispute.disputeType}</div>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">发起人：</span>
+                        {order.dispute.initiatorName}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">纠纷原因：</span>
+                        {order.dispute.reason}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">创建时间：</span>
+                        {formatDateTime(order.dispute.createdAt)}
+                      </div>
+                      {order.dispute.resolution ? (
+                        <div>
+                          <span className="text-muted-foreground">处理结果：</span>
+                          {order.dispute.resolution}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    当前订单还没有纠纷记录。
+                  </div>
+                )}
+
+                {canCreateDispute ? (
+                  <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
+                    <Label htmlFor="dispute-reason">发起纠纷</Label>
+                    <Textarea
+                      id="dispute-reason"
+                      value={disputeReason}
+                      onChange={(event) => setDisputeReason(event.target.value)}
+                      placeholder="请描述账号异常、售后问题或需要平台介入的原因"
+                      className="min-h-[100px]"
+                    />
+                    <Button onClick={handleCreateDispute} disabled={submittingDispute}>
+                      {submittingDispute ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AlertCircle className="mr-2 h-4 w-4" />}
+                      提交纠纷
+                    </Button>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            {/* Pricing Info */}
             <Card>
               <CardHeader>
                 <CardTitle>订单金额</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm">
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">租金</span>
-                  <span className="font-semibold">¥{order.actual_rental.toFixed(2)}</span>
+                  <span className="font-medium">{formatMoney(order.rentalPrice)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">押金</span>
-                  <span className="font-semibold">¥{order.deposit}</span>
+                  <span className="font-medium">{formatMoney(order.deposit)}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">总价</span>
-                  <span className="text-2xl font-bold text-green-600">¥{order.total_price.toFixed(2)}</span>
-                </div>
-
-                {/* Deposit Status */}
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Shield className="w-4 h-4 text-purple-600" />
-                    <span className="text-purple-700">
-                      押金状态：{order.deposit_status === 'frozen' ? '冻结中' :
-                                 order.deposit_status === 'returned' ? '已退还' : '已扣除'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-purple-600 mt-1">
-                    {order.deposit_status === 'frozen' &&
-                     '租期结束后，若无违规行为将自动退还'}
-                  </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">总计</span>
+                  <span className="text-2xl font-semibold text-green-600">
+                    {formatMoney(order.totalPrice ?? order.total_price)}
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Seller Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>卖家信息</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">{order.seller_name}</p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <span>⭐ {order.seller_rating}</span>
-                      <span>·</span>
-                      <span>{order.seller_orders}单</span>
-                    </div>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  联系卖家
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
             <Card>
               <CardHeader>
                 <CardTitle>订单操作</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {order.status === 'pending_payment' && (
+              <CardContent className="space-y-3">
+                {order.status === 'pending_payment' ? (
                   <>
-                    <Button
-                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                      onClick={handlePayNow}
-                    >
-                      去支付
+                    <Button className="w-full" onClick={handlePayNow}>
+                      立即支付
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        if (confirm('确定要取消订单吗？')) {
-                          // TODO: 实现取消订单功能
-                          toast.info('取消订单功能开发中');
-                        }
-                      }}
-                    >
+                    <Button variant="outline" className="w-full" disabled>
                       取消订单
                     </Button>
                   </>
-                )}
-                {order.status === 'paid' && (
-                  <>
-                    <Button
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                      onClick={loadLoginInfo}
-                      disabled={loadingQr}
-                    >
-                      {loadingQr ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          处理中...
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRight className="w-4 h-4 mr-2" />
-                          开始使用
-                        </>
-                      )}
-                    </Button>
-                    <Link href={`/payment/refund?orderId=${order.id}`}>
-                      <Button variant="outline" className="w-full">
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        申请退款
-                      </Button>
-                    </Link>
-                  </>
-                )}
-                {order.status === 'active' && (
-                  <>
-                    {/* 归还账号按钮 */}
-                    <Button
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                      onClick={handleReturnAccount}
-                      disabled={completingOrder}
-                    >
-                      {completingOrder ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          处理中...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          归还账号
-                        </>
-                      )}
-                    </Button>
+                ) : null}
 
-                    <Button variant="outline" className="w-full">
+                {order.status === 'paid' ? (
+                  <Button className="w-full" onClick={loadLoginInfo} disabled={loadingLoginInfo}>
+                    {loadingLoginInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    开始使用
+                  </Button>
+                ) : null}
+
+                {order.status === 'active' ? (
+                  <>
+                    <Button className="w-full" onClick={handleReturnAccount} disabled={completingOrder}>
+                      {completingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                      归还账号
+                    </Button>
+                    <Button variant="outline" className="w-full" disabled>
                       申请退款
                     </Button>
-                    <Button variant="outline" className="w-full text-orange-600 hover:text-orange-700">
-                      发起纠纷
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      延长租期
-                    </Button>
                   </>
-                )}
-                {order.status === 'pending_verification' && (
-                  <>
-                    <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-                      <div className="flex items-center gap-2 text-sm text-yellow-700">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>等待卖家验收</span>
-                      </div>
-                      <p className="text-xs text-yellow-600 mt-2">
-                        卖家需要在验收截止时间前检查账号状态
-                      </p>
-                    </div>
-                    <Button variant="outline" className="w-full" disabled>
-                      <Clock className="w-4 h-4 mr-2" />
-                      等待验收
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      查看验收进度
-                    </Button>
-                  </>
-                )}
-                {order.status === 'completed' && (
-                  <>
-                    <Button variant="outline" className="w-full">
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                      再次购买
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <FileText className="w-4 h-4 mr-2" />
-                      查看合同
-                    </Button>
-                  </>
-                )}
-                {order.status === 'disputed' && (
-                  <Button variant="outline" className="w-full">
-                    查看纠纷详情
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                ) : null}
 
-            {/* 卖家验收（仅卖家可见） */}
-            {order.status === 'pending_verification' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-orange-600">卖家验收</CardTitle>
-                  <CardDescription>请检查账号状态，确认后完成验收</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Textarea
-                    placeholder="请输入验收备注（选填）"
-                    className="min-h-[80px]"
-                  />
-                  <div className="flex gap-2">
+                {order.status === 'pending_verification' ? (
+                  <>
                     <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleVerifyOrder('pass', '验收通过，账号状态正常')}
+                      className="w-full"
+                      onClick={() => handleVerifyOrder('pass')}
+                      disabled={verifyingOrder !== null}
                     >
-                      <CheckCircle className="w-4 h-4 mr-2" />
+                      {verifyingOrder === 'pass' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                       验收通过
                     </Button>
                     <Button
                       variant="destructive"
-                      className="flex-1"
-                      onClick={() => handleVerifyOrder('reject', '验收失败，账号状态异常')}
+                      className="w-full"
+                      onClick={() => handleVerifyOrder('reject')}
+                      disabled={verifyingOrder !== null}
                     >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      验收拒绝
+                      {verifyingOrder === 'reject' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                      验收不通过
                     </Button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    注意：验收通过后订单将完成并分账，验收拒绝将发起纠纷
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+                  </>
+                ) : null}
+              </CardContent>
+            </Card>
 
-            {/* Help */}
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    遇到问题？
-                  </p>
-                  <Button variant="ghost" className="w-full">
-                    联系客服
-                  </Button>
-                </div>
+              <CardHeader>
+                <CardTitle>帮助支持</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" disabled>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  联系客服
+                </Button>
               </CardContent>
             </Card>
           </div>

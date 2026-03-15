@@ -8,7 +8,7 @@ interface UserContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  refreshUser: () => Promise<void>;
+  refreshUser: (force?: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -46,6 +46,12 @@ function writeCachedUser(user: User) {
   localStorage.setItem(USER_CACHE_TIME_KEY, Date.now().toString());
 }
 
+function clearCachedUser() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(USER_CACHE_KEY);
+  localStorage.removeItem(USER_CACHE_TIME_KEY);
+}
+
 function hasAuthCookie() {
   if (typeof document === 'undefined') {
     return false;
@@ -61,7 +67,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshUser = async () => {
+  const refreshUser = async (force = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -71,11 +77,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       if (!token && !cookieLoggedIn) {
         setUser(null);
+        clearCachedUser();
         clearAuth();
         return;
       }
 
-      if (token) {
+      if (token && !force) {
         const cachedUser = readCachedUser();
         if (cachedUser) {
           setUser(cachedUser);
@@ -104,10 +111,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       setUser(null);
+      clearCachedUser();
       clearAuth();
       setError(data.error || '获取用户信息失败');
     } catch (error) {
       setUser(null);
+      clearCachedUser();
       clearAuth();
       setError('网络错误，请稍后重试');
     } finally {
@@ -135,6 +144,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setError(null);
+      clearCachedUser();
       clearAuth();
     }
   };

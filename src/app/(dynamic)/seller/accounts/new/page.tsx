@@ -80,6 +80,37 @@ interface SkinConfig {
   skins: string[];
 }
 
+const createDefaultFormData = () => ({
+  product_type: '涓夎娲茶鍔ㄥ搱澶竵鍑虹',
+  images: [] as File[],
+  imageUrls: [] as string[],
+  platform: '',
+  province: 'all',
+  city: 'all',
+  login_method: '',
+  qq_account: '',
+  qq_password: '',
+  start_hour: '00',
+  end_hour: '23',
+  coins_value: '',
+  rental_ratio: '',
+  deposit: '',
+  safebox_type: '',
+  stamina_level: '',
+  load_level: '',
+  account_level: '',
+  rank: '',
+  kd: '',
+  selected_skins: [] as string[],
+  awm_bullets: '',
+  level6_helmet: '',
+  level6_armor: '',
+  has_battlepass: false,
+  battlepass_level: '',
+  remark: '',
+  agreement: false,
+});
+
 // 小时列表
 const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
 
@@ -327,13 +358,6 @@ function NewAccountPage() {
     loadData();
   }, []);
 
-  // 加载账号数据（编辑模式）
-  useEffect(() => {
-    if (accountId) {
-      setIsEditMode(true);
-      loadAccountData(accountId);
-    }
-  }, [accountId]);
 
   // 加载账号数据
   const loadAccountData = async (id: string) => {
@@ -350,7 +374,8 @@ function NewAccountPage() {
 
         // 填充表单数据
         setFormData({
-          ...formData,
+          ...createDefaultFormData(),
+          agreement: formData.agreement,
           platform: customAttributes.platform || '',
           province: customAttributes.province || 'all',
           city: customAttributes.city || 'all',
@@ -895,7 +920,7 @@ function NewAccountPage() {
                 onClick={() => setShowAuthDialog(false)}
                 className="flex-1"
               >
-                返回
+                {'\u6211\u7684\u8d26\u53f7'}
               </Button>
               <Button
                 onClick={() => {
@@ -936,11 +961,11 @@ function NewAccountPage() {
             <Link href="/seller/accounts">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                返回
+                {'\u6211\u7684\u8d26\u53f7'}
               </Button>
             </Link>
             <span className="text-sm text-muted-foreground">/</span>
-            <span className="text-sm font-medium">{isEditMode ? '编辑账号' : '上架账号'}</span>
+            <span className="text-sm font-medium">{isEditMode ? '\u7f16\u8f91\u8d26\u53f7' : '\u4e0a\u67b6\u8d26\u53f7'}</span>
           </div>
 
           {/* 页面标题 */}
@@ -1193,7 +1218,7 @@ function NewAccountPage() {
                 {/* 上号方式 */}
                 <div>
                   <Label className="text-sm">上号方式 *</Label>
-                  <Select onValueChange={(value) => setFormData({...formData, login_method: value})}>
+                  <Select value={formData.login_method} onValueChange={(value) => setFormData({...formData, login_method: value})}>
                     <SelectTrigger className="mt-1.5">
                       <SelectValue placeholder="选择上号方式" />
                     </SelectTrigger>
@@ -1517,7 +1542,7 @@ function NewAccountPage() {
                   {/* 安全箱 */}
                   <div>
                     <Label className="text-sm">安全箱 *</Label>
-                    <Select onValueChange={(value) => setFormData({...formData, safebox_type: value})}>
+                    <Select value={formData.safebox_type} onValueChange={(value) => setFormData({...formData, safebox_type: value})}>
                       <SelectTrigger className="mt-1.5">
                         <SelectValue placeholder="选择安全箱类型" />
                       </SelectTrigger>
@@ -1532,7 +1557,7 @@ function NewAccountPage() {
                   {/* 体力等级 */}
                   <div>
                     <Label className="text-sm">体力等级 *</Label>
-                    <Select onValueChange={(value) => setFormData({...formData, stamina_level: value})}>
+                    <Select value={formData.stamina_level} onValueChange={(value) => setFormData({...formData, stamina_level: value})}>
                       <SelectTrigger className="mt-1.5">
                         <SelectValue placeholder="选择体力等级" />
                       </SelectTrigger>
@@ -1548,7 +1573,7 @@ function NewAccountPage() {
                   {/* 负重等级 */}
                   <div>
                     <Label className="text-sm">负重等级 *</Label>
-                    <Select onValueChange={(value) => setFormData({...formData, load_level: value})}>
+                    <Select value={formData.load_level} onValueChange={(value) => setFormData({...formData, load_level: value})}>
                       <SelectTrigger className="mt-1.5">
                         <SelectValue placeholder="选择负重等级" />
                       </SelectTrigger>
@@ -1576,7 +1601,7 @@ function NewAccountPage() {
                   {/* 账号段位 */}
                   <div>
                     <Label className="text-sm">账号段位 *</Label>
-                    <Select onValueChange={(value) => setFormData({...formData, rank: value})}>
+                    <Select value={formData.rank} onValueChange={(value) => setFormData({...formData, rank: value})}>
                       <SelectTrigger className="mt-1.5">
                         <SelectValue placeholder="选择账号段位" />
                       </SelectTrigger>

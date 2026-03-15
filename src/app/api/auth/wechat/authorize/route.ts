@@ -7,10 +7,6 @@ import {
   normalizeReturnTo,
 } from '@/lib/wechat/login-flow';
 
-/**
- * 微信 OAuth 授权入口
- * GET /api/auth/wechat/authorize?state=xxx
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,25 +14,36 @@ export async function GET(request: NextRequest) {
     const returnTo = normalizeReturnTo(searchParams.get('returnTo'));
     const requestHostname = getRequestHostname(request);
 
+    console.log('[wechat-authorize] request received', {
+      state,
+      returnTo,
+      requestHostname,
+    });
+
     if (isLocalHostname(requestHostname)) {
       const redirectUrl = new URL('/login', request.url);
       redirectUrl.searchParams.set(
         'error',
-        '当前是本地开发地址，微信授权回调会跳到已备案公网 HTTPS 域名，所以这里已禁用本地微信登录。'
+        '当前是本地开发地址，微信授权回调必须使用已备案的 HTTPS 公网域名，因此这里已禁用本地微信登录。',
       );
       return NextResponse.redirect(redirectUrl);
     }
 
     const authUrl = await createWechatOauthRedirectUrl(state);
+    console.log('[wechat-authorize] redirecting to wechat oauth', {
+      state,
+      returnTo,
+    });
+
     return attachWechatReturnToCookie(NextResponse.redirect(authUrl), returnTo);
   } catch (error: any) {
-    console.error('微信 OAuth 授权失败:', error);
+    console.error('[wechat-authorize] failed:', error);
     return NextResponse.json(
       {
         success: false,
         error: error.message || '微信 OAuth 授权失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

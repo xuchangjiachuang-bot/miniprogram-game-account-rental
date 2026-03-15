@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { eq, or } from 'drizzle-orm';
+import { and, eq, ne, or } from 'drizzle-orm';
 import { db, users } from './db';
 import { ensureWechatLoginSchema } from './init-wechat-login';
 import { ensureUserBalance } from './user-balance-service';
@@ -58,6 +58,13 @@ export interface LoginResult {
   message: string;
   token?: string;
   user?: User;
+}
+
+export interface UpdateUserProfileParams {
+  nickname?: string;
+  phone?: string;
+  email?: string | null;
+  avatar?: string | null;
 }
 
 interface TokenPayload {
@@ -255,6 +262,53 @@ async function updateUserRow(userId: string, patch: Partial<UserRow>) {
     .returning();
 
   return updated || null;
+}
+
+export async function updateUserProfile(userId: string, params: UpdateUserProfileParams): Promise<User> {
+  const currentRow = await getUserRowById(userId);
+  if (!currentRow) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const nickname = trimToLength(params.nickname ?? currentRow.nickname, USER_NICKNAME_MAX_LENGTH);
+  const phone = trimToLength(params.phone ?? currentRow.phone, 20);
+  const email = trimToLength(params.email ?? currentRow.email, 100);
+  const avatar = trimToLength(params.avatar ?? currentRow.avatar, WECHAT_AVATAR_MAX_LENGTH);
+
+  if (!nickname) {
+    throw new Error('INVALID_NICKNAME');
+  }
+
+  if (!phone) {
+    throw new Error('INVALID_PHONE');
+  }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('INVALID_EMAIL');
+  }
+
+  const duplicatedPhoneRows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.phone, phone), ne(users.id, userId)))
+    .limit(1);
+
+  if (duplicatedPhoneRows.length > 0) {
+    throw new Error('PHONE_ALREADY_USED');
+  }
+
+  const updatedRow = await updateUserRow(userId, {
+    nickname,
+    phone,
+    email,
+    avatar,
+  });
+
+  if (!updatedRow) {
+    throw new Error('PROFILE_UPDATE_FAILED');
+  }
+
+  return normalizeUser(updatedRow);
 }
 
 function buildIdentityPatch(openid: string, source: 'mp' | 'open', row?: UserRow | null): WechatIdentityPatch {

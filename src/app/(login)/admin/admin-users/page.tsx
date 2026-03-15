@@ -246,8 +246,6 @@ function AdminUsersContent() {
       <AdminHeader
         title="管理员账号管理"
         showAdminUsers={false}
-        showWechatConfig={true}
-        showWechatStatus={true}
       />
 
       <div className="container mx-auto p-6">
