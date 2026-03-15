@@ -74,6 +74,15 @@ const emptyForm: FormState = {
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
 
+function trimPreviewText(value: string, maxLength: number) {
+  const text = value.trim();
+  if (!text) {
+    return '';
+  }
+
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
 function normalizeFaqItems(value: unknown): FaqItem[] {
   if (!Array.isArray(value)) {
     return [];
@@ -152,6 +161,14 @@ export default function SearchContentPage() {
 
     return `/${form.pageType}/${normalizedSlug}`;
   }, [form.pageType, normalizedSlug]);
+
+  const searchPreviewTitle = form.seoTitle.trim() || form.title.trim() || '页面标题预览';
+  const searchPreviewDescription =
+    form.seoDescription.trim() || form.summary.trim() || '这里会显示搜索结果中的描述摘要。';
+  const sharePreviewTitle = form.ogTitle.trim() || searchPreviewTitle;
+  const sharePreviewDescription = form.ogDescription.trim() || searchPreviewDescription;
+  const aiPreviewSummary =
+    form.seoSummary.trim() || form.summary.trim() || '这里会显示 AI / GEO 摘要，用于搜索和内容理解。';
 
   const slugConflict = useMemo(
     () =>
@@ -487,6 +504,47 @@ export default function SearchContentPage() {
               <div className="space-y-2">
                 <Label htmlFor="ogImage">OG 图片</Label>
                 <Input id="ogImage" value={form.ogImage} onChange={(e) => updateForm('ogImage', e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <div className="rounded-xl border bg-white p-4">
+                <div className="text-sm font-medium text-gray-900">搜索结果预览</div>
+                <div className="mt-4 space-y-1">
+                  <div className="text-xs text-green-700">{previewPath ? `${siteUrl}${previewPath}` : siteUrl}</div>
+                  <div className="text-lg font-medium leading-6 text-blue-700">
+                    {trimPreviewText(searchPreviewTitle, 60)}
+                  </div>
+                  <p className="text-sm leading-6 text-gray-600">
+                    {trimPreviewText(searchPreviewDescription, 140)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-white p-4">
+                <div className="text-sm font-medium text-gray-900">社交分享预览</div>
+                <div className="mt-4 overflow-hidden rounded-xl border bg-gray-50">
+                  <div className="flex h-32 items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-sm text-gray-500">
+                    {form.ogImage.trim() ? '已配置 OG 图片' : '未配置 OG 图片'}
+                  </div>
+                  <div className="space-y-2 p-4">
+                    <div className="font-medium text-gray-900">{trimPreviewText(sharePreviewTitle, 48)}</div>
+                    <p className="text-sm leading-6 text-gray-600">
+                      {trimPreviewText(sharePreviewDescription, 110)}
+                    </p>
+                    <div className="text-xs text-gray-500">{previewPath ? `${siteUrl}${previewPath}` : siteUrl}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-white p-4">
+                <div className="text-sm font-medium text-gray-900">AI / GEO 预览</div>
+                <div className="mt-4 rounded-xl bg-gray-50 p-4">
+                  <div className="text-sm font-medium text-gray-900">{trimPreviewText(searchPreviewTitle, 40)}</div>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    {trimPreviewText(aiPreviewSummary, 150)}
+                  </p>
+                </div>
               </div>
             </div>
 

@@ -56,6 +56,15 @@ const emptyForm: FormState = {
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
 
+function trimPreviewText(value: string, maxLength: number) {
+  const text = value.trim();
+  if (!text) {
+    return '';
+  }
+
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
 function toFormState(item?: AccountSeoItem | null): FormState {
   if (!item) {
     return emptyForm;
@@ -88,6 +97,15 @@ export default function AccountSeoPage() {
   );
 
   const previewPath = form.entityKey ? `/accounts/${form.entityKey}` : '';
+  const searchPreviewTitle = form.title.trim() || selectedItem?.title || '商品标题预览';
+  const searchPreviewDescription =
+    form.description.trim() ||
+    selectedItem?.description ||
+    '这里会显示商品详情页的搜索结果摘要。';
+  const sharePreviewTitle = form.ogTitle.trim() || searchPreviewTitle;
+  const sharePreviewDescription = form.ogDescription.trim() || searchPreviewDescription;
+  const aiPreviewSummary =
+    form.summary.trim() || form.description.trim() || selectedItem?.description || '这里会显示 AI / GEO 摘要。';
 
   const loadItems = async (keyword = '') => {
     setLoading(true);
@@ -304,6 +322,47 @@ export default function AccountSeoPage() {
                       value={form.ogImage}
                       onChange={(e) => updateForm('ogImage', e.target.value)}
                     />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-xl border bg-white p-4">
+                    <div className="text-sm font-medium text-gray-900">搜索结果预览</div>
+                    <div className="mt-4 space-y-1">
+                      <div className="text-xs text-green-700">{`${siteUrl}${previewPath}`}</div>
+                      <div className="text-lg font-medium leading-6 text-blue-700">
+                        {trimPreviewText(searchPreviewTitle, 60)}
+                      </div>
+                      <p className="text-sm leading-6 text-gray-600">
+                        {trimPreviewText(searchPreviewDescription, 140)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <div className="text-sm font-medium text-gray-900">社交分享预览</div>
+                    <div className="mt-4 overflow-hidden rounded-xl border bg-gray-50">
+                      <div className="flex h-32 items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-sm text-gray-500">
+                        {form.ogImage.trim() ? '已配置 OG 图片' : '未配置 OG 图片'}
+                      </div>
+                      <div className="space-y-2 p-4">
+                        <div className="font-medium text-gray-900">{trimPreviewText(sharePreviewTitle, 48)}</div>
+                        <p className="text-sm leading-6 text-gray-600">
+                          {trimPreviewText(sharePreviewDescription, 110)}
+                        </p>
+                        <div className="text-xs text-gray-500">{`${siteUrl}${previewPath}`}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <div className="text-sm font-medium text-gray-900">AI / GEO 预览</div>
+                    <div className="mt-4 rounded-xl bg-gray-50 p-4">
+                      <div className="text-sm font-medium text-gray-900">{trimPreviewText(searchPreviewTitle, 40)}</div>
+                      <p className="mt-2 text-sm leading-6 text-gray-600">
+                        {trimPreviewText(aiPreviewSummary, 150)}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
