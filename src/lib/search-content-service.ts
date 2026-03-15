@@ -38,6 +38,15 @@ export type ContentPageInput = {
   status: string;
 };
 
+export class SearchContentError extends Error {
+  code: string;
+
+  constructor(code: string, message?: string) {
+    super(message || code);
+    this.code = code;
+  }
+}
+
 function normalizeSlug(slug: string) {
   return slug
     .trim()
@@ -83,6 +92,18 @@ export async function getContentPageById(id: string) {
   return rows[0] || null;
 }
 
+export async function findContentPageBySlug(pageType: string, slug: string) {
+  const rows = await sqlClient<ContentPageRecord[]>`
+    SELECT *
+    FROM content_pages
+    WHERE page_type = ${pageType}
+      AND slug = ${normalizeSlug(slug)}
+    LIMIT 1
+  `;
+
+  return rows[0] || null;
+}
+
 export async function getPublishedContentPageBySlug(pageType: string, slug: string) {
   const rows = await sqlClient<ContentPageRecord[]>`
     SELECT *
@@ -121,6 +142,19 @@ export async function upsertContentPage(input: ContentPageInput & { id?: string 
   const slug = normalizeSlug(input.slug);
   const faqJson = normalizeFaqJson(input.faqJson);
   const publishedAt = input.status === 'published' ? new Date().toISOString() : null;
+
+  if (!slug) {
+    throw new SearchContentError('INVALID_SLUG');
+  }
+
+  if (!input.title.trim()) {
+    throw new SearchContentError('INVALID_TITLE');
+  }
+
+  const existing = await findContentPageBySlug(input.pageType, slug);
+  if (existing && existing.id !== input.id) {
+    throw new SearchContentError('SLUG_ALREADY_EXISTS');
+  }
 
   if (input.id) {
     const rows = await sqlClient<ContentPageRecord[]>`

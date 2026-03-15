@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { deleteContentPage, getContentPageById, upsertContentPage } from '@/lib/search-content-service';
+import { deleteContentPage, getContentPageById, SearchContentError, upsertContentPage } from '@/lib/search-content-service';
 
 export async function GET(
   request: NextRequest,
@@ -61,6 +61,9 @@ export async function PUT(
     return NextResponse.json({ success: true, data: page });
   } catch (error: any) {
     console.error('[admin-search-content] update failed:', error);
+    if (error instanceof SearchContentError) {
+      return NextResponse.json({ success: false, error: error.code }, { status: 400 });
+    }
     return NextResponse.json(
       { success: false, error: error.message || 'FAILED_TO_UPDATE_CONTENT_PAGE' },
       { status: 500 },

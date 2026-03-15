@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { ExternalLink, Plus, Save, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,11 @@ type ContentPage = {
   updated_at: string;
 };
 
+type FaqItem = {
+  question: string;
+  answer: string;
+};
+
 type FormState = {
   id?: string;
   slug: string;
@@ -38,7 +44,7 @@ type FormState = {
   title: string;
   summary: string;
   content: string;
-  faqJson: string;
+  faqItems: FaqItem[];
   seoTitle: string;
   seoDescription: string;
   seoSummary: string;
@@ -55,7 +61,7 @@ const emptyForm: FormState = {
   title: '',
   summary: '',
   content: '',
-  faqJson: '[]',
+  faqItems: [],
   seoTitle: '',
   seoDescription: '',
   seoSummary: '',
@@ -65,6 +71,19 @@ const emptyForm: FormState = {
   indexable: true,
   status: 'draft',
 };
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
+
+function normalizeFaqItems(value: unknown): FaqItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => ({
+    question: String((item as any)?.question || ''),
+    answer: String((item as any)?.answer || ''),
+  }));
+}
 
 function toFormState(page?: ContentPage | null): FormState {
   if (!page) {
@@ -78,7 +97,7 @@ function toFormState(page?: ContentPage | null): FormState {
     title: page.title,
     summary: page.summary || '',
     content: page.content || '',
-    faqJson: JSON.stringify(page.faq_json || [], null, 2),
+    faqItems: normalizeFaqItems(page.faq_json),
     seoTitle: page.seo_title || '',
     seoDescription: page.seo_description || '',
     seoSummary: page.seo_summary || '',
@@ -88,6 +107,19 @@ function toFormState(page?: ContentPage | null): FormState {
     indexable: Boolean(page.indexable),
     status: page.status || 'draft',
   };
+}
+
+function mapErrorMessage(code: string) {
+  switch (code) {
+    case 'SLUG_ALREADY_EXISTS':
+      return '同类型页面下 slug 已存在，请更换。';
+    case 'INVALID_SLUG':
+      return '请填写合法的 slug。';
+    case 'INVALID_TITLE':
+      return '标题不能为空。';
+    default:
+      return code;
+  }
 }
 
 export default function SearchContentPage() {
@@ -102,6 +134,36 @@ export default function SearchContentPage() {
     [pages, selectedId],
   );
 
+  const normalizedSlug = useMemo(
+    () =>
+      form.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-/]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, ''),
+    [form.slug],
+  );
+
+  const previewPath = useMemo(() => {
+    if (!normalizedSlug) {
+      return '';
+    }
+
+    return `/${form.pageType}/${normalizedSlug}`;
+  }, [form.pageType, normalizedSlug]);
+
+  const slugConflict = useMemo(
+    () =>
+      pages.find(
+        (item) =>
+          item.page_type === form.pageType &&
+          item.slug === normalizedSlug &&
+          item.id !== form.id,
+      ) || null,
+    [form.id, form.pageType, normalizedSlug, pages],
+  );
+
   const loadPages = async () => {
     setLoading(true);
     try {
@@ -112,7 +174,7 @@ export default function SearchContentPage() {
       }
       setPages(result.data || []);
     } catch (error: any) {
-      toast.error(error.message || '加载内容页失败');
+      toast.error(mapErrorMessage(error.message || 'FAILED_TO_LOAD_CONTENT_PAGES'));
     } finally {
       setLoading(false);
     }
@@ -126,20 +188,35 @@ export default function SearchContentPage() {
     setForm(toFormState(selectedPage));
   }, [selectedPage]);
 
+  const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
   const handleCreate = () => {
     setSelectedId('');
     setForm(emptyForm);
   };
 
   const handleSave = async () => {
+    if (slugConflict) {
+      toast.error('当前 slug 已被占用，请调整后再保存。');
+      return;
+    }
+
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        slug: normalizedSlug,
+        faqJson: form.faqItems.filter((item) => item.question.trim() || item.answer.trim()),
+      };
+
       const response = await fetch(
         form.id ? `/api/admin/search-content/pages/${form.id}` : '/api/admin/search-content/pages',
         {
           method: form.id ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         },
       );
       const result = await response.json();
@@ -152,7 +229,7 @@ export default function SearchContentPage() {
       }
       toast.success('内容页已保存');
     } catch (error: any) {
-      toast.error(error.message || '保存失败');
+      toast.error(mapErrorMessage(error.message || 'FAILED_TO_SAVE_CONTENT_PAGE'));
     } finally {
       setSaving(false);
     }
@@ -180,8 +257,25 @@ export default function SearchContentPage() {
       setForm(emptyForm);
       await loadPages();
     } catch (error: any) {
-      toast.error(error.message || '删除失败');
+      toast.error(mapErrorMessage(error.message || 'FAILED_TO_DELETE_CONTENT_PAGE'));
     }
+  };
+
+  const addFaqItem = () => {
+    updateForm('faqItems', [...form.faqItems, { question: '', answer: '' }]);
+  };
+
+  const updateFaqItem = (index: number, key: keyof FaqItem, value: string) => {
+    const nextItems = [...form.faqItems];
+    nextItems[index] = { ...nextItems[index], [key]: value };
+    updateForm('faqItems', nextItems);
+  };
+
+  const removeFaqItem = (index: number) => {
+    updateForm(
+      'faqItems',
+      form.faqItems.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
 
   return (
@@ -203,7 +297,7 @@ export default function SearchContentPage() {
         <Card>
           <CardHeader>
             <CardTitle>内容页列表</CardTitle>
-            <CardDescription>先从帮助页和规则页开始搭建搜索内容资产。</CardDescription>
+            <CardDescription>先从帮助页、规则页和专题页开始。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? (
@@ -234,13 +328,15 @@ export default function SearchContentPage() {
         <Card>
           <CardHeader>
             <CardTitle>{form.id ? '编辑内容页' : '新建内容页'}</CardTitle>
-            <CardDescription>公开内容页会用于搜索引擎收录、FAQ 摘要和 sitemap。</CardDescription>
+            <CardDescription>
+              公开内容页会用于搜索引擎收录、FAQ 摘要和 sitemap。
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="pageType">页面类型</Label>
-                <Select value={form.pageType} onValueChange={(value) => setForm((current) => ({ ...current, pageType: value }))}>
+                <Select value={form.pageType} onValueChange={(value) => updateForm('pageType', value)}>
                   <SelectTrigger id="pageType">
                     <SelectValue />
                   </SelectTrigger>
@@ -253,7 +349,7 @@ export default function SearchContentPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">发布状态</Label>
-                <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}>
+                <Select value={form.status} onValueChange={(value) => updateForm('status', value)}>
                   <SelectTrigger id="status">
                     <SelectValue />
                   </SelectTrigger>
@@ -265,59 +361,123 @@ export default function SearchContentPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="title">标题</Label>
-                <Input id="title" value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} />
+                <Input id="title" value={form.title} onChange={(e) => updateForm('title', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
-                <Input id="slug" value={form.slug} onChange={(e) => setForm((current) => ({ ...current, slug: e.target.value }))} />
+                <Input id="slug" value={form.slug} onChange={(e) => updateForm('slug', e.target.value)} />
+                {normalizedSlug ? (
+                  <p className="text-xs text-gray-500">{`规范化后：${normalizedSlug}`}</p>
+                ) : null}
+                {slugConflict ? (
+                  <p className="text-xs text-red-500">{`slug 冲突：已存在《${slugConflict.title}》`}</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-medium text-gray-900">预览链接</div>
+                  <div className="text-sm text-gray-600">
+                    {previewPath ? `${siteUrl}${previewPath}` : '填写 slug 后生成预览链接'}
+                  </div>
+                </div>
+                {previewPath ? (
+                  <Button asChild variant="outline">
+                    <Link href={previewPath} target="_blank">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      打开预览
+                    </Link>
+                  </Button>
+                ) : null}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="summary">页面摘要</Label>
-              <Textarea id="summary" value={form.summary} onChange={(e) => setForm((current) => ({ ...current, summary: e.target.value }))} rows={3} />
+              <Textarea id="summary" value={form.summary} onChange={(e) => updateForm('summary', e.target.value)} rows={3} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="content">正文内容</Label>
-              <Textarea id="content" value={form.content} onChange={(e) => setForm((current) => ({ ...current, content: e.target.value }))} rows={14} />
+              <Textarea id="content" value={form.content} onChange={(e) => updateForm('content', e.target.value)} rows={14} />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="faqJson">FAQ JSON</Label>
-              <Textarea id="faqJson" value={form.faqJson} onChange={(e) => setForm((current) => ({ ...current, faqJson: e.target.value }))} rows={8} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>FAQ</Label>
+                  <p className="text-xs text-gray-500">建议维护用户真实会问的问题，方便搜索和 AI 引用。</p>
+                </div>
+                <Button type="button" variant="outline" onClick={addFaqItem}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  添加 FAQ
+                </Button>
+              </div>
+              {form.faqItems.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
+                  暂无 FAQ，点击右上角添加。
+                </div>
+              ) : (
+                form.faqItems.map((item, index) => (
+                  <div key={`faq-${index}`} className="space-y-3 rounded-lg border p-4">
+                    <div className="space-y-2">
+                      <Label>{`问题 ${index + 1}`}</Label>
+                      <Input
+                        value={item.question}
+                        onChange={(e) => updateFaqItem(index, 'question', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{`回答 ${index + 1}`}</Label>
+                      <Textarea
+                        value={item.answer}
+                        onChange={(e) => updateFaqItem(index, 'answer', e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="button" variant="destructive" onClick={() => removeFaqItem(index)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        删除 FAQ
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="seoTitle">SEO 标题</Label>
-                <Input id="seoTitle" value={form.seoTitle} onChange={(e) => setForm((current) => ({ ...current, seoTitle: e.target.value }))} />
+                <Input id="seoTitle" value={form.seoTitle} onChange={(e) => updateForm('seoTitle', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ogTitle">OG 标题</Label>
-                <Input id="ogTitle" value={form.ogTitle} onChange={(e) => setForm((current) => ({ ...current, ogTitle: e.target.value }))} />
+                <Input id="ogTitle" value={form.ogTitle} onChange={(e) => updateForm('ogTitle', e.target.value)} />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="seoDescription">SEO 描述</Label>
-                <Textarea id="seoDescription" value={form.seoDescription} onChange={(e) => setForm((current) => ({ ...current, seoDescription: e.target.value }))} rows={4} />
+                <Textarea id="seoDescription" value={form.seoDescription} onChange={(e) => updateForm('seoDescription', e.target.value)} rows={4} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ogDescription">OG 描述</Label>
-                <Textarea id="ogDescription" value={form.ogDescription} onChange={(e) => setForm((current) => ({ ...current, ogDescription: e.target.value }))} rows={4} />
+                <Textarea id="ogDescription" value={form.ogDescription} onChange={(e) => updateForm('ogDescription', e.target.value)} rows={4} />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="seoSummary">AI 摘要友好简介</Label>
-                <Textarea id="seoSummary" value={form.seoSummary} onChange={(e) => setForm((current) => ({ ...current, seoSummary: e.target.value }))} rows={4} />
+                <Textarea id="seoSummary" value={form.seoSummary} onChange={(e) => updateForm('seoSummary', e.target.value)} rows={4} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ogImage">OG 图片</Label>
-                <Input id="ogImage" value={form.ogImage} onChange={(e) => setForm((current) => ({ ...current, ogImage: e.target.value }))} />
+                <Input id="ogImage" value={form.ogImage} onChange={(e) => updateForm('ogImage', e.target.value)} />
               </div>
             </div>
 
@@ -326,7 +486,7 @@ export default function SearchContentPage() {
                 <div className="font-medium text-gray-900">允许搜索引擎收录</div>
                 <div className="text-sm text-gray-500">关闭后不会进入 sitemap，也会输出 noindex。</div>
               </div>
-              <Switch checked={form.indexable} onCheckedChange={(checked) => setForm((current) => ({ ...current, indexable: checked }))} />
+              <Switch checked={form.indexable} onCheckedChange={(checked) => updateForm('indexable', checked)} />
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
@@ -334,7 +494,7 @@ export default function SearchContentPage() {
                 <Trash2 className="mr-2 h-4 w-4" />
                 删除
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving || Boolean(slugConflict)}>
                 <Save className="mr-2 h-4 w-4" />
                 {saving ? '保存中...' : '保存内容页'}
               </Button>
