@@ -51,6 +51,18 @@ interface WalletUiSettings {
   withdrawalFee: number;
 }
 
+interface WithdrawalRecord {
+  id: string;
+  withdrawalNo?: string;
+  amount: number;
+  actualAmount?: number;
+  status: string;
+  createdAt: string;
+  reviewTime?: string | null;
+  reviewRemark?: string | null;
+  failureReason?: string | null;
+}
+
 export default function UserCenterPage() {
   const { user, loading, refreshUser } = useUser();
   const [activeTab, setActiveTab] = useState('profile');
@@ -117,6 +129,7 @@ export default function UserCenterPage() {
   // 钱包状态
   const [balance, setBalance] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [rechargeAmount, setRechargeAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
@@ -319,12 +332,16 @@ export default function UserCenterPage() {
 
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const [balanceResponse, transactionsResponse] = await Promise.all([
+      const [balanceResponse, transactionsResponse, withdrawalsResponse] = await Promise.all([
         fetch('/api/wallet', {
           headers,
           cache: 'no-store'
         }),
         fetch('/api/wallet/transactions?page=1&pageSize=10', {
+          headers,
+          cache: 'no-store'
+        }),
+        fetch('/api/withdrawals', {
           headers,
           cache: 'no-store'
         })
@@ -338,11 +355,17 @@ export default function UserCenterPage() {
         throw new Error('加载钱包流水失败');
       }
 
+      if (!withdrawalsResponse.ok) {
+        throw new Error('鍔犺浇鎻愮幇璁板綍澶辫触');
+      }
+
       const balanceResult = await balanceResponse.json();
       const transactionsResult = await transactionsResponse.json();
+      const withdrawalsResult = await withdrawalsResponse.json();
 
       setBalance(balanceResult.data || null);
       setTransactions(transactionsResult.data?.list || []);
+      setWithdrawals(withdrawalsResult.data?.withdrawals || []);
     } catch (error) {
       console.error('加载钱包数据失败:', error);
       toast.error('加载钱包数据失败');
@@ -530,6 +553,19 @@ export default function UserCenterPage() {
     }
 
     return getTransactionTypeText(type);
+  };
+
+  const getWithdrawalStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary">{'\u5f85\u5ba1\u6838'}</Badge>;
+      case 'approved':
+        return <Badge className="bg-green-500">{'\u5df2\u901a\u8fc7'}</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">{'\u5df2\u62d2\u7edd'}</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   // 充值
@@ -1571,6 +1607,88 @@ export default function UserCenterPage() {
                             <div className={`text-lg font-semibold ${getTransactionTypeColor(transaction.transaction_type)}`}>
                               {getTransactionDisplayAmount(transaction) >= 0 ? '+' : ''}
                               {formatBalance(getTransactionDisplayAmount(transaction))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col gap-2">
+                      <CardTitle>{'\u63d0\u73b0\u8bb0\u5f55'}</CardTitle>
+                      <CardDescription>
+                        {'\u5728\u8fd9\u91cc\u53ef\u4ee5\u67e5\u770b\u63d0\u73b0\u72b6\u6001\u3001\u5ba1\u6838\u65f6\u95f4\u548c\u5907\u6ce8\u539f\u56e0\u3002'}
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {withdrawals.length === 0 ? (
+                        <div className="py-8 text-center text-gray-500">
+                          {'\u6682\u65e0\u63d0\u73b0\u8bb0\u5f55'}
+                        </div>
+                      ) : (
+                        withdrawals.slice(0, 10).map((withdrawal) => (
+                          <div
+                            key={withdrawal.id}
+                            className="rounded-lg border p-4 transition-colors hover:bg-accent"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {getWithdrawalStatusBadge(withdrawal.status)}
+                                  {withdrawal.withdrawalNo ? (
+                                    <span className="text-xs text-gray-500">{withdrawal.withdrawalNo}</span>
+                                  ) : null}
+                                </div>
+                                <div className="grid gap-1 text-sm text-gray-600">
+                                  <p>
+                                    {'\u7533\u8bf7\u91d1\u989d\uff1a'}
+                                    <span className="ml-1 font-medium text-gray-900">
+                                      {formatBalance(Number(withdrawal.amount || 0))}
+                                    </span>
+                                  </p>
+                                  <p>
+                                    {'\u5b9e\u9645\u5230\u8d26\uff1a'}
+                                    <span className="ml-1 font-medium text-gray-900">
+                                      {formatBalance(Number(withdrawal.actualAmount || 0))}
+                                    </span>
+                                  </p>
+                                  <p>
+                                    {'\u7533\u8bf7\u65f6\u95f4\uff1a'}
+                                    <span className="ml-1">
+                                      {new Date(withdrawal.createdAt).toLocaleString('zh-CN')}
+                                    </span>
+                                  </p>
+                                  {withdrawal.reviewTime ? (
+                                    <p>
+                                      {'\u5ba1\u6838\u65f6\u95f4\uff1a'}
+                                      <span className="ml-1">
+                                        {new Date(withdrawal.reviewTime).toLocaleString('zh-CN')}
+                                      </span>
+                                    </p>
+                                  ) : null}
+                                </div>
+                                {withdrawal.reviewRemark ? (
+                                  <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                    <span className="font-medium">{'\u5ba1\u6838\u5907\u6ce8\uff1a'}</span>
+                                    {withdrawal.reviewRemark}
+                                  </div>
+                                ) : null}
+                                {withdrawal.failureReason ? (
+                                  <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    <span className="font-medium">{'\u5931\u8d25\u539f\u56e0\uff1a'}</span>
+                                    {withdrawal.failureReason}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <div className="text-lg font-semibold text-gray-900">
+                                  {formatBalance(Number(withdrawal.amount || 0))}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ))
