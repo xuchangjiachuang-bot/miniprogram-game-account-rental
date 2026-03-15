@@ -990,32 +990,32 @@ export default function UserCenterPage() {
           <h1 className="text-2xl font-bold mb-6">个人中心</h1>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid h-auto w-full grid-cols-3 gap-2 md:grid-cols-7">
-              <TabsTrigger value="profile" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+            <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-2xl bg-muted/30 p-1 sm:grid-cols-7 sm:gap-1 sm:bg-transparent sm:p-0">
+              <TabsTrigger value="profile" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <User className="h-4 w-4 sm:mr-2" />
                 个人资料
               </TabsTrigger>
-              <TabsTrigger value="verification" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="verification" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <Shield className="h-4 w-4 sm:mr-2" />
                 实名认证
               </TabsTrigger>
-              <TabsTrigger value="chats" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="chats" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <MessageSquare className="h-4 w-4 sm:mr-2" />
                 群聊
               </TabsTrigger>
-              <TabsTrigger value="orders" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="orders" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <FileText className="h-4 w-4 sm:mr-2" />
                 我的订单
               </TabsTrigger>
-              <TabsTrigger value="accounts" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="accounts" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <Users className="h-4 w-4 sm:mr-2" />
                 我的账号
               </TabsTrigger>
-              <TabsTrigger value="wallet" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="wallet" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <Wallet className="h-4 w-4 sm:mr-2" />
                 我的钱包
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex min-h-[64px] flex-col gap-1 px-2 py-2 text-[11px] leading-tight sm:min-h-0 sm:flex-row sm:text-sm">
+              <TabsTrigger value="notifications" className="flex min-h-[52px] flex-col gap-1 px-1.5 py-1.5 text-[10px] leading-tight sm:min-h-0 sm:flex-row sm:px-2 sm:py-2 sm:text-sm">
                 <Bell className="h-4 w-4 sm:mr-2" />
                 通知
               </TabsTrigger>
@@ -1385,19 +1385,16 @@ export default function UserCenterPage() {
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>我的账号</CardTitle>
-                    <CardDescription>统一从这里进入账号管理、编辑和继续上架流程。</CardDescription>
+                    <CardTitle>{'\u6211\u7684\u8d26\u53f7'}</CardTitle>
+                    <CardDescription>{'\u4ece\u8fd9\u91cc\u8fdb\u5165\u8d26\u53f7\u7ba1\u7406\u548c\u4e0a\u67b6\u6d41\u7a0b\u3002'}</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
-                      上架账号页中的“返回”将回到这里对应的账号管理链路，避免和个人资料、钱包入口混在一起。
-                    </div>
+                  <CardContent className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Button onClick={() => window.location.href = '/seller/accounts'} className="w-full">
-                        查看我的账号
+                        {'\u67e5\u770b\u6211\u7684\u8d26\u53f7'}
                       </Button>
                       <Button variant="outline" onClick={() => window.location.href = '/seller/accounts/new'} className="w-full">
-                        上架新账号
+                        {'\u4e0a\u67b6\u65b0\u8d26\u53f7'}
                       </Button>
                     </div>
                   </CardContent>

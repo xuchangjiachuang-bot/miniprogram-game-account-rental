@@ -81,7 +81,7 @@ interface SkinConfig {
 }
 
 const createDefaultFormData = () => ({
-  product_type: '涓夎娲茶鍔ㄥ搱澶竵鍑虹',
+  product_type: '\u4e09\u89d2\u6d32\u884c\u52a8\u54c8\u592b\u5e01\u51fa\u79df',
   images: [] as File[],
   imageUrls: [] as string[],
   platform: '',
@@ -1413,7 +1413,7 @@ function NewAccountPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <Info className="w-3.5 h-3.5 text-purple-600" />
                       <span className="text-purple-900">
-                        建议比例：<span className="font-bold">1:{suggestedRatio}</span>
+                        <>{'\u7ecf\u9a8c\u53c2\u8003\u533a\u95f4'}<span className="font-bold">{`: 1:${suggestedRatio}`}</span></>
                       </span>
                     </div>
                   </div>

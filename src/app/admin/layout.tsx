@@ -54,7 +54,7 @@ const defaultMenuItems = [
   { id: 'users', title: '用户管理', href: '/admin/users', icon: Users },
   { id: 'wecom-customer-service', title: '企业微信', href: '/admin/wecom-customer-service', icon: Headset },
   { id: 'sms', title: '短信服务', href: '/admin/sms', icon: MessageSquareText },
-  { id: 'withdrawals', title: '提现分账', href: '/admin/withdrawals', icon: Wallet },
+  { id: 'withdrawals', title: '提现审核', href: '/admin/withdrawals', icon: Wallet },
   { id: 'homepage', title: '首页配置', href: '/admin/homepage', icon: LayoutDashboard },
   { id: 'skins', title: '皮肤管理', href: '/admin/skins', icon: LayoutDashboard },
   { id: 'commission-activities', title: '优惠活动', href: '/admin/commission-activities', icon: RefreshCw },

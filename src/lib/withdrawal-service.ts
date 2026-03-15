@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { balanceTransactions, db, userBalances, users, withdrawals } from './db';
 import { createTransferBill } from '@/lib/wechat/v3';
 
@@ -33,7 +33,7 @@ export async function getWithdrawalRequests(params: {
             nickname: users.nickname,
           })
           .from(users)
-          .where(sql`id = ANY(${userIds})`)
+          .where(inArray(users.id, userIds))
       : [];
 
     const userMap = new Map(userList.map((user) => [user.id, user]));
