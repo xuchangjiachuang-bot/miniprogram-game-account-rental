@@ -28,7 +28,7 @@ function getDefaultSettings() {
     requireManualReview: true,
     autoApproveVerified: false,
     listingDepositAmount: 50,
-    orderPaymentTimeout: 1800,
+    orderPaymentTimeout: 180,
     wechatMpAppId: '',
     wechatMpAppSecret: '',
     wechatOpenAppId: '',

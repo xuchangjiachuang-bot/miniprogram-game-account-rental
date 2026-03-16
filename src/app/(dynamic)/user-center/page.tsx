@@ -165,6 +165,8 @@ export default function UserCenterPage() {
     front: '',
     back: ''
   });
+  const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [verificationReviewComment, setVerificationReviewComment] = useState('');
 
   // 文件上传输入框引用
   const idCardFrontRef = useRef<HTMLInputElement>(null);
@@ -252,6 +254,48 @@ export default function UserCenterPage() {
         break;
     }
   }, [user, activeTab]);
+
+  useEffect(() => {
+    if (!user || activeTab !== 'verification') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadVerificationStatus = async () => {
+      try {
+        const token = getToken();
+        const response = await fetch('/api/verification/result', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: 'no-store',
+        });
+        const result = await response.json();
+        if (!result.success || cancelled) {
+          return;
+        }
+
+        const nextStatus = result.data?.status || 'none';
+        setVerificationStatus(nextStatus);
+        setVerificationReviewComment(result.data?.reviewComment || '');
+
+        if (result.passed) {
+          await refreshUser(true);
+        }
+      } catch (error) {
+        console.error('加载实名认证状态失败:', error);
+      }
+    };
+
+    void loadVerificationStatus();
+    const timer = window.setInterval(() => {
+      void loadVerificationStatus();
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [user?.id, activeTab, refreshUser]);
 
   useEffect(() => {
     if (activeTab !== 'chats' || !user) {
@@ -1175,6 +1219,16 @@ export default function UserCenterPage() {
                         </div>
                       </div>
 
+                      {verificationStatus === 'pending' ? (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                          实名认证已提交，正在等待后台审核。
+                        </div>
+                      ) : null}
+                      {verificationStatus === 'rejected' ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                          审核未通过。{verificationReviewComment || '请根据提示重新提交。'}
+                        </div>
+                      ) : null}
                       <Button
                         onClick={() => setVerificationDialogOpen(true)}
                         className="w-full"

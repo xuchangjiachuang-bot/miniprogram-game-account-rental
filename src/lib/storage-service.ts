@@ -355,15 +355,20 @@ export async function resolveStoredFileReference(
     return null;
   }
 
-  if (
-    reference.startsWith('http://') ||
-    reference.startsWith('https://') ||
-    reference.startsWith('/')
-  ) {
-    return reference;
+  const normalizedReference = reference.trim();
+  if (!normalizedReference) {
+    return null;
   }
 
-  return generateFileUrl(reference, expireTime);
+  if (
+    normalizedReference.startsWith('http://') ||
+    normalizedReference.startsWith('https://') ||
+    normalizedReference.startsWith('/')
+  ) {
+    return normalizedReference;
+  }
+
+  return generateFileUrl(normalizedReference, expireTime);
 }
 
 export async function listFiles(

@@ -53,6 +53,9 @@ export async function createVerificationApplication(
   params: CreateVerificationParams
 ): Promise<{ success: boolean; data?: VerificationApplication; error?: string }> {
   try {
+    const normalizedFrontUrl = params.idCardFrontUrl.trim();
+    const normalizedBackUrl = params.idCardBackUrl.trim();
+
     // 检查是否已有待审核或已通过的申请
     const existingApplication = await db
       .select()
@@ -98,8 +101,8 @@ export async function createVerificationApplication(
         userId: params.userId,
         realName: params.realName,
         idCard: params.idCard,
-        idCardFrontUrl: params.idCardFrontUrl,
-        idCardBackUrl: params.idCardBackUrl,
+        idCardFrontUrl: normalizedFrontUrl,
+        idCardBackUrl: normalizedBackUrl,
         verificationService: params.verificationService || 'manual'
       })
       .returning();

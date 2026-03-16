@@ -78,7 +78,7 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   requireManualReview: true,
   autoApproveVerified: false,
   listingDepositAmount: 50,
-  orderPaymentTimeout: 1800,
+  orderPaymentTimeout: 180,
 };
 
 function toNumber(value: string, fallback: number) {

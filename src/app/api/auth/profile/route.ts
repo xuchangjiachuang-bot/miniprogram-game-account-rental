@@ -37,7 +37,6 @@ export async function PUT(request: NextRequest) {
 
     const statusMap: Record<string, number> = {
       INVALID_NICKNAME: 400,
-      INVALID_PHONE: 400,
       INVALID_EMAIL: 400,
       PHONE_ALREADY_USED: 409,
       USER_NOT_FOUND: 404,
@@ -45,7 +44,6 @@ export async function PUT(request: NextRequest) {
 
     const errorMap: Record<string, string> = {
       INVALID_NICKNAME: '用户名不能为空',
-      INVALID_PHONE: '手机号不能为空',
       INVALID_EMAIL: '邮箱格式不正确',
       PHONE_ALREADY_USED: '该手机号已被其他账号使用',
       USER_NOT_FOUND: '用户不存在',

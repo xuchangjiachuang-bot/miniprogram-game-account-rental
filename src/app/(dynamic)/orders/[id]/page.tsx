@@ -133,6 +133,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [disputeReason, setDisputeReason] = useState('');
   const [verifyingOrder, setVerifyingOrder] = useState<'pass' | 'reject' | null>(null);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [pendingPaymentMs, setPendingPaymentMs] = useState<number | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState(false);
 
   useEffect(() => {
     void loadOrderDetail();
@@ -152,6 +154,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [order?.endTime, order?.status]);
+
+  useEffect(() => {
+    if (!order?.createdAt || order.status !== 'pending_payment') {
+      setPendingPaymentMs(null);
+      return;
+    }
+
+    const createdAt = new Date(order.createdAt).getTime();
+    if (Number.isNaN(createdAt)) {
+      setPendingPaymentMs(null);
+      return;
+    }
+
+    const update = () => {
+      setPendingPaymentMs(createdAt + 3 * 60 * 1000 - Date.now());
+    };
+
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [order?.createdAt, order?.status]);
 
   const statusBadge = useMemo(() => {
     const meta = statusMeta[order?.status || ''] || { label: order?.status || '--' };
@@ -211,6 +234,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   function handlePayNow() {
     if (!order) return;
     window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+  }
+
+  async function handleCancelOrder() {
+    if (!confirm('确认取消这个待支付订单吗？')) {
+      return;
+    }
+
+    try {
+      setCancellingOrder(true);
+      const response = await fetch(`/api/orders/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'cancel' }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '取消订单失败');
+      }
+
+      toast.success(result.message || '订单已取消');
+      await loadOrderDetail();
+    } catch (error: any) {
+      console.error('取消订单失败:', error);
+      toast.error(error.message || '取消订单失败');
+    } finally {
+      setCancellingOrder(false);
+    }
   }
 
   async function handleReturnAccount() {
@@ -391,6 +442,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     买家已申请归还账号，当前等待卖家验收。
                     <div className="mt-1 text-yellow-700">
                       验收截止时间：{formatDateTime(order.verificationDeadline)}
+                    </div>
+                  </div>
+                ) : null}
+
+                {order.status === 'pending_payment' ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <div>订单已创建，等待支付。未支付订单会在 3 分钟后自动取消。</div>
+                    <div className="mt-1 text-blue-700">
+                      剩余支付时间：{pendingPaymentMs === null ? '--' : formatCountdown(pendingPaymentMs)}
                     </div>
                   </div>
                 ) : null}
@@ -619,7 +679,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <Button className="w-full" onClick={handlePayNow}>
                       立即支付
                     </Button>
-                    <Button variant="outline" className="w-full" disabled>
+                    <Button variant="outline" className="w-full" onClick={handleCancelOrder} disabled={cancellingOrder}>
                       取消订单
                     </Button>
                   </>

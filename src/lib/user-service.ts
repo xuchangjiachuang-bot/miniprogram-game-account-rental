@@ -150,9 +150,18 @@ function normalizeWechatAvatar(avatar: string | undefined) {
   return trimToLength(avatar, WECHAT_AVATAR_MAX_LENGTH);
 }
 
+function isPlaceholderWechatPhone(phone: string | null | undefined) {
+  if (!phone) {
+    return false;
+  }
+
+  return /^wx_[a-z0-9]+$/i.test(phone.trim());
+}
+
 function normalizeUser(row: UserRow): User {
   const userType = (row.userType || 'buyer') as UserType;
-  const nickname = row.nickname || row.phone || `${USERNAME_FALLBACK_PREFIX}${row.id.slice(-4)}`;
+  const displayPhone = isPlaceholderWechatPhone(row.phone) ? null : row.phone || null;
+  const nickname = row.nickname || displayPhone || `${USERNAME_FALLBACK_PREFIX}${row.id.slice(-4)}`;
   const createdAt = row.createdAt || null;
   const updatedAt = row.updatedAt || null;
   const lastLoginAt = row.lastLoginAt || null;
@@ -164,7 +173,7 @@ function normalizeUser(row: UserRow): User {
     nickname,
     avatar: row.avatar || row.wechatAvatar || null,
     email: row.email || null,
-    phone: row.phone || null,
+    phone: displayPhone,
     userType,
     user_type: userType,
     userNo: row.id,
@@ -250,7 +259,28 @@ async function getUserRowsByWechatIdentity(openid: string, source: 'mp' | 'open'
   return rows.filter(isActiveUser);
 }
 
-async function updateUserRow(userId: string, patch: Partial<UserRow>) {
+type UserRowPatch = Omit<
+  Partial<UserRow>,
+  | 'email'
+  | 'avatar'
+  | 'wechatOpenid'
+  | 'wechatMpOpenid'
+  | 'wechatOpenPlatformOpenid'
+  | 'wechatUnionid'
+  | 'wechatNickname'
+  | 'wechatAvatar'
+> & {
+  email?: string | null;
+  avatar?: string | null;
+  wechatOpenid?: string | null;
+  wechatMpOpenid?: string | null;
+  wechatOpenPlatformOpenid?: string | null;
+  wechatUnionid?: string | null;
+  wechatNickname?: string | null;
+  wechatAvatar?: string | null;
+};
+
+async function updateUserRow(userId: string, patch: UserRowPatch) {
   await ensureWechatLoginSchema();
   const [updated] = await db
     .update(users)
@@ -271,7 +301,8 @@ export async function updateUserProfile(userId: string, params: UpdateUserProfil
   }
 
   const nickname = trimToLength(params.nickname ?? currentRow.nickname, USER_NICKNAME_MAX_LENGTH);
-  const phone = trimToLength(params.phone ?? currentRow.phone, 20);
+  const nextPhoneInput = params.phone === undefined ? currentRow.phone : params.phone;
+  const phone = trimToLength(nextPhoneInput, 20);
   const email = trimToLength(params.email ?? currentRow.email, 100);
   const avatar = trimToLength(params.avatar ?? currentRow.avatar, WECHAT_AVATAR_MAX_LENGTH);
 
@@ -279,27 +310,25 @@ export async function updateUserProfile(userId: string, params: UpdateUserProfil
     throw new Error('INVALID_NICKNAME');
   }
 
-  if (!phone) {
-    throw new Error('INVALID_PHONE');
-  }
-
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('INVALID_EMAIL');
   }
 
-  const duplicatedPhoneRows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.phone, phone), ne(users.id, userId)))
-    .limit(1);
+  if (phone) {
+    const duplicatedPhoneRows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, phone), ne(users.id, userId)))
+      .limit(1);
 
-  if (duplicatedPhoneRows.length > 0) {
-    throw new Error('PHONE_ALREADY_USED');
+    if (duplicatedPhoneRows.length > 0) {
+      throw new Error('PHONE_ALREADY_USED');
+    }
   }
 
   const updatedRow = await updateUserRow(userId, {
     nickname,
-    phone,
+    phone: phone || undefined,
     email,
     avatar,
   });
