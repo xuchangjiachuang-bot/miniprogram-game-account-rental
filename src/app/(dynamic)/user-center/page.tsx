@@ -51,6 +51,20 @@ interface WalletUiSettings {
   withdrawalFee: number;
 }
 
+function resolveWechatWithdrawOpenid(user: any) {
+  if (!user) {
+    return null;
+  }
+
+  return user.wechat_openid
+    || user.wechat_mp_openid
+    || user.wechat_open_platform_openid
+    || user.wechatOpenid
+    || user.wechatMpOpenid
+    || user.wechatOpenPlatformOpenid
+    || null;
+}
+
 interface WithdrawalRecord {
   id: string;
   withdrawalNo?: string;
@@ -146,7 +160,8 @@ export default function UserCenterPage() {
   const [walletUiSettings, setWalletUiSettings] = useState<WalletUiSettings>({
     withdrawalFee: 1,
   });
-  const hasBoundWechatWithdrawAccount = Boolean(user?.wechat_openid);
+  const resolvedWechatWithdrawOpenid = resolveWechatWithdrawOpenid(user);
+  const hasBoundWechatWithdrawAccount = Boolean(resolvedWechatWithdrawOpenid);
   const withdrawAccountDisplayValue = hasBoundWechatWithdrawAccount
     ? '当前授权登录的微信账号（自动到账）'
     : withdrawAccount;
@@ -240,7 +255,7 @@ export default function UserCenterPage() {
       avatarKey: '',
       email: user.email || ''
     });
-    setWithdrawAccount(user.wechat_openid || '');
+    setWithdrawAccount(resolveWechatWithdrawOpenid(user) || '');
     loadPublicPlatformSettings();
   }, [user]);
 
@@ -712,7 +727,7 @@ export default function UserCenterPage() {
       return;
     }
 
-    if (!user?.wechat_openid) {
+    if (!resolvedWechatWithdrawOpenid) {
       toast.error('请先使用微信授权登录并绑定微信后再提现');
       return;
     }
@@ -749,7 +764,7 @@ export default function UserCenterPage() {
 
       toast.success(`微信提现 ¥${withdrawAmount} 已提交`);
       setWithdrawAmount('');
-      setWithdrawAccount(user?.wechat_openid || '');
+      setWithdrawAccount(resolvedWechatWithdrawOpenid || '');
       loadWalletData();
     } catch (error) {
       console.error('提现失败:', error);
@@ -892,11 +907,6 @@ export default function UserCenterPage() {
 
     if (!nickname) {
       toast.error('请输入用户名');
-      return;
-    }
-
-    if (!phone) {
-      toast.error('请输入手机号');
       return;
     }
 

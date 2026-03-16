@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/user-service';
+import { resolveWechatWithdrawalOpenid, verifyToken } from '@/lib/user-service';
 import { getUserBalance, requestWithdrawal } from '@/lib/user-balance-service';
 
 function mapWithdrawalMessage(message: string) {
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.wechat_openid) {
+    const wechatOpenid = resolveWechatWithdrawalOpenid(user);
+    if (!wechatOpenid) {
       return NextResponse.json(
         { success: false, error: '当前账号未绑定微信，无法发起微信提现' },
         { status: 400 },
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const accountInfo = {
-      openid: user.wechat_openid,
+      openid: wechatOpenid,
       accountName: user.realName || user.username || user.phone || '',
       phone: user.phone || '',
       nickname: user.username || '',

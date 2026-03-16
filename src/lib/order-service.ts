@@ -180,6 +180,7 @@ export function transformDbOrderToApiFormat(dbOrder: any): any {
     rentalPrice: parseFloat(dbOrder.rentalPrice || '0'),
     deposit: parseFloat(dbOrder.deposit || '0'),
     deposit_amount: parseFloat(dbOrder.deposit || '0'),
+    totalPrice: parseFloat(dbOrder.totalPrice || '0'),
     total_price: parseFloat(dbOrder.totalPrice || '0'),
     total_amount: parseFloat(dbOrder.totalPrice || '0'),
     

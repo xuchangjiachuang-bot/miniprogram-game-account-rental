@@ -290,9 +290,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  function handlePayNow() {
+  async function handlePayNow() {
     if (!order) return;
-    window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'pay' }),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message || '支付成功');
+        await loadOrderDetail();
+        return;
+      }
+
+      if (result.code === 'INSUFFICIENT_AVAILABLE_BALANCE') {
+        window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+        return;
+      }
+
+      throw new Error(result.error || '支付失败');
+    } catch (error: any) {
+      console.error('支付订单失败:', error);
+      toast.error(error.message || '支付失败');
+    }
   }
 
   async function handleOpenSupportChat() {

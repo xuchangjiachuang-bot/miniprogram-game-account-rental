@@ -1,12 +1,15 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db, orders } from '@/lib/db';
+import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service';
 import { getOrderDispute } from '@/lib/dispute-service';
 import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { cancelOrder, transformDbOrderToApiFormat } from '@/lib/order-service';
 import { getPaymentTimeoutSeconds, isOrderTimeout } from '@/lib/order-timeout-service';
+import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
+import { sendOrderPaidNotification } from '@/lib/notification-service';
 import { getServerUserId } from '@/lib/server-auth';
+import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
 
 export async function GET(
@@ -95,6 +98,174 @@ export async function POST(
     }
 
     const order = orderList[0];
+
+    if (action === 'pay') {
+      if (order.buyerId !== userId) {
+        return NextResponse.json({ success: false, error: '只有买家可以支付订单' }, { status: 403 });
+      }
+
+      if (order.status !== 'pending_payment') {
+        return NextResponse.json({
+          success: false,
+          error: `当前订单状态不可支付：${order.status}`,
+        }, { status: 400 });
+      }
+
+      const totalAmount = Number(order.totalPrice || 0);
+      const depositAmount = Number(order.deposit || 0);
+      const rentalAmount = Math.max(0, totalAmount - depositAmount);
+
+      if (totalAmount <= 0) {
+        return NextResponse.json({ success: false, error: '订单金额异常，无法支付' }, { status: 400 });
+      }
+
+      const now = new Date().toISOString();
+
+      const payResult = await db.transaction(async (tx) => {
+        const [balance] = await tx
+          .select()
+          .from(userBalances)
+          .where(eq(userBalances.userId, userId))
+          .limit(1);
+
+        const availableBalance = Number(balance?.availableBalance || 0);
+        const frozenBalance = Number(balance?.frozenBalance || 0);
+        if (availableBalance < totalAmount) {
+          return {
+            success: false as const,
+            reason: 'INSUFFICIENT_AVAILABLE_BALANCE',
+            availableBalance,
+            requiredAmount: totalAmount,
+          };
+        }
+
+        await tx
+          .update(userBalances)
+          .set({
+            availableBalance: (availableBalance - totalAmount).toFixed(2),
+            frozenBalance: (frozenBalance + depositAmount).toFixed(2),
+            updatedAt: now,
+          })
+          .where(eq(userBalances.userId, userId));
+
+        await tx.insert(balanceTransactions).values({
+          id: crypto.randomUUID(),
+          userId,
+          orderId: order.id,
+          transactionType: 'order_payment',
+          amount: rentalAmount.toFixed(2),
+          balanceBefore: availableBalance.toFixed(2),
+          balanceAfter: (availableBalance - rentalAmount).toFixed(2),
+          description: `订单 ${order.orderNo} 余额支付租金`,
+          createdAt: now,
+        });
+
+        if (depositAmount > 0) {
+          await tx.insert(balanceTransactions).values({
+            id: crypto.randomUUID(),
+            userId,
+            orderId: order.id,
+            transactionType: 'deposit_freeze',
+            amount: depositAmount.toFixed(2),
+            balanceBefore: (availableBalance - rentalAmount).toFixed(2),
+            balanceAfter: (availableBalance - totalAmount).toFixed(2),
+            description: `订单 ${order.orderNo} 余额支付押金冻结`,
+            createdAt: now,
+          });
+        }
+
+        await tx
+          .update(orders)
+          .set({
+            status: 'paid',
+            paymentMethod: 'wallet',
+            paymentTime: now,
+            updatedAt: now,
+          })
+          .where(and(eq(orders.id, order.id), eq(orders.status, 'pending_payment')));
+
+        const [existingPayment] = await tx
+          .select({ id: paymentRecords.id })
+          .from(paymentRecords)
+          .where(and(
+            eq(paymentRecords.orderId, order.id),
+            eq(paymentRecords.type, 'payment'),
+            eq(paymentRecords.method, 'wallet'),
+          ))
+          .limit(1);
+
+        if (!existingPayment) {
+          await tx.insert(paymentRecords).values({
+            id: crypto.randomUUID(),
+            orderId: order.id,
+            orderNo: order.orderNo,
+            userId,
+            amount: totalAmount.toFixed(2),
+            type: 'payment',
+            method: 'wallet',
+            transactionId: '',
+            thirdPartyOrderId: order.id,
+            status: 'success',
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+
+        await tx
+          .update(accounts)
+          .set({
+            status: 'rented',
+            updatedAt: now,
+          })
+          .where(eq(accounts.id, order.accountId));
+
+        await safeLogFinanceAuditEvent({
+          eventType: 'order_payment_wallet_paid',
+          status: 'success',
+          userId,
+          orderId: order.id,
+          amount: totalAmount,
+          balanceBefore: availableBalance,
+          balanceAfter: availableBalance - totalAmount,
+          details: {
+            orderNo: order.orderNo,
+            paymentMethod: 'wallet',
+            rentalAmount,
+            depositAmount,
+            frozenBalanceBefore: frozenBalance,
+            frozenBalanceAfter: frozenBalance + depositAmount,
+          },
+        }, tx);
+
+        return { success: true as const };
+      });
+
+      if (!payResult.success) {
+        return NextResponse.json({
+          success: false,
+          error: '余额不足',
+          code: payResult.reason,
+          data: {
+            availableBalance: payResult.availableBalance,
+            requiredAmount: payResult.requiredAmount,
+          },
+        }, { status: 400 });
+      }
+
+      await sendOrderPaidNotification(order.id, false);
+      await ensureOrderGroupChat(order.id);
+
+      return NextResponse.json({
+        success: true,
+        message: '余额支付成功',
+        data: {
+          orderId: order.id,
+          orderNo: order.orderNo,
+          status: 'paid',
+          paymentMethod: 'wallet',
+        },
+      });
+    }
 
     if (action === 'cancel') {
       if (order.buyerId !== userId) {

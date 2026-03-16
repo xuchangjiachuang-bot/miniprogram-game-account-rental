@@ -155,7 +155,7 @@ function isPlaceholderWechatPhone(phone: string | null | undefined) {
     return false;
   }
 
-  return /^wx_[a-z0-9]+$/i.test(phone.trim());
+  return /^(wx|wechat)_[a-z0-9]+$/i.test(phone.trim());
 }
 
 function normalizeUser(row: UserRow): User {
@@ -328,7 +328,7 @@ export async function updateUserProfile(userId: string, params: UpdateUserProfil
 
   const updatedRow = await updateUserRow(userId, {
     nickname,
-    phone: phone || undefined,
+    phone: params.phone === undefined ? undefined : (phone || currentRow.phone),
     email,
     avatar,
   });
@@ -450,6 +450,20 @@ export async function verifyToken(token: string): Promise<User | null> {
 
   const row = await getUserRowById(userId);
   return row ? normalizeUser(row) : null;
+}
+
+export function resolveWechatWithdrawalOpenid(user: Partial<User> | null | undefined) {
+  if (!user) {
+    return null;
+  }
+
+  return user.wechat_openid
+    || user.wechat_mp_openid
+    || user.wechat_open_platform_openid
+    || user.wechatOpenid
+    || user.wechatMpOpenid
+    || user.wechatOpenPlatformOpenid
+    || null;
 }
 
 export async function getUserById(userId: string): Promise<User | null> {

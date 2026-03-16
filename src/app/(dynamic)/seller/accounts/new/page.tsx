@@ -853,7 +853,7 @@ function NewAccountPage() {
         const isApproved = auditStatus === 'approved';
         const successMessage = isEditMode
           ? `账号修改成功！\n\n${isApproved ? '账号已按当前审核配置通过并保持上架。' : '账号已保存，当前处于待审核状态，审核通过后会上架。'}`
-          : `账号提交成功！\n\n${isApproved ? '账号已通过审核并上架，可在账号列表中查看。' : '账号已提交，当前处于待审核状态，审核通过后会自动上架。'}\n\n保证金金额：￥${result.data.deposit?.amount || '50'}\n账号ID：${result.data.account.id}`;
+          : `账号提交成功！\n\n${isApproved ? '账号已通过审核并上架，可在账号列表中查看。' : '账号已提交，当前处于待审核状态，审核通过后会自动上架。'}\n\n保证金金额：￥${result.data.deposit?.amount ?? 0}\n账号ID：${result.data.account.id}`;
 
         alert(successMessage);
         // 跳转到账号列表页

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerToken } from '@/lib/server-auth';
-import { verifyToken } from '@/lib/user-service';
+import { resolveWechatWithdrawalOpenid, verifyToken } from '@/lib/user-service';
 
 /**
  * 获取当前用户信息
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         userType: user.user_type,
         phone: user.phone,
         email: user.email,
-        wechatOpenid: user.wechat_openid || null,
+        wechatOpenid: resolveWechatWithdrawalOpenid(user),
         verified: user.isRealNameVerified,
         realName: user.realName,
         verifiedAt: user.isRealNameVerified ? user.updated_at : null,
