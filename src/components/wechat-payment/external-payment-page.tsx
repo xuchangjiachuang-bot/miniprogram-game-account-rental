@@ -174,7 +174,7 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
           status: order.status,
         });
 
-        if (order.status === 'paid' || order.status === 'completed') {
+        if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status)) {
           setPaymentStatus('success');
           setPolling(true);
         }
@@ -228,7 +228,11 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
         });
         const result = await parseJsonResponse<any>(response);
 
-        if (result.success && result.data && (result.data.status === 'paid' || result.data.status === 'completed')) {
+        if (
+          result.success
+          && result.data
+          && ['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(result.data.status)
+        ) {
           setPolling(false);
           setPaymentStatus('success');
           router.push(`/orders/${orderId}`);
