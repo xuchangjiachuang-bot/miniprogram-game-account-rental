@@ -3,8 +3,8 @@
  * 订单完成时自动触发分账，将卖家应得金额计入余额
  */
 
-import { db, orders, userBalances, balanceTransactions, splitRecords, platformSettings } from './db';
-import { eq, and } from 'drizzle-orm';
+import { db, orders, userBalances, balanceTransactions, splitRecords, platformSettings, accounts } from './db';
+import { eq, and, sql } from 'drizzle-orm';
 import { getEffectiveCommissionRate } from './commission-activity-service';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
 import { getApprovedConsumptionSummary } from './order-consumption-service';
@@ -107,6 +107,14 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           updatedAt: new Date().toISOString()
         })
         .where(eq(orders.id, orderId));
+
+      await tx
+        .update(accounts)
+        .set({
+          tradeCount: sql`${accounts.tradeCount} + 1`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(accounts.id, order.accountId));
 
       // 4.2 增加卖家可用余额
       const sellerBalances = await tx

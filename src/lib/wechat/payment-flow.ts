@@ -102,7 +102,6 @@ export async function markWechatOrderPaid(params: {
       .update(accounts)
       .set({
         status: 'rented',
-        tradeCount: sql`${accounts.tradeCount} + 1`,
         updatedAt: now,
       })
       .where(and(
