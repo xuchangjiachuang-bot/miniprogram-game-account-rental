@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getAutoSeoPageBySlug } from '@/lib/auto-seo-pages';
 import {
   getPublishedContentPageBySlug,
   listLatestPublishedContentPages,
   listPublicAccountLinks,
+  listPublicAccountLinksByIds,
   listRelatedPublishedContentPages,
 } from '@/lib/search-content-service';
 import { buildAutoAccountSeo, resolveContentPageSeo } from '@/lib/seo-auto';
@@ -28,29 +30,32 @@ export async function generateContentPageMetadata(
 ): Promise<Metadata> {
   const { slug } = await params;
   const page = await getPublishedContentPageBySlug(pageType, slug);
+  const autoPage = page ? null : await getAutoSeoPageBySlug(pageType, slug);
 
-  if (!page) {
+  if (!page && !autoPage) {
     return {};
   }
 
-  const resolvedSeo = resolveContentPageSeo(page);
+  const resolvedSeo = page ? resolveContentPageSeo(page) : autoPage!.seo;
+  const canonicalPath = page ? `/${page.page_type}/${page.slug}` : `/${autoPage!.pageType}/${autoPage!.slug}`;
+  const indexable = page ? Boolean(page.indexable) : true;
 
   return {
     title: resolvedSeo.title,
     description: resolvedSeo.description,
     alternates: {
-      canonical: `${siteUrl}/${page.page_type}/${page.slug}`,
+      canonical: `${siteUrl}${canonicalPath}`,
     },
     robots: {
-      index: Boolean(page.indexable),
-      follow: Boolean(page.indexable),
+      index: indexable,
+      follow: indexable,
     },
     openGraph: {
       title: resolvedSeo.ogTitle,
       description: resolvedSeo.ogDescription,
       images: resolvedSeo.ogImage ? [resolvedSeo.ogImage] : undefined,
       type: 'article',
-      url: `${siteUrl}/${page.page_type}/${page.slug}`,
+      url: `${siteUrl}${canonicalPath}`,
     },
   };
 }
@@ -58,16 +63,24 @@ export async function generateContentPageMetadata(
 export async function renderContentPage(pageType: string, { params }: PageProps) {
   const { slug } = await params;
   const page = await getPublishedContentPageBySlug(pageType, slug);
+  const autoPage = page ? null : await getAutoSeoPageBySlug(pageType, slug);
 
-  if (!page) {
+  if (!page && !autoPage) {
     notFound();
   }
 
-  const resolvedSeo = resolveContentPageSeo(page);
-  const faqItems = Array.isArray(page.faq_json) ? page.faq_json : [];
-  const relatedPages = await listRelatedPublishedContentPages(pageType, page.slug, 4);
+  const resolvedSeo = page ? resolveContentPageSeo(page) : autoPage!.seo;
+  const faqItems = page ? (Array.isArray(page.faq_json) ? page.faq_json : []) : autoPage!.faqItems;
+  const pageTitle = page ? page.title : autoPage!.title;
+  const pageSlug = page ? page.slug : autoPage!.slug;
+  const pageContent = page ? page.content : autoPage!.content;
+  const pageUpdatedAt = page ? page.updated_at : autoPage!.updatedAt;
+  const canonicalPath = page ? `/${page.page_type}/${page.slug}` : `/${autoPage!.pageType}/${autoPage!.slug}`;
+  const relatedPages = page ? await listRelatedPublishedContentPages(pageType, page.slug, 4) : [];
   const latestPages = await listLatestPublishedContentPages(6);
-  const featuredAccounts = await listPublicAccountLinks(4);
+  const featuredAccounts = autoPage
+    ? await listPublicAccountLinksByIds(autoPage.accountIds, 4)
+    : await listPublicAccountLinks(4);
   const faqStructuredData = faqItems
     .filter((item: any) => item?.question && item?.answer)
     .map((item: any) => ({
@@ -91,8 +104,8 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
             </li>
             <li>/</li>
             <li>
-              <Link href={`/${pageType}/${page.slug}`} className="text-gray-700">
-                {page.title}
+              <Link href={canonicalPath} className="text-gray-700">
+                {pageTitle}
               </Link>
             </li>
           </ol>
@@ -101,17 +114,17 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
         <article className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
           <header className="space-y-3 border-b pb-6">
             <p className="text-sm text-gray-500">
-              更新于 {new Date(page.updated_at).toLocaleDateString('zh-CN')}
+              更新于 {new Date(pageUpdatedAt).toLocaleDateString('zh-CN')}
             </p>
-            <h1 className="text-3xl font-bold text-gray-900">{page.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
             {resolvedSeo.summary ? (
               <p className="text-base leading-7 text-gray-600">{resolvedSeo.summary}</p>
             ) : null}
           </header>
 
           <div className="space-y-5 pt-6 text-[15px] leading-8 text-gray-700">
-            {splitParagraphs(page.content).map((paragraph, index) => (
-              <p key={`${page.id}-paragraph-${index}`}>{paragraph}</p>
+            {splitParagraphs(pageContent).map((paragraph, index) => (
+              <p key={`${pageSlug}-paragraph-${index}`}>{paragraph}</p>
             ))}
           </div>
         </article>
@@ -121,7 +134,7 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
             <h2 className="text-2xl font-semibold text-gray-900">常见问题</h2>
             <div className="mt-6 space-y-4">
               {faqItems.map((item: any, index) => (
-                <div key={`${page.id}-faq-${index}`} className="rounded-xl border bg-gray-50 p-4">
+                <div key={`${pageSlug}-faq-${index}`} className="rounded-xl border bg-gray-50 p-4">
                   <h3 className="font-medium text-gray-900">{item?.question || ''}</h3>
                   <p className="mt-2 text-sm leading-7 text-gray-600">{item?.answer || ''}</p>
                 </div>
@@ -155,7 +168,9 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
         {featuredAccounts.length > 0 ? (
           <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-2xl font-semibold text-gray-900">最新商品</h2>
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {autoPage ? '专题关联商品' : '最新商品'}
+              </h2>
               <Link href="/" className="text-sm text-blue-600 hover:text-blue-700">
                 返回首页继续浏览
               </Link>
@@ -172,7 +187,7 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
                     className="rounded-xl border bg-gray-50 p-4 transition-colors hover:border-gray-300 hover:bg-white"
                   >
                     <div className="font-medium text-gray-900">{accountSeo.title}</div>
-                    <p className="mt-2 text-sm text-gray-600">{`哈夫币 ${item.coins_m}M · 租金 ¥${price} · 押金 ¥${item.deposit}`}</p>
+                    <p className="mt-2 text-sm text-gray-600">{`哈夫币 ${item.coins_m}M · 租金 ￥${price} · 押金 ￥${item.deposit}`}</p>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
                       {accountSeo.description}
                     </p>
@@ -231,7 +246,7 @@ export async function renderContentPage(pageType: string, { params }: PageProps)
                 '@type': 'ListItem',
                 position: 2,
                 name: resolvedSeo.title,
-                item: `${siteUrl}/${page.page_type}/${page.slug}`,
+                item: `${siteUrl}${canonicalPath}`,
               },
             ],
           }),

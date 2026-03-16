@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAutoSeoPageBySlug } from '@/lib/auto-seo-pages';
 import { getPublishedContentPageBySlug } from '@/lib/search-content-service';
 
 export async function GET(
@@ -8,12 +9,13 @@ export async function GET(
   try {
     const { pageType, slug } = await params;
     const page = await getPublishedContentPageBySlug(pageType, slug);
+    const autoPage = page ? null : await getAutoSeoPageBySlug(pageType, slug);
 
-    if (!page) {
+    if (!page && !autoPage) {
       return NextResponse.json({ success: false, error: 'CONTENT_PAGE_NOT_FOUND' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, data: page });
+    return NextResponse.json({ success: true, data: page || autoPage });
   } catch (error: any) {
     console.error('[public-content-page] load failed:', error);
     return NextResponse.json(

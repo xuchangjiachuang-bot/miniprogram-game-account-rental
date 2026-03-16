@@ -38,6 +38,15 @@ type FaqItem = {
   answer: string;
 };
 
+type AutoSeoPagePreview = {
+  pageType: string;
+  slug: string;
+  title: string;
+  summary: string;
+  updatedAt: string;
+  accountCount: number;
+};
+
 type FormState = {
   id?: string;
   slug: string;
@@ -134,6 +143,7 @@ function mapErrorMessage(code: string) {
 
 export default function SearchContentPage() {
   const [pages, setPages] = useState<ContentPage[]>([]);
+  const [autoPages, setAutoPages] = useState<AutoSeoPagePreview[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -222,8 +232,22 @@ export default function SearchContentPage() {
     }
   };
 
+  const loadAutoPages = async () => {
+    try {
+      const response = await fetch('/api/admin/search-content/auto-pages', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'FAILED_TO_LOAD_AUTO_PAGES');
+      }
+      setAutoPages(result.data || []);
+    } catch (error: any) {
+      toast.error(mapErrorMessage(error.message || 'FAILED_TO_LOAD_AUTO_PAGES'));
+    }
+  };
+
   useEffect(() => {
     void loadPages();
+    void loadAutoPages();
   }, []);
 
   useEffect(() => {
@@ -368,6 +392,44 @@ export default function SearchContentPage() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>自动 SEO 专题预览</CardTitle>
+          <CardDescription>
+            这些页面由真实在架账号自动生成并进入 sitemap，后台只负责查看效果和用手工内容覆盖。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {autoPages.length === 0 ? (
+            <div className="text-sm text-gray-500">当前还没有可自动生成的业务专题。</div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {autoPages.slice(0, 12).map((page) => (
+                <div key={`${page.pageType}-${page.slug}`} className="rounded-xl border bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium text-gray-900">{page.title}</div>
+                    <span className="text-xs text-gray-500">{`${page.accountCount} 个商品`}</span>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">{`/${page.pageType}/${page.slug}`}</div>
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">{page.summary}</p>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <span className="text-xs text-gray-500">
+                      {`更新于 ${new Date(page.updatedAt).toLocaleDateString('zh-CN')}`}
+                    </span>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/${page.pageType}/${page.slug}`} target="_blank">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        预览
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card>

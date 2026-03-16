@@ -86,6 +86,43 @@ export type PublicAccountLinkItem = {
   seo_description: string | null;
 };
 
+export async function listPublicAccountLinksByIds(accountIds: string[], limit = 6) {
+  if (accountIds.length === 0) {
+    return [];
+  }
+
+  const uniqueIds = Array.from(new Set(accountIds.map((item) => item.trim()).filter(Boolean))).slice(0, limit);
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  return sqlClient<PublicAccountLinkItem[]>`
+    SELECT
+      a.id,
+      a.account_id,
+      a.title,
+      a.description,
+      a.coins_m,
+      a.deposit,
+      a.account_value,
+      a.recommended_rental,
+      a.updated_at,
+      s.title AS seo_title,
+      s.description AS seo_description
+    FROM accounts a
+    LEFT JOIN seo_entity_overrides s
+      ON s.entity_type = 'account'
+     AND s.entity_key = a.account_id
+    WHERE a.is_deleted = false
+      AND a.audit_status = 'approved'
+      AND a.status = 'available'
+      AND COALESCE(s.indexable, true) = true
+      AND a.account_id = ANY(${uniqueIds})
+    ORDER BY a.updated_at DESC NULLS LAST, a.created_at DESC
+    LIMIT ${limit}
+  `;
+}
+
 export type ContentPageInput = {
   slug: string;
   pageType: string;
