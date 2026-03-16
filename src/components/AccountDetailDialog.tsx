@@ -187,8 +187,8 @@ export function AccountDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[96vw] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
-        <ScrollArea className="flex-1">
+      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl p-0 sm:w-[96vw] sm:max-w-[1100px]">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-4 p-4 pb-5 sm:p-5">
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               {images.length > 0 ? (
@@ -352,7 +352,7 @@ export function AccountDetailDialog({
           </div>
         </ScrollArea>
 
-        <div className="space-y-2 border-t border-slate-200 bg-white p-3 sm:px-5 sm:py-4">
+        <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-3 sm:px-5 sm:py-4">
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               关闭
