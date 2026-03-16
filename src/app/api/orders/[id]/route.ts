@@ -114,12 +114,14 @@ export async function POST(
       const totalAmount = Number(order.totalPrice || 0);
       const depositAmount = Number(order.deposit || 0);
       const rentalAmount = Math.max(0, totalAmount - depositAmount);
+      const rentalHours = Number(order.rentalDuration) || 24;
 
       if (totalAmount <= 0) {
         return NextResponse.json({ success: false, error: '订单金额异常，无法支付' }, { status: 400 });
       }
 
       const now = new Date().toISOString();
+      const endTime = new Date(Date.now() + rentalHours * 60 * 60 * 1000).toISOString();
 
       const payResult = await db.transaction(async (tx) => {
         const [balance] = await tx
@@ -177,9 +179,11 @@ export async function POST(
         await tx
           .update(orders)
           .set({
-            status: 'paid',
+            status: 'active',
             paymentMethod: 'wallet',
             paymentTime: now,
+            startTime: now,
+            endTime,
             updatedAt: now,
           })
           .where(and(eq(orders.id, order.id), eq(orders.status, 'pending_payment')));
@@ -261,8 +265,10 @@ export async function POST(
         data: {
           orderId: order.id,
           orderNo: order.orderNo,
-          status: 'paid',
+          status: 'active',
           paymentMethod: 'wallet',
+          startTime: now,
+          endTime,
         },
       });
     }

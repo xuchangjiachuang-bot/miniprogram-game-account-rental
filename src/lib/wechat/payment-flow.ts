@@ -57,17 +57,22 @@ export async function markWechatOrderPaid(params: {
       }
     }
 
-    if (order.status === 'paid') {
+    if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status || '')) {
       return { order, alreadyPaid: true };
     }
+
+    const rentalHours = Number(order.rentalDuration) || 24;
+    const endTime = new Date(Date.now() + rentalHours * 60 * 60 * 1000).toISOString();
 
     await tx
       .update(orders)
       .set({
-        status: 'paid',
+        status: 'active',
         paymentTime: now,
         paymentMethod: 'wechat',
         transactionId: transactionId || order.transactionId,
+        startTime: now,
+        endTime,
         updatedAt: now,
       })
       .where(eq(orders.id, orderId));

@@ -179,10 +179,10 @@ export function AccountDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl">
         {/* 图片轮播区域 - 16:9 比例 */}
         {hasImages && (
-          <div className="relative aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex-shrink-0">
+          <div className="relative aspect-video w-full bg-gray-100 flex-shrink-0">
             {imageError ? (
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
@@ -248,7 +248,7 @@ export function AccountDetailDialog({
 
               {/* 快速信息卡片 - 紧凑布局 */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Card className="p-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <Card className="p-2 border-gray-200 shadow-none">
                   <div className="flex items-center gap-1.5">
                     <Coins className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
                     <div className="min-w-0">
@@ -258,7 +258,7 @@ export function AccountDetailDialog({
                   </div>
                 </Card>
 
-                <Card className="p-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <Card className="p-2 border-gray-200 shadow-none">
                   <div className="flex items-center gap-1.5">
                     <Shield className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
                     <div className="min-w-0">
@@ -268,7 +268,7 @@ export function AccountDetailDialog({
                   </div>
                 </Card>
 
-                <Card className="p-2 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <Card className="p-2 border-gray-200 shadow-none">
                   <div className="flex items-center gap-1.5">
                     <Zap className="h-3.5 w-3.5 text-orange-600 flex-shrink-0" />
                     <div className="min-w-0">
@@ -278,7 +278,7 @@ export function AccountDetailDialog({
                   </div>
                 </Card>
 
-                <Card className="p-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <Card className="p-2 border-gray-200 shadow-none">
                   <div className="flex items-center gap-1.5">
                     <Target className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
                     <div className="min-w-0">
@@ -299,11 +299,11 @@ export function AccountDetailDialog({
                 价格详情
               </h3>
 
-              <Card className="p-2 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-purple-200">
+              <Card className="p-2 border-gray-200 shadow-none">
                 <div className="grid grid-cols-4 gap-2">
                   <div>
                     <p className="text-[10px] text-gray-600 mb-0.5">租金</p>
-                    <p className="text-base font-bold text-purple-600">
+                    <p className="text-base font-bold text-gray-900">
                       ¥{account.actual_rental?.toFixed(2) || '0.00'}
                     </p>
                   </div>
@@ -315,13 +315,13 @@ export function AccountDetailDialog({
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-600 mb-0.5">租期</p>
-                    <p className="text-xs font-bold text-purple-600 truncate" title={rentalDisplay}>
+                    <p className="text-xs font-bold text-gray-900 truncate" title={rentalDisplay}>
                       {rentalDisplay}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-600 mb-0.5">总计</p>
-                    <p className="text-base font-bold text-purple-700">
+                    <p className="text-base font-bold text-gray-900">
                       ¥{account.total_price?.toFixed(2) || '0.00'}
                     </p>
                   </div>
@@ -339,7 +339,7 @@ export function AccountDetailDialog({
               </h3>
 
               <div className="grid grid-cols-4 gap-2">
-                <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="rounded-lg border border-gray-200 p-2">
                   <div className="flex items-center gap-1 text-gray-600 mb-0.5">
                     <Smartphone className="h-3 w-3" />
                     <span className="text-[10px]">平台</span>
@@ -347,7 +347,7 @@ export function AccountDetailDialog({
                   <p className="text-xs font-semibold text-gray-900">{platform}</p>
                 </div>
 
-                <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="rounded-lg border border-gray-200 p-2">
                   <div className="flex items-center gap-1 text-gray-600 mb-0.5">
                     <Shield className="h-3 w-3" />
                     <span className="text-[10px]">上号方式</span>
@@ -355,7 +355,7 @@ export function AccountDetailDialog({
                   <p className="text-xs font-semibold text-gray-900">{loginMethod}</p>
                 </div>
 
-                <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="rounded-lg border border-gray-200 p-2">
                   <div className="flex items-center gap-1 text-gray-600 mb-0.5">
                     <Clock className="h-3 w-3" />
                     <span className="text-[10px]">上号时间</span>
@@ -365,7 +365,7 @@ export function AccountDetailDialog({
                   </p>
                 </div>
 
-                <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="rounded-lg border border-gray-200 p-2">
                   <div className="flex items-center gap-1 text-gray-600 mb-0.5">
                     <MapPin className="h-3 w-3" />
                     <span className="text-[10px]">地区</span>
@@ -386,7 +386,7 @@ export function AccountDetailDialog({
                   账号属性
                 </h3>
 
-                <div className="space-y-1.5 bg-gray-50 p-2 rounded-lg">
+                <div className="space-y-1.5 rounded-lg border border-gray-200 p-2">
                   {/* 段位 */}
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 text-gray-600">
@@ -445,7 +445,7 @@ export function AccountDetailDialog({
                   游戏道具
                 </h3>
 
-                <div className="space-y-1.5 bg-gray-50 p-2 rounded-lg">
+                <div className="space-y-1.5 rounded-lg border border-gray-200 p-2">
                   {/* AWM子弹 */}
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 text-gray-600">
@@ -486,7 +486,7 @@ export function AccountDetailDialog({
                   皮肤信息
                 </h3>
 
-                <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-2 rounded-lg border border-pink-200">
+                <div className="rounded-lg border border-gray-200 p-2">
                   {hasSkins ? (
                     <div className="flex flex-wrap gap-1 items-center">
                       {Array.isArray(skins) ? (

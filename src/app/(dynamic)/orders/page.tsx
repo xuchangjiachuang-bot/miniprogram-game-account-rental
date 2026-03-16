@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle, Clock, ShoppingCart, Store } from 'lucide-react';
+import { CheckCircle, Clock, MessageSquare, ShoppingCart, Store } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,19 @@ const statusMeta: Record<string, { label: string; className?: string }> = {
 
 function formatMoney(amount: number) {
   return `¥${Number(amount || 0).toFixed(2)}`;
+}
+
+function canEnterChat(status: string) {
+  return [
+    'paid',
+    'active',
+    'pending_verification',
+    'pending_consumption_confirm',
+    'completed',
+    'disputed',
+    'refunding',
+    'refunded',
+  ].includes(status);
 }
 
 function OrderStatusBadge({ status }: { status: string }) {
@@ -256,7 +269,15 @@ function OrderList({
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {canEnterChat(String(order.status)) ? (
+                  <Button asChild variant="outline">
+                    <Link href={`/user-center?tab=chats&orderId=${order.id}`}>
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      进入群聊
+                    </Link>
+                  </Button>
+                ) : null}
                 <Button asChild variant="outline">
                   <Link href={`/orders/${order.id}`}>查看订单</Link>
                 </Button>

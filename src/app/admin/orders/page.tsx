@@ -99,6 +99,21 @@ function getSettlementStatusLabel(status?: string | null) {
   }
 }
 
+function getVerificationResultLabel(result?: string | null) {
+  switch (result) {
+    case 'pending':
+      return '待验收';
+    case 'passed':
+      return '验收通过';
+    case 'rejected':
+      return '验收不通过';
+    case 'auto_passed':
+      return '系统自动验收通过';
+    default:
+      return result || '--';
+  }
+}
+
 function getOrderStatusBadge(status: string) {
   switch (status) {
     case 'pending_payment':
@@ -397,7 +412,7 @@ export default function AdminOrders() {
                 <section>
                   <h3 className="mb-2 font-semibold">验收 / 争议信息</h3>
                   <div className="space-y-1 text-sm">
-                    {selectedOrder.verificationResult ? <p><span className="text-gray-500">验收结果：</span>{selectedOrder.verificationResult}</p> : null}
+                    {selectedOrder.verificationResult ? <p><span className="text-gray-500">验收结果：</span>{getVerificationResultLabel(selectedOrder.verificationResult)}</p> : null}
                     {selectedOrder.verificationRemark ? <p><span className="text-gray-500">验收备注：</span>{selectedOrder.verificationRemark}</p> : null}
                     {selectedOrder.disputeReason ? <p><span className="text-gray-500">争议原因：</span>{selectedOrder.disputeReason}</p> : null}
                   </div>

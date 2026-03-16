@@ -2,16 +2,15 @@
 
 import Link from 'next/link';
 import { use, useEffect, useMemo, useState } from 'react';
-import QRCode from 'react-qr-code';
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle,
   Clock,
   Copy,
+  ExternalLink,
   Loader2,
   MessageSquare,
-  RefreshCw,
   Shield,
   XCircle,
 } from 'lucide-react';
@@ -85,8 +84,6 @@ type OrderDetail = {
 };
 
 type LoginPayload = {
-  qrCodeContent?: string;
-  qrCodeUrl?: string;
   loginInfo?: {
     loginMethod?: string;
     qqAccount?: string | null;
@@ -94,6 +91,10 @@ type LoginPayload = {
     accountTitle?: string;
     expiryTime?: string;
   };
+};
+
+type CustomerServiceConfig = {
+  kfUrl?: string;
 };
 
 type ConsumptionItemDraft = {
@@ -114,7 +115,7 @@ function getConsumptionDraftTotal(items: ConsumptionItemDraft[]) {
 
 const statusMeta: Record<string, { label: string; className?: string }> = {
   pending_payment: { label: '待支付' },
-  paid: { label: '待开始', className: 'bg-blue-600 hover:bg-blue-600' },
+  paid: { label: '已支付', className: 'bg-blue-600 hover:bg-blue-600' },
   active: { label: '进行中', className: 'bg-purple-600 hover:bg-purple-600' },
   pending_verification: { label: '待验收', className: 'bg-yellow-500 hover:bg-yellow-500 text-black' },
   disputed: { label: '争议中', className: 'bg-red-600 hover:bg-red-600' },
@@ -131,6 +132,40 @@ function formatDateTime(value?: string | null) {
 function formatMoney(value?: number | string | null) {
   const amount = Number(value || 0);
   return `¥${amount.toFixed(2)}`;
+}
+
+function getVerificationResultLabel(result?: string | null) {
+  switch (result) {
+    case 'passed':
+      return '验收通过';
+    case 'rejected':
+      return '验收不通过';
+    case 'pending':
+      return '待验收';
+    case 'auto_passed':
+      return '系统自动验收通过';
+    default:
+      return result || '--';
+  }
+}
+
+function isPasswordLoginMethod(loginMethod?: string | null) {
+  return ['qq', 'password', 'qq_password'].includes(loginMethod || '');
+}
+
+function getLoginMethodLabel(loginMethod?: string | null) {
+  switch (loginMethod) {
+    case 'qq':
+    case 'qq_password':
+    case 'password':
+      return '账号密码登录';
+    case 'qq_scan':
+      return 'QQ扫码登录';
+    case 'wechat_scan':
+      return '微信扫码登录';
+    default:
+      return loginMethod || '未知登录方式';
+  }
 }
 
 function formatCountdown(ms: number) {
@@ -157,6 +192,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [loadingLoginInfo, setLoadingLoginInfo] = useState(false);
   const [loginPayload, setLoginPayload] = useState<LoginPayload | null>(null);
+  const [loginInfoLoaded, setLoginInfoLoaded] = useState(false);
+  const [customerServiceUrl, setCustomerServiceUrl] = useState('');
   const [completingOrder, setCompletingOrder] = useState(false);
   const [openingSupportChat, setOpeningSupportChat] = useState(false);
   const [submittingDispute, setSubmittingDispute] = useState(false);
@@ -176,6 +213,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     void loadOrderDetail();
   }, [id]);
+
+  useEffect(() => {
+    setLoginPayload(null);
+    setLoginInfoLoaded(false);
+  }, [id]);
+
+  useEffect(() => {
+    void loadCustomerServiceConfig();
+  }, []);
 
   useEffect(() => {
     if (!order?.endTime || order.status !== 'active') {
@@ -237,6 +283,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     );
   }, [order?.status]);
 
+  const showLoginCard = !!order && ['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'completed'].includes(order.status);
+
+  useEffect(() => {
+    if (!showLoginCard || loginInfoLoaded || loadingLoginInfo) {
+      return;
+    }
+
+    void loadLoginInfo();
+  }, [showLoginCard, loginInfoLoaded, loadingLoginInfo]);
+
   async function loadOrderDetail() {
     try {
       setLoading(true);
@@ -255,8 +311,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function loadCustomerServiceConfig() {
+    try {
+      const response = await fetch('/api/customer-service/config', { credentials: 'include' });
+      const result = await response.json();
+      if (result.success) {
+        const config = result.data as CustomerServiceConfig;
+        setCustomerServiceUrl(config.kfUrl || '');
+      }
+    } catch (error) {
+      console.error('加载企业微信客服配置失败:', error);
+    }
+  }
+
   async function loadLoginInfo() {
     try {
+      setLoginInfoLoaded(true);
       setLoadingLoginInfo(true);
       const response = await fetch(`/api/orders/${id}/qrcode`, { credentials: 'include' });
       const result = await response.json();
@@ -298,6 +368,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (result.success) {
         toast.success(result.message || '支付成功');
         await loadOrderDetail();
+        await handleOpenSupportChat();
         return;
       }
 
@@ -559,7 +630,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const showLoginCard = ['paid', 'active'].includes(order.status);
   const isConsumptionPending = order.status === 'pending_consumption_confirm';
   const consumptionDraftTotal = getConsumptionDraftTotal(consumptionItems);
   const canCreateDispute =
@@ -656,6 +726,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     平台已发起退款，正在等待微信退款结果回调。
                   </div>
                 ) : null}
+                {false && customerServiceUrl ? (
+                  <Button variant="outline" className="mt-3 w-full" asChild>
+                    <a href={customerServiceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      转企业微信客服
+                    </a>
+                  </Button>
+                ) : null}
+                {false && customerServiceUrl ? (
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href={customerServiceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      转企业微信客服
+                    </a>
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -682,7 +768,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <div className="text-sm text-muted-foreground">验收结果</div>
-                        <div className="font-medium">{order.verificationResult || '--'}</div>
+                        <div className="font-medium">{getVerificationResultLabel(order.verificationResult)}</div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">验收备注</div>
@@ -697,18 +783,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {showLoginCard ? (
               <Card>
                 <CardHeader>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <CardTitle>登录凭证</CardTitle>
-                      <CardDescription>仅在已支付或进行中的订单里展示。</CardDescription>
-                    </div>
-                    {!loginPayload ? (
-                      <Button variant="outline" onClick={loadLoginInfo} disabled={loadingLoginInfo}>
-                        {loadingLoginInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                        获取登录信息
-                      </Button>
-                    ) : null}
-                  </div>
+                  <CardTitle>登录凭证</CardTitle>
+                  <CardDescription>账号密码直接显示，扫码登录二维码请在订单群聊查看。</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {loadingLoginInfo ? (
@@ -719,13 +795,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                   {!loadingLoginInfo && !loginPayload ? (
                     <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                      点击“获取登录信息”后，这里会直接展示账号密码或二维码。
+                      正在同步登录信息。如果账号使用扫码登录，请前往订单群聊查看二维码。
                     </div>
                   ) : null}
 
                   {!loadingLoginInfo && loginPayload?.loginInfo ? (
                     <div className="space-y-4">
-                      {['qq', 'password'].includes(loginPayload.loginInfo.loginMethod || '') ? (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <div className="text-sm text-muted-foreground">登录方式</div>
+                          <div className="font-medium">{getLoginMethodLabel(loginPayload.loginInfo.loginMethod)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">有效期至</div>
+                          <div className="font-medium">{formatDateTime(loginPayload.loginInfo.expiryTime)}</div>
+                        </div>
+                      </div>
+
+                      {isPasswordLoginMethod(loginPayload.loginInfo.loginMethod) ? (
                         <div className="space-y-3">
                           <div>
                             <Label>账号</Label>
@@ -753,27 +840,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          <div className="flex flex-col items-center rounded-xl border bg-white p-6">
-                            <QRCode value={loginPayload.qrCodeContent || loginPayload.qrCodeUrl || order.id} size={180} />
-                            <div className="mt-4 text-sm text-muted-foreground">使用订单提供的扫码方式登录账号</div>
-                          </div>
-                          {loginPayload.qrCodeContent ? (
-                            <Button
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => handleCopy(loginPayload.qrCodeContent || '', '二维码内容')}
-                            >
-                              <Copy className="mr-2 h-4 w-4" />
-                              复制二维码内容
-                            </Button>
-                          ) : null}
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                          该账号使用扫码登录，二维码不会在订单页展示。请进入订单群聊查看卖家或平台客服发送的二维码后完成登录。
                         </div>
                       )}
-
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        请勿修改密码、转移资产或使用外挂工具，租期结束后请及时退出账号。
-                      </div>
                     </div>
                   ) : null}
                 </CardContent>
@@ -980,15 +1050,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </>
                 ) : null}
 
-                {order.status === 'paid' ? (
-                  <Button className="w-full" onClick={loadLoginInfo} disabled={loadingLoginInfo}>
-                    {loadingLoginInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    开始使用
-                  </Button>
-                ) : null}
-
                 {order.status === 'active' ? (
                   <>
+                    <Button variant="outline" className="w-full" onClick={handleOpenSupportChat} disabled={openingSupportChat}>
+                      {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                      进入订单群聊
+                    </Button>
                     <Button className="w-full" onClick={handleReturnAccount} disabled={completingOrder}>
                       {completingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                       归还账号
@@ -1001,6 +1068,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                 {order.status === 'pending_verification' ? (
                   <>
+                    <Button variant="outline" className="w-full" onClick={handleOpenSupportChat} disabled={openingSupportChat}>
+                      {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                      进入订单群聊
+                    </Button>
                     <Button
                       className="w-full"
                       onClick={() => handleVerifyOrder('pass')}
@@ -1025,9 +1096,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
             <Card>
               <CardHeader>
-                <CardTitle>帮助支持</CardTitle>
+                <CardTitle>订单群聊</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Button
                   variant="outline"
                   className="w-full"
@@ -1035,8 +1106,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   disabled={openingSupportChat}
                 >
                   {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                  联系客服
+                  进入订单群聊
                 </Button>
+                {customerServiceUrl ? (
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href={customerServiceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      转企业微信客服
+                    </a>
+                  </Button>
+                ) : null}
+                <div className="mt-3 text-sm text-muted-foreground">
+                  登录二维码、买卖双方沟通和平台客服介入都会在这里处理。
+                </div>
               </CardContent>
             </Card>
           </div>

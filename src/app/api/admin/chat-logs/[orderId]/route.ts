@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, admins, orders, users, groupChats, chatMessages } from '@/lib/db';
 import { desc, eq, inArray } from 'drizzle-orm';
+import { ensureOrderGroupChat, sendGroupMessageForUser } from '@/lib/chat-service-new';
+import { ensurePlatformCustomerServiceUser } from '@/lib/platform-customer-service-user';
 
 /**
  * 获取订单聊天详情
@@ -44,6 +46,7 @@ export async function GET(
       .select()
       .from(groupChats)
       .where(eq(groupChats.orderId, order.id))
+      .orderBy(desc(groupChats.updatedAt), desc(groupChats.createdAt))
       .limit(1);
 
     const buyerList = await db
@@ -141,6 +144,75 @@ export async function GET(
     console.error('获取聊天详情失败:', error);
     return NextResponse.json(
       { success: false, error: error.message || '获取聊天详情失败' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
+  try {
+    const adminToken = request.cookies.get('admin_token')?.value;
+    if (!adminToken) {
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
+    const adminList = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.id, adminToken))
+      .limit(1);
+
+    if (adminList.length === 0) {
+      return NextResponse.json({ success: false, error: '管理员不存在' }, { status: 401 });
+    }
+
+    const { orderId } = await params;
+    const body = await request.json();
+    const content = typeof body.content === 'string' ? body.content.trim() : '';
+
+    if (!content) {
+      return NextResponse.json({ success: false, error: '消息内容不能为空' }, { status: 400 });
+    }
+
+    const orderList = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.orderNo, orderId))
+      .limit(1);
+
+    if (orderList.length === 0) {
+      return NextResponse.json({ success: false, error: '订单不存在' }, { status: 404 });
+    }
+
+    const order = orderList[0];
+    const groupChat = await ensureOrderGroupChat(order.id);
+    const supportUser = await ensurePlatformCustomerServiceUser();
+
+    const message = await sendGroupMessageForUser({
+      groupId: groupChat.id,
+      userId: supportUser.id,
+      content,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: message,
+    });
+  } catch (error: any) {
+    if (error.message === 'CHAT_GROUP_FORBIDDEN') {
+      return NextResponse.json({ success: false, error: '客服暂时无权在该群聊发言' }, { status: 403 });
+    }
+
+    if (error.message === 'CHAT_MESSAGE_EMPTY') {
+      return NextResponse.json({ success: false, error: '消息内容不能为空' }, { status: 400 });
+    }
+
+    console.error('管理员发送群聊消息失败:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || '发送消息失败' },
       { status: 500 }
     );
   }

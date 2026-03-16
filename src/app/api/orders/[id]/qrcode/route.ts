@@ -4,8 +4,9 @@ import { accounts, db, orders } from '@/lib/db';
 import { getServerUserId } from '@/lib/server-auth';
 
 /**
- * Return account login credentials for a paid or active order.
- * The first successful fetch after payment activates the rental window.
+ * Returns order login information.
+ * Password credentials are displayed on the order page.
+ * Scan-login QR codes are sent in the order group chat instead.
  */
 export async function GET(
   request: NextRequest,
@@ -38,10 +39,10 @@ export async function GET(
       }, { status: 403 });
     }
 
-    if (!['paid', 'active'].includes(orderStatus)) {
+    if (!['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'completed'].includes(orderStatus)) {
       return NextResponse.json({
         success: false,
-        error: '仅已支付或进行中的订单可查看登录信息',
+        error: '仅已支付或已开始的订单可查看登录信息',
       }, { status: 400 });
     }
 
@@ -99,8 +100,8 @@ export async function GET(
       accountId: account.id,
       accountTitle: account.title,
       loginMethod: customAttributes.loginMethod,
-      qqAccount: customAttributes.qqAccount,
-      qqPassword: ['qq', 'password'].includes(customAttributes.loginMethod)
+      qqAccount: customAttributes.qqAccount || null,
+      qqPassword: ['qq', 'password', 'qq_password'].includes(customAttributes.loginMethod)
         ? customAttributes.qqPassword || null
         : null,
       platform: customAttributes.platform,
@@ -114,13 +115,7 @@ export async function GET(
       success: true,
       message: '登录信息获取成功',
       data: {
-        qrCodeUrl: `data:text/plain;charset=utf-8,${encodeURIComponent(JSON.stringify(loginInfo))}`,
         loginInfo,
-        qrCodeContent: JSON.stringify({
-          type: 'account_login',
-          orderId: effectiveOrder.id,
-          timestamp: Date.now(),
-        }),
         order: {
           id: effectiveOrder.id,
           status: effectiveOrder.status,
@@ -130,10 +125,10 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error('生成登录二维码失败:', error);
+    console.error('获取登录信息失败:', error);
     return NextResponse.json({
       success: false,
-      error: error.message || '生成登录二维码失败',
+      error: error.message || '获取登录信息失败',
     }, { status: 500 });
   }
 }

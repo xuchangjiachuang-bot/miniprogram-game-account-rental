@@ -48,6 +48,8 @@ export default function AdminChatLogs() {
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
   const [chatDetail, setChatDetail] = useState<ChatDetailData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -116,6 +118,35 @@ export default function AdminChatLogs() {
       setChatDetail(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!selectedGroup || !replyContent.trim()) {
+      return;
+    }
+
+    try {
+      setSendingReply(true);
+      const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(selectedGroup.orderId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: replyContent.trim() }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '发送消息失败');
+      }
+
+      setReplyContent('');
+      await fetchChatDetail(selectedGroup.orderId);
+      await fetchChatLogs();
+    } catch (error: any) {
+      console.error('发送客服消息失败:', error);
+      alert(error.message || '发送消息失败');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -318,6 +349,28 @@ export default function AdminChatLogs() {
               </Button>
             </div>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>客服回复</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="以平台客服身份发送消息给买家和卖家"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void sendReply();
+                  }
+                }}
+              />
+              <Button onClick={() => void sendReply()} disabled={sendingReply || !replyContent.trim()}>
+                {sendingReply ? '发送中...' : '发送客服消息'}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -329,6 +382,7 @@ export default function AdminChatLogs() {
               <Button variant="outline" size="sm" onClick={() => {
                 setSelectedGroup(null);
                 setChatDetail(null);
+                setReplyContent('');
               }}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 返回
@@ -409,6 +463,27 @@ export default function AdminChatLogs() {
               </CardContent>
             </Card>
           )}
+          <Card>
+            <CardHeader>
+              <CardTitle>客服回复</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="以平台客服身份发送消息给买家和卖家"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void sendReply();
+                  }
+                }}
+              />
+              <Button onClick={() => void sendReply()} disabled={sendingReply || !replyContent.trim()}>
+                {sendingReply ? '发送中...' : '发送客服消息'}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

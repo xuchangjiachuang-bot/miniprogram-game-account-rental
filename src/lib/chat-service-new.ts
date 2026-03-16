@@ -36,6 +36,38 @@ export interface ChatMessageSummary {
 
 type ChatMemberRole = 'buyer' | 'seller' | 'admin';
 
+function getGroupSortTime(group: { updatedAt?: string | null; createdAt?: string | null }) {
+  return group.updatedAt || group.createdAt || '';
+}
+
+function dedupeGroupsByOrder<T extends { id: string; orderId: string; updatedAt?: string | null; createdAt?: string | null }>(groups: T[]) {
+  const sorted = [...groups].sort((a, b) => getGroupSortTime(b).localeCompare(getGroupSortTime(a)));
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const group of sorted) {
+    const key = group.orderId || group.id;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(group);
+  }
+
+  return deduped;
+}
+
+async function getCanonicalOrderGroup(orderId: string) {
+  const groups = await db
+    .select()
+    .from(groupChats)
+    .where(eq(groupChats.orderId, orderId))
+    .orderBy(desc(groupChats.updatedAt), desc(groupChats.createdAt));
+
+  return groups[0] || null;
+}
+
 function formatUserName(
   user?: { nickname?: string | null; phone?: string | null },
   role?: string,
@@ -168,14 +200,14 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
   createdAt: string;
   updatedAt: string;
 }> {
-  const existing = await db.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
+  const existing = await getCanonicalOrderGroup(orderId);
 
-  if (existing[0]) {
-    await ensureSupportMemberForExistingGroup(existing[0].id);
+  if (existing) {
+    await ensureSupportMemberForExistingGroup(existing.id);
     return {
-      ...existing[0],
-      createdAt: existing[0].createdAt || '',
-      updatedAt: existing[0].updatedAt || existing[0].createdAt || '',
+      ...existing,
+      createdAt: existing.createdAt || '',
+      updatedAt: existing.updatedAt || existing.createdAt || '',
     };
   }
 
@@ -289,12 +321,14 @@ export async function getUserGroups(userId: string): Promise<ChatGroupSummary[]>
     .where(inArray(groupChats.id, groupIds))
     .orderBy(desc(groupChats.updatedAt));
 
-  await Promise.all(groups.map((group) => ensureSupportMemberForExistingGroup(group.id)));
+  const uniqueGroups = dedupeGroupsByOrder(groups);
+
+  await Promise.all(uniqueGroups.map((group) => ensureSupportMemberForExistingGroup(group.id)));
 
   const lastMessageMap = await loadLastMessages(groupIds);
 
   const summaries = await Promise.all(
-    groups.map(async (group) => ({
+    uniqueGroups.map(async (group) => ({
       id: group.id,
       orderId: group.orderId,
       orderTitle: group.title,
