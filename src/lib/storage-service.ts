@@ -99,6 +99,33 @@ function normalizeBrowserUrl(reference: string): string {
   }
 }
 
+function inferContentType(fileKey: string): string {
+  const extension = path.extname(fileKey).toLowerCase();
+
+  switch (extension) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.pdf':
+      return 'application/pdf';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+function buildAppFileUrl(fileKey: string): string {
+  const params = new URLSearchParams({ key: fileKey });
+  return `/api/storage/file?${params.toString()}`;
+}
+
 async function saveFileLocally(
   fileContent: Buffer,
   fileName: string,
@@ -386,8 +413,14 @@ export async function resolveStoredFileReference(
     return normalizeBrowserUrl(normalizedReference);
   }
 
+  if (await fileExists(normalizedReference)) {
+    return buildAppFileUrl(normalizedReference);
+  }
+
   return generateFileUrl(normalizedReference, expireTime);
 }
+
+export { inferContentType };
 
 export async function listFiles(
   prefix: string,

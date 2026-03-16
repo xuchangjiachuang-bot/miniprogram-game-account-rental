@@ -20,6 +20,7 @@ import {
 interface ChatWindowProps {
   group: ChatGroup;
   onClose?: () => void;
+  onMessageSent?: () => void;
 }
 
 const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
@@ -45,7 +46,7 @@ function formatBeijingTime(value: string) {
   }
 }
 
-export function ChatWindow({ group, onClose }: ChatWindowProps) {
+export function ChatWindow({ group, onClose, onMessageSent }: ChatWindowProps) {
   const { user } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -101,8 +102,10 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
     void loadMessages();
 
     const timer = window.setInterval(() => {
-      void loadMessages({ silent: true });
-    }, 5000);
+      if (document.visibilityState === 'visible') {
+        void loadMessages({ silent: true });
+      }
+    }, 2000);
 
     return () => window.clearInterval(timer);
   }, [group.id]);
@@ -166,6 +169,8 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
         setNewMessage('');
       }
 
+      await loadMessages({ silent: true });
+      onMessageSent?.();
       scrollToBottom();
     } catch (error: any) {
       console.error('发送群聊消息失败:', error);

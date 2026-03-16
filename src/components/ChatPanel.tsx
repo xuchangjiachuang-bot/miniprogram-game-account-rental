@@ -108,7 +108,13 @@ export function ChatPanel() {
 
       <div className="flex-1">
         {selectedGroup ? (
-          <ChatWindow group={selectedGroup} onClose={() => setSelectedGroup(null)} />
+          <ChatWindow
+            group={selectedGroup}
+            onClose={() => setSelectedGroup(null)}
+            onMessageSent={() => {
+              void loadGroups({ silent: true });
+            }}
+          />
         ) : (
           <Card className="flex h-full items-center justify-center">
             <div className="text-center text-muted-foreground">

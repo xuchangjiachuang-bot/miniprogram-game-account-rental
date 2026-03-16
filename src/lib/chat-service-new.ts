@@ -408,7 +408,10 @@ export async function getMessage(messageId: string): Promise<ChatMessageSummary 
     senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
     senderName: formatUserName(message, message.senderType),
     senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-    content: message.content,
+    content:
+      message.messageType === 'image'
+        ? (await resolveStoredFileReference(message.content)) || message.content
+        : message.content,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
     createdAt: message.createdAt || '',
   };
@@ -518,7 +521,10 @@ export async function sendGroupMessageForUser(params: {
     senderType: message.senderType as ChatMessageSummary['senderType'],
     senderName: formatUserName(sender, message.senderType),
     senderAvatar: sender?.avatar || undefined,
-    content: message.content,
+    content:
+      message.messageType === 'image'
+        ? (await resolveStoredFileReference(message.content)) || message.content
+        : message.content,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
     createdAt: message.createdAt || now,
   };
