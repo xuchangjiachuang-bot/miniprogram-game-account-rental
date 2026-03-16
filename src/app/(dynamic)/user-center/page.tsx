@@ -177,6 +177,7 @@ export default function UserCenterPage() {
   });
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [verificationReviewComment, setVerificationReviewComment] = useState('');
+  const hasSyncedApprovedVerificationRef = useRef(false);
 
   // 文件上传输入框引用
   const idCardFrontRef = useRef<HTMLInputElement>(null);
@@ -271,6 +272,7 @@ export default function UserCenterPage() {
     }
 
     let cancelled = false;
+    hasSyncedApprovedVerificationRef.current = user.isRealNameVerified;
 
     const loadVerificationStatus = async () => {
       try {
@@ -288,7 +290,8 @@ export default function UserCenterPage() {
         setVerificationStatus(nextStatus);
         setVerificationReviewComment(result.data?.reviewComment || '');
 
-        if (result.passed) {
+        if (result.passed && !hasSyncedApprovedVerificationRef.current) {
+          hasSyncedApprovedVerificationRef.current = true;
           await refreshUser(true);
         }
       } catch (error) {

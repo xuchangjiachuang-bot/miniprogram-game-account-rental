@@ -127,7 +127,16 @@ export function AccountDetailDialog({
   const platform = account.customAttributes?.platform || account.platform || '-';
 
   // 获取上号方式
-  const loginMethod = account.customAttributes?.loginMethod || account.login_method || '-';
+  const rawLoginMethod = account.customAttributes?.loginMethod || account.login_method || '-';
+  const loginMethod = rawLoginMethod === 'qq'
+    ? 'QQ账号密码'
+    : rawLoginMethod === 'qq_scan'
+      ? 'QQ扫码'
+      : rawLoginMethod === 'wechat'
+        ? '微信扫码'
+        : rawLoginMethod === 'password'
+          ? 'Steam账号密码'
+          : rawLoginMethod;
 
   // 获取地区信息
   const province = account.customAttributes?.province || account.region?.province || account.province || '-';

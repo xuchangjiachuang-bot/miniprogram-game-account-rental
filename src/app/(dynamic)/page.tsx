@@ -332,6 +332,7 @@ export default function Home() {
             },
             platform: customAttributes.platform || '未知平台',
             login_method: customAttributes.loginMethod === 'qq' ? 'QQ账号密码' :
+                          customAttributes.loginMethod === 'qq_scan' ? 'QQ扫码' :
                           customAttributes.loginMethod === 'password' ? 'Steam账号密码' :
                           customAttributes.loginMethod === 'wechat' ? '微信扫码' : '未知',
             available_time: {
@@ -404,10 +405,12 @@ export default function Home() {
     if (filters.platformLogin !== 'all') {
       if (filters.platformLogin === 'wegame-wechat') {
         if (account.login_method !== '微信扫码') return false;
+      } else if (filters.platformLogin === 'wegame-qq-scan') {
+        if (account.login_method !== 'QQ扫码') return false;
       } else if (filters.platformLogin === 'wegame-qq') {
         if (account.login_method !== 'QQ账号密码') return false;
       } else if (filters.platformLogin === 'steam-password') {
-        if (account.login_method !== '账号密码') return false;
+        if (account.login_method !== 'Steam账号密码') return false;
       }
     }
     // 皮肤筛选
@@ -533,6 +536,7 @@ export default function Home() {
                   <SelectContent>
                     <SelectItem value="all">全部</SelectItem>
                     <SelectItem value="wegame-wechat">Wegame · 微信扫码</SelectItem>
+                    <SelectItem value="wegame-qq-scan">Wegame · QQ扫码</SelectItem>
                     <SelectItem value="wegame-qq">Wegame · QQ账号密码</SelectItem>
                     <SelectItem value="steam-password">Steam · 账号密码</SelectItem>
                   </SelectContent>

@@ -492,6 +492,14 @@ function NewAccountPage() {
       return { isValid: false, error: '负重等级必须是1-15之间的整数', field: 'load_level' };
     }
 
+    if (!formData.account_level?.trim()) {
+      return { isValid: false, error: '请填写账号等级', field: 'account_level' };
+    }
+    const accountLevelValue = parseInt(formData.account_level, 10);
+    if (isNaN(accountLevelValue) || accountLevelValue < 1 || accountLevelValue > 60) {
+      return { isValid: false, error: '账号等级必须是1-60之间的整数', field: 'account_level' };
+    }
+
     // 验证备注长度
     if (formData.remark && formData.remark.length > 200) {
       return { isValid: false, error: '备注不能超过200字', field: 'remark' };
@@ -693,8 +701,8 @@ function NewAccountPage() {
 
     // 显示加载中
     const confirmMessage = isEditMode
-      ? '确认保存账号信息吗？\n\n修改后账号将重新进入待审核状态'
-      : '确认提交账号上架吗？\n\n注意：\n1. 提交后将自动冻结上架保证金（可在后台配置金额）\n2. 账号需要管理员审核通过后才会上架\n3. 审核通过前账号状态为"草稿"，不会对外展示\n4. 审核被拒绝时保证金会自动退还';
+      ? '确认保存账号信息吗？\n\n修改后系统会按当前审核配置重新处理账号状态。'
+      : '确认提交账号上架吗？\n\n注意：\n1. 提交后将自动冻结上架保证金（可在后台配置金额）\n2. 账号会按当前平台审核配置自动上架或进入待审核\n3. 待审核中的账号不会对外展示\n4. 审核被拒绝时保证金会自动退还';
 
     const confirmSubmit = confirm(confirmMessage);
 
@@ -841,9 +849,11 @@ function NewAccountPage() {
       console.log('后端响应数据:', result);
 
       if (result.success) {
+        const auditStatus = result.data?.account?.auditStatus;
+        const isApproved = auditStatus === 'approved';
         const successMessage = isEditMode
-          ? `账号修改成功！\n\n账号将重新进入待审核状态，需要管理员审核通过后才能上架。`
-          : `账号提交成功！\n\n${result.message}\n\n保证金金额：￥${result.data.deposit?.amount || '50'}\n账号ID：${result.data.account.id}`;
+          ? `账号修改成功！\n\n${isApproved ? '账号已按当前审核配置通过并保持上架。' : '账号已保存，当前处于待审核状态，审核通过后会上架。'}`
+          : `账号提交成功！\n\n${isApproved ? '账号已通过审核并上架，可在账号列表中查看。' : '账号已提交，当前处于待审核状态，审核通过后会自动上架。'}\n\n保证金金额：￥${result.data.deposit?.amount || '50'}\n账号ID：${result.data.account.id}`;
 
         alert(successMessage);
         // 跳转到账号列表页
@@ -1191,7 +1201,7 @@ function NewAccountPage() {
                         <div className="w-3 h-3 rounded-full bg-purple-500" />
                         <div>
                           <div className="font-medium text-sm">Wegame</div>
-                          <div className="text-xs text-gray-500">支持微信扫码和QQ账号密码</div>
+                          <div className="text-xs text-gray-500">支持微信扫码、QQ扫码和QQ账号密码</div>
                         </div>
                       </div>
                     </button>
@@ -1216,7 +1226,7 @@ function NewAccountPage() {
                 </div>
 
                 {/* 上号方式 */}
-                <div>
+                <div data-field="login_method">
                   <Label className="text-sm">上号方式 *</Label>
                   <Select value={formData.login_method} onValueChange={(value) => setFormData({...formData, login_method: value})}>
                     <SelectTrigger className="mt-1.5">
@@ -1226,6 +1236,7 @@ function NewAccountPage() {
                       {formData.platform === 'wegame' ? (
                         <>
                           <SelectItem value="qq">QQ账号密码</SelectItem>
+                          <SelectItem value="qq_scan">QQ扫码</SelectItem>
                           <SelectItem value="wechat">微信扫码</SelectItem>
                         </>
                       ) : formData.platform === 'steam' ? (
@@ -1268,15 +1279,15 @@ function NewAccountPage() {
                     </div>
                   )}
 
-                  {/* 微信扫码说明 */}
-                  {formData.login_method === 'wechat' && (
+                  {/* 扫码登录说明 */}
+                  {(formData.login_method === 'wechat' || formData.login_method === 'qq_scan') && (
                     <div className="mt-3 p-3 bg-muted rounded-lg">
                       <div className="flex items-start gap-2">
                         <MessageCircle className="w-4 h-4 text-purple-600 mt-0.5" />
                         <div className="flex-1">
-                          <p className="text-xs font-medium">群聊通知</p>
+                          <p className="text-xs font-medium">扫码登录说明</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            买家下单后，系统会自动创建一个群聊，包含您、买家和平台客服，方便交易过程中的沟通
+                            买家下单后，系统会自动创建群聊，方便您和买家沟通上号与交易流程。请按订单页提供的方式完成扫码登录。
                           </p>
                         </div>
                       </div>
@@ -1587,11 +1598,13 @@ function NewAccountPage() {
                   </div>
 
                   {/* 账号等级 */}
-                  <div>
+                  <div data-field="account_level">
                     <Label className="text-sm">账号等级 *</Label>
                     <Input
                       type="number"
-                      placeholder="65"
+                      placeholder="1-60"
+                      min="1"
+                      max="60"
                       value={formData.account_level}
                       onChange={(e) => setFormData({...formData, account_level: e.target.value})}
                       className="mt-1.5"

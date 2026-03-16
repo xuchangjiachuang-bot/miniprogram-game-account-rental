@@ -738,7 +738,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-4">
                           <div className="flex flex-col items-center rounded-xl border bg-white p-6">
                             <QRCode value={loginPayload.qrCodeContent || loginPayload.qrCodeUrl || order.id} size={180} />
-                            <div className="mt-4 text-sm text-muted-foreground">使用微信扫码登录账号</div>
+                            <div className="mt-4 text-sm text-muted-foreground">使用订单提供的扫码方式登录账号</div>
                           </div>
                           {loginPayload.qrCodeContent ? (
                             <Button

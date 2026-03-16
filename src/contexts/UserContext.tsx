@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@/lib/user-service';
 import { clearAuth, getToken } from '@/lib/auth-token';
 
@@ -67,7 +67,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshUser = async (force = false) => {
+  const refreshUser = useCallback(async (force = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -122,7 +122,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const logout = async () => {
     try {
