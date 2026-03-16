@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { accounts, chatMessages, db, groupChatMembers, groupChats, orders, users } from '@/lib/db';
 import { ensurePlatformCustomerServiceMember } from '@/lib/platform-customer-service-user';
+import { resolveStoredFileReference } from '@/lib/storage-service';
 
 export interface ChatGroupMemberSummary {
   id: string;
@@ -195,7 +196,7 @@ async function ensureSupportMemberForExistingGroup(groupId: string) {
       groupChatId: groupId,
       senderId: supportMember.user.id,
       senderType: 'system',
-      content: `${supportMember.user.nickname}已加入群聊，将协助处理交易、售后和纠纷问题。`,
+      content: '订单群聊已创建，买卖双方可在这里沟通交易、使用、验号和售后问题。',
       messageType: 'system',
       createdAt: new Date().toISOString(),
     });
@@ -287,7 +288,7 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
       groupChatId: group.id,
       senderId: supportMember.user.id,
       senderType: 'system',
-      content: `${supportMember.user.nickname}已加入群聊，买卖双方可在这里沟通交易、使用、验号和售后问题。`,
+      content: '订单群聊已创建，买卖双方可在这里沟通交易、使用、验号和售后问题。',
       messageType: 'system',
       createdAt: now,
     });
@@ -443,16 +444,21 @@ export async function getGroupMessagesForUser(
     .orderBy(asc(chatMessages.createdAt))
     .limit(limit);
 
-  return messages.map((message) => ({
-    id: message.id,
-    senderId: message.senderId,
-    senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
-    senderName: formatUserName(message, message.senderType),
-    senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-    content: message.content,
-    messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-    createdAt: message.createdAt || '',
-  }));
+  return Promise.all(
+    messages.map(async (message) => ({
+      id: message.id,
+      senderId: message.senderId,
+      senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
+      senderName: formatUserName(message, message.senderType),
+      senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
+      content:
+        message.messageType === 'image'
+          ? (await resolveStoredFileReference(message.content)) || message.content
+          : message.content,
+      messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
+      createdAt: message.createdAt || '',
+    })),
+  );
 }
 
 export async function sendGroupMessageForUser(params: {

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { admins, chatMessages, db, groupChats, orders, users } from '@/lib/db';
-import { ensureOrderGroupChat, sendGroupMessageForUser } from '@/lib/chat-service-new';
-import { ensurePlatformCustomerServiceUser } from '@/lib/platform-customer-service-user';
+import { resolveStoredFileReference } from '@/lib/storage-service';
 
 async function requireAdminToken(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -77,25 +76,31 @@ export async function GET(
         ...messageList.map((message) => message.senderId).filter(Boolean),
       ]),
     );
+
     const relatedUsers =
       senderIds.length > 0
         ? await db.select().from(users).where(inArray(users.id, senderIds))
         : [];
     const userMap = new Map(relatedUsers.map((user) => [user.id, user]));
 
-    const messages = messageList.map((message) => {
-      const sender = userMap.get(message.senderId);
-      return {
-        id: message.id,
-        sender: message.senderId,
-        senderName:
-          message.senderType === 'system' ? '系统' : sender?.nickname || sender?.phone || '未知用户',
-        senderType: message.senderType,
-        content: message.content,
-        messageType: message.messageType || 'text',
-        timestamp: message.createdAt,
-      };
-    });
+    const messages = await Promise.all(
+      messageList.map(async (message) => {
+        const sender = userMap.get(message.senderId);
+        return {
+          id: message.id,
+          sender: message.senderId,
+          senderName:
+            message.senderType === 'system' ? '系统' : sender?.nickname || sender?.phone || '未知用户',
+          senderType: message.senderType,
+          content:
+            message.messageType === 'image'
+              ? (await resolveStoredFileReference(message.content)) || message.content
+              : message.content,
+          messageType: message.messageType || 'text',
+          timestamp: message.createdAt,
+        };
+      }),
+    );
 
     return NextResponse.json({
       success: true,
@@ -116,56 +121,14 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ orderId: string }> },
-) {
-  try {
-    const auth = await requireAdminToken(request);
-    if ('error' in auth) {
-      return auth.error;
-    }
-
-    const { orderId } = await params;
-    const body = await request.json();
-    const content = typeof body.content === 'string' ? body.content.trim() : '';
-    const messageType = body.messageType === 'image' ? 'image' : 'text';
-
-    if (!content) {
-      return NextResponse.json({ success: false, error: '消息内容不能为空' }, { status: 400 });
-    }
-
-    const orderList = await db.select().from(orders).where(eq(orders.orderNo, orderId)).limit(1);
-    if (orderList.length === 0) {
-      return NextResponse.json({ success: false, error: '订单不存在' }, { status: 404 });
-    }
-
-    const order = orderList[0];
-    const groupChat = await ensureOrderGroupChat(order.id);
-    const supportUser = await ensurePlatformCustomerServiceUser();
-
-    const message = await sendGroupMessageForUser({
-      groupId: groupChat.id,
-      userId: supportUser.id,
-      content,
-      messageType,
-    });
-
-    return NextResponse.json({ success: true, data: message });
-  } catch (error: any) {
-    if (error.message === 'CHAT_GROUP_FORBIDDEN') {
-      return NextResponse.json({ success: false, error: '客服暂无权限在该群聊发言' }, { status: 403 });
-    }
-
-    if (error.message === 'CHAT_MESSAGE_EMPTY') {
-      return NextResponse.json({ success: false, error: '消息内容不能为空' }, { status: 400 });
-    }
-
-    if (error.message === 'CHAT_MESSAGE_TYPE_UNSUPPORTED') {
-      return NextResponse.json({ success: false, error: '暂不支持该消息类型' }, { status: 400 });
-    }
-
-    console.error('管理员发送群聊消息失败:', error);
-    return NextResponse.json({ success: false, error: error.message || '发送消息失败' }, { status: 500 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAdminToken(request);
+  if ('error' in auth) {
+    return auth.error;
   }
+
+  return NextResponse.json(
+    { success: false, error: '后台仅支持查看订单群聊记录，不支持客服直接回复。' },
+    { status: 403 },
+  );
 }

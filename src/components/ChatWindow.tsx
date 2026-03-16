@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
-import { ImagePlus, Loader2, MessageSquare, Send } from 'lucide-react';
+import { ImagePlus, Loader2, MessageSquare, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@/contexts/UserContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +25,26 @@ interface ChatWindowProps {
 const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+function formatBeijingTime(value: string) {
+  if (!value) {
+    return '';
+  }
+
+  try {
+    return new Date(value).toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return value;
+  }
+}
+
 export function ChatWindow({ group, onClose }: ChatWindowProps) {
   const { user } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,10 +52,20 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const title = useMemo(() => group.orderTitle || '订单群聊', [group.orderTitle]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingImagePreview) {
+        URL.revokeObjectURL(pendingImagePreview);
+      }
+    };
+  }, [pendingImagePreview]);
 
   const scrollToBottom = () => {
     window.setTimeout(() => {
@@ -79,26 +107,6 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
     return () => window.clearInterval(timer);
   }, [group.id]);
 
-  const handleSend = async () => {
-    const content = newMessage.trim();
-    if (!content || sending || uploadingImage) {
-      return;
-    }
-
-    try {
-      setSending(true);
-      const message = await sendGroupMessage(group.id, content);
-      setMessages((current) => [...current, message]);
-      setNewMessage('');
-      scrollToBottom();
-    } catch (error: any) {
-      console.error('发送群聊消息失败:', error);
-      toast.error(error?.message || '发送群聊消息失败');
-    } finally {
-      setSending(false);
-    }
-  };
-
   const validateImageFile = (file: File) => {
     if (!ACCEPTED_CHAT_IMAGE_TYPES.includes(file.type)) {
       throw new Error('仅支持 JPG、PNG、WEBP 图片');
@@ -109,22 +117,62 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
     }
   };
 
-  const handleSendImageFile = async (file: File) => {
+  const setPendingImage = (file: File) => {
+    validateImageFile(file);
+
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+
+    setPendingImageFile(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+  };
+
+  const clearPendingImage = () => {
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+
+    setPendingImageFile(null);
+    setPendingImagePreview('');
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSend = async () => {
+    const content = newMessage.trim();
+    const hasPendingImage = Boolean(pendingImageFile);
+
+    if ((!content && !hasPendingImage) || sending || uploadingImage) {
+      return;
+    }
+
     try {
-      validateImageFile(file);
-      setUploadingImage(true);
-      const message = await sendGroupImageMessage(group.id, file);
-      setMessages((current) => [...current, message]);
-      scrollToBottom();
-      toast.success('图片发送成功');
-    } catch (error: any) {
-      console.error('发送图片消息失败:', error);
-      toast.error(error?.message || '发送图片消息失败');
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      setSending(true);
+
+      if (pendingImageFile) {
+        setUploadingImage(true);
+        const imageMessage = await sendGroupImageMessage(group.id, pendingImageFile);
+        setMessages((current) => [...current, imageMessage]);
+        clearPendingImage();
+        setUploadingImage(false);
       }
+
+      if (content) {
+        const textMessage = await sendGroupMessage(group.id, content);
+        setMessages((current) => [...current, textMessage]);
+        setNewMessage('');
+      }
+
+      scrollToBottom();
+    } catch (error: any) {
+      console.error('发送群聊消息失败:', error);
+      toast.error(error?.message || '发送群聊消息失败');
+    } finally {
+      setSending(false);
+      setUploadingImage(false);
     }
   };
 
@@ -134,14 +182,19 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
       return;
     }
 
-    await handleSendImageFile(file);
+    try {
+      setPendingImage(file);
+      toast.success('图片已加入待发送区域');
+    } catch (error: any) {
+      toast.error(error?.message || '图片处理失败');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handlePaste = async (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const item = Array.from(event.clipboardData.items).find((clipboardItem) =>
-      clipboardItem.type.startsWith('image/'),
-    );
-
+    const item = Array.from(event.clipboardData.items).find((clipboardItem) => clipboardItem.type.startsWith('image/'));
     if (!item) {
       return;
     }
@@ -152,18 +205,12 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
     }
 
     event.preventDefault();
-    await handleSendImageFile(file);
-  };
-
-  const formatTime = (value: string) => {
-    if (!value) {
-      return '';
-    }
 
     try {
-      return formatDistanceToNow(new Date(value), { addSuffix: true, locale: zhCN });
-    } catch {
-      return '';
+      setPendingImage(file);
+      toast.success('截图已加入待发送区域，请点击发送');
+    } catch (error: any) {
+      toast.error(error?.message || '图片处理失败');
     }
   };
 
@@ -172,9 +219,7 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
       <CardHeader className="flex flex-row items-center justify-between border-b py-3">
         <div className="min-w-0">
           <CardTitle className="truncate text-lg font-medium">{title}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            下单后自动创建，买家、卖家和平台客服都可以在这里沟通。
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">买卖双方可在这里沟通交易、使用、验号和售后问题。</p>
         </div>
         {onClose ? (
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -185,13 +230,11 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         {loading ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            正在加载聊天消息...
-          </div>
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载聊天消息...</div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <MessageSquare className="h-10 w-10 opacity-50" />
-            <p>暂无消息，开始沟通订单细节吧</p>
+            <p>暂无消息，先开始沟通吧</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -202,9 +245,7 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
               if (isSystem) {
                 return (
                   <div key={message.id} className="flex justify-center">
-                    <div className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                      {message.content}
-                    </div>
+                    <div className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{message.content}</div>
                   </div>
                 );
               }
@@ -215,10 +256,8 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
                     <AvatarImage src={message.senderAvatar} />
                     <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
                   </Avatar>
-                  <div className={`max-w-[75%] ${isSelf ? 'items-end' : 'items-start'} flex flex-col`}>
-                    {!isSelf ? (
-                      <span className="mb-1 text-xs text-muted-foreground">{message.senderName}</span>
-                    ) : null}
+                  <div className={`flex max-w-[75%] flex-col ${isSelf ? 'items-end' : 'items-start'}`}>
+                    {!isSelf ? <span className="mb-1 text-xs text-muted-foreground">{message.senderName}</span> : null}
                     <div
                       className={
                         isSelf
@@ -238,7 +277,7 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
                         message.content
                       )}
                     </div>
-                    <span className="mt-1 text-xs text-muted-foreground">{formatTime(message.createdAt)}</span>
+                    <span className="mt-1 text-xs text-muted-foreground">{formatBeijingTime(message.createdAt)}</span>
                   </div>
                 </div>
               );
@@ -255,12 +294,25 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
           className="hidden"
           onChange={(event) => void handleFileChange(event)}
         />
+
+        {pendingImagePreview ? (
+          <div className="mb-3 rounded-xl border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>待发送图片</span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={clearPendingImage}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <img src={pendingImagePreview} alt="待发送图片预览" className="max-h-40 rounded-lg object-contain" />
+          </div>
+        ) : null}
+
         <div className="flex gap-2">
           <Input
             value={newMessage}
             onChange={(event) => setNewMessage(event.target.value)}
             onPaste={(event) => void handlePaste(event)}
-            placeholder="输入消息，或直接粘贴二维码截图发送"
+            placeholder="输入消息，或粘贴截图后点击发送"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
@@ -268,21 +320,14 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
               }
             }}
           />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sending || uploadingImage}
-          >
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={sending || uploadingImage}>
             {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
-          <Button onClick={() => void handleSend()} disabled={!newMessage.trim() || sending || uploadingImage}>
+          <Button onClick={() => void handleSend()} disabled={(!newMessage.trim() && !pendingImageFile) || sending || uploadingImage}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          支持 JPG、PNG、WEBP，最大 3MB，也支持截图后直接粘贴发送。
-        </p>
+        <p className="mt-2 text-xs text-muted-foreground">支持 JPG、PNG、WEBP，最大 3MB。截图粘贴后会先进入待发送区域。</p>
       </div>
     </Card>
   );

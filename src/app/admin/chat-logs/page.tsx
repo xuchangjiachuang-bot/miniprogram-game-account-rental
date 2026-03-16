@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Bot, Clock, ImagePlus, Loader2, Search, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Clock, Search, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,13 +43,15 @@ interface ChatGroup {
 
 function formatDateTime(dateStr: string) {
   if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleString('zh-CN', {
+
+  return new Date(dateStr).toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 
@@ -73,16 +75,12 @@ function getSenderRoleBadge(role: string) {
     case 'seller':
       return <Badge className="bg-green-500 text-xs">卖家</Badge>;
     case 'admin':
-      return <Badge className="bg-blue-500 text-xs">客服</Badge>;
+      return <Badge className="bg-blue-500 text-xs">平台</Badge>;
     case 'system':
       return <Badge variant="secondary" className="text-xs">系统</Badge>;
     default:
       return <Badge variant="secondary" className="text-xs">未知</Badge>;
   }
-}
-
-function getSenderIcon(role: string) {
-  return role === 'system' ? Bot : User;
 }
 
 export default function AdminChatLogs() {
@@ -92,13 +90,9 @@ export default function AdminChatLogs() {
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
   const [chatDetail, setChatDetail] = useState<ChatDetailData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-  const [uploadingReplyImage, setUploadingReplyImage] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
-  const replyImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchChatLogs = async () => {
     try {
@@ -155,111 +149,6 @@ export default function AdminChatLogs() {
     }
   };
 
-  const sendReply = async () => {
-    if (!selectedGroup || !replyContent.trim()) {
-      return;
-    }
-
-    try {
-      setSendingReply(true);
-      const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(selectedGroup.orderId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: replyContent.trim() }),
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || '发送消息失败');
-      }
-
-      setReplyContent('');
-      await fetchChatDetail(selectedGroup.orderId);
-      await fetchChatLogs();
-    } catch (error: any) {
-      console.error('发送客服消息失败:', error);
-      alert(error.message || '发送消息失败');
-    } finally {
-      setSendingReply(false);
-    }
-  };
-
-  const uploadChatImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', 'screenshot');
-
-    const response = await fetch('/api/storage/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    const result = await response.json();
-
-    if (!response.ok || !result.success || !result.url) {
-      throw new Error(result.error || '图片上传失败');
-    }
-
-    return result.url as string;
-  };
-
-  const sendImageReply = async (file: File) => {
-    if (!selectedGroup) {
-      alert('请先进入一个群聊');
-      return;
-    }
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      alert('仅支持 JPG、PNG、WEBP 图片');
-      return;
-    }
-
-    if (file.size > 3 * 1024 * 1024) {
-      alert('图片不能超过 3MB');
-      return;
-    }
-
-    try {
-      setUploadingReplyImage(true);
-      const imageUrl = await uploadChatImage(file);
-      const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(selectedGroup.orderId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: imageUrl, messageType: 'image' }),
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || '发送图片失败');
-      }
-
-      await fetchChatDetail(selectedGroup.orderId);
-      await fetchChatLogs();
-    } catch (error: any) {
-      console.error('发送客服图片失败:', error);
-      alert(error.message || '发送图片失败');
-    } finally {
-      setUploadingReplyImage(false);
-      if (replyImageInputRef.current) {
-        replyImageInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleReplyPaste = async (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const item = Array.from(event.clipboardData.items).find((clipboardItem) => clipboardItem.type.startsWith('image/'));
-    if (!item) {
-      return;
-    }
-
-    const file = item.getAsFile();
-    if (!file) {
-      return;
-    }
-
-    event.preventDefault();
-    await sendImageReply(file);
-  };
-
   useEffect(() => {
     if (!selectedGroup) {
       void fetchChatLogs();
@@ -277,64 +166,11 @@ export default function AdminChatLogs() {
     void fetchChatLogs();
   };
 
-  const renderReplyComposer = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>客服回复</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <input
-          ref={replyImageInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) {
-              void sendImageReply(file);
-            }
-          }}
-        />
-        <Input
-          value={replyContent}
-          onChange={(event) => setReplyContent(event.target.value)}
-          onPaste={(event) => void handleReplyPaste(event)}
-          placeholder="输入客服消息，或直接粘贴二维码截图发送"
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              void sendReply();
-            }
-          }}
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => replyImageInputRef.current?.click()}
-            disabled={sendingReply || uploadingReplyImage}
-          >
-            {uploadingReplyImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-          </Button>
-          <Button
-            onClick={() => void sendReply()}
-            disabled={sendingReply || uploadingReplyImage || !replyContent.trim()}
-          >
-            {sendingReply ? '发送中...' : '发送客服消息'}
-          </Button>
-        </div>
-        <p className="text-xs text-gray-500">支持 JPG、PNG、WEBP，最大 3MB，也支持截图后直接粘贴发送。</p>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">交易群聊记录</h1>
-          <p className="mt-1 text-sm text-gray-600">查询和处理订单群聊记录</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">交易群聊记录</h1>
+        <p className="mt-1 text-sm text-gray-600">仅用于查看订单群聊记录，不提供后台客服代聊功能。</p>
       </div>
 
       <Card>
@@ -388,7 +224,7 @@ export default function AdminChatLogs() {
             </Card>
           ) : (
             chatGroups.map((group) => (
-              <Card key={group.id} className="cursor-pointer transition-shadow hover:shadow-md">
+              <Card key={group.id} className="transition-shadow hover:shadow-md">
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -421,12 +257,7 @@ export default function AdminChatLogs() {
                         <div className="mt-1 text-xs text-gray-500">{formatDateTime(group.lastMessageTime)}</div>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-4"
-                      onClick={() => setSelectedGroup(group)}
-                    >
+                    <Button variant="outline" size="sm" className="ml-4" onClick={() => setSelectedGroup(group)}>
                       查看聊天
                     </Button>
                   </div>
@@ -437,12 +268,7 @@ export default function AdminChatLogs() {
 
           {!loading && chatGroups.length > 0 && total > pageSize ? (
             <div className="mt-4 flex justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page === 1}
-              >
+              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
                 上一页
               </Button>
               <span className="flex items-center text-sm text-gray-600">
@@ -458,8 +284,6 @@ export default function AdminChatLogs() {
               </Button>
             </div>
           ) : null}
-
-          {renderReplyComposer()}
         </div>
       ) : (
         <div className="space-y-4">
@@ -471,7 +295,6 @@ export default function AdminChatLogs() {
                 onClick={() => {
                   setSelectedGroup(null);
                   setChatDetail(null);
-                  setReplyContent('');
                 }}
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
@@ -501,7 +324,6 @@ export default function AdminChatLogs() {
               <CardContent>
                 <div className="space-y-4">
                   {chatDetail.messages.map((message) => {
-                    const SenderIcon = getSenderIcon(message.senderType);
                     const isSystem = message.senderType === 'system';
 
                     return (
@@ -517,7 +339,7 @@ export default function AdminChatLogs() {
                                     : 'bg-blue-100'
                               }`}
                             >
-                              <SenderIcon className="h-4 w-4 text-gray-600" />
+                              <User className="h-4 w-4 text-gray-600" />
                             </div>
                           </div>
                         ) : null}
@@ -547,11 +369,7 @@ export default function AdminChatLogs() {
                           >
                             {message.messageType === 'image' ? (
                               <a href={message.content} target="_blank" rel="noreferrer">
-                                <img
-                                  src={message.content}
-                                  alt="聊天图片"
-                                  className="max-h-72 max-w-full rounded-lg object-contain"
-                                />
+                                <img src={message.content} alt="聊天图片" className="max-h-72 max-w-full rounded-lg object-contain" />
                               </a>
                             ) : (
                               message.content
@@ -571,8 +389,6 @@ export default function AdminChatLogs() {
               </CardContent>
             </Card>
           )}
-
-          {renderReplyComposer()}
         </div>
       )}
     </div>
