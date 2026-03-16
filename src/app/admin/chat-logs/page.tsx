@@ -223,11 +223,14 @@ export default function AdminChatLogs() {
     });
     const result = await response.json();
 
-    if (!response.ok || !result.success || !result.url) {
+    if (!response.ok || !result.success || !result.url || !result.key) {
       throw new Error(result.error || '图片上传失败');
     }
 
-    return result.url as string;
+    return {
+      key: result.key as string,
+      url: result.url as string,
+    };
   };
 
   const sendReply = async () => {
@@ -243,11 +246,11 @@ export default function AdminChatLogs() {
 
       if (pendingReplyImageFile) {
         setUploadingReplyImage(true);
-        const imageUrl = await uploadChatImage(pendingReplyImageFile);
+        const uploaded = await uploadChatImage(pendingReplyImageFile);
         const imageResponse = await fetch(`/api/admin/chat-logs/${encodeURIComponent(selectedGroup.orderId)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: imageUrl, messageType: 'image' }),
+          body: JSON.stringify({ content: uploaded.key, messageType: 'image' }),
         });
         const imageResult = await imageResponse.json();
 

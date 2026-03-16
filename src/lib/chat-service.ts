@@ -34,7 +34,7 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-async function uploadChatImage(file: File): Promise<string> {
+async function uploadChatImage(file: File): Promise<{ key: string; url: string }> {
   const token = getToken();
   const formData = new FormData();
   formData.append('file', file);
@@ -47,11 +47,14 @@ async function uploadChatImage(file: File): Promise<string> {
   });
 
   const payload = await response.json();
-  if (!response.ok || !payload.success || !payload.url) {
+  if (!response.ok || !payload.success || !payload.url || !payload.key) {
     throw new Error(payload.error || '图片上传失败');
   }
 
-  return payload.url as string;
+  return {
+    key: payload.key as string,
+    url: payload.url as string,
+  };
 }
 
 function buildHeaders(): Record<string, string> {
@@ -100,14 +103,14 @@ export async function sendGroupMessage(groupId: string, content: string): Promis
 }
 
 export async function sendGroupImageMessage(groupId: string, file: File): Promise<ChatMessage> {
-  const imageUrl = await uploadChatImage(file);
+  const uploaded = await uploadChatImage(file);
   const response = await fetch(`/api/chat/groups/${groupId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...buildHeaders(),
     },
-    body: JSON.stringify({ content: imageUrl, messageType: 'image' }),
+    body: JSON.stringify({ content: uploaded.key, messageType: 'image' }),
   });
 
   return parseJson(response);

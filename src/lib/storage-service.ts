@@ -81,6 +81,24 @@ function toPublicUrl(fileKey: string): string {
   return origin ? `${origin}/${normalized}` : `/${normalized}`;
 }
 
+function normalizeBrowserUrl(reference: string): string {
+  if (!reference.startsWith('http://')) {
+    return reference;
+  }
+
+  try {
+    const parsed = new URL(reference);
+    if (['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+      return reference;
+    }
+
+    parsed.protocol = 'https:';
+    return parsed.toString();
+  } catch {
+    return reference;
+  }
+}
+
 async function saveFileLocally(
   fileContent: Buffer,
   fileName: string,
@@ -365,7 +383,7 @@ export async function resolveStoredFileReference(
     normalizedReference.startsWith('https://') ||
     normalizedReference.startsWith('/')
   ) {
-    return normalizedReference;
+    return normalizeBrowserUrl(normalizedReference);
   }
 
   return generateFileUrl(normalizedReference, expireTime);
