@@ -1448,7 +1448,7 @@ export default function UserCenterPage() {
                             <Badge variant={
                               order.status === 'active' ? 'default' :
                               order.status === 'completed' ? 'secondary' :
-                              order.status === 'cancelled' ? 'destructive' : 'outline'
+                              order.status === 'cancelled' || order.status === 'disputed' ? 'destructive' : 'outline'
                             }>
                               {order.status === 'active' ? '进行中' :
                                order.status === 'completed' ? '已完成' :

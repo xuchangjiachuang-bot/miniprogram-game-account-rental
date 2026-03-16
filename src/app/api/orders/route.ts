@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       .where(
         and(
           eq(orders.accountId, account.id),
-          inArray(orders.status, ['pending_payment', 'paid', 'active', 'pending_verification', 'disputed', 'refunding']),
+          inArray(orders.status, ['pending_payment', 'paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'refunding']),
         ),
       )
       .limit(1);

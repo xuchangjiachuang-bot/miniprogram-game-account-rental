@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     if (status && status !== 'all') {
       if (status === 'active') {
-        conditions.push(eq(orders.status, 'active'));
+        conditions.push(inArray(orders.status, ['active', 'pending_verification', 'pending_consumption_confirm']));
       } else if (status === 'completed') {
         conditions.push(eq(orders.status, 'completed'));
       } else if (status === 'disputed') {
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
         lastMessage: lastMsg?.content || '群聊已创建',
         lastMessageTime: lastMsg?.createdAt || chat.updatedAt,
         messageCount: messageStatsMap.get(chat.id) || 0,
-        status: order.status === 'active' ? 'active' :
+        status: ['active', 'pending_verification', 'pending_consumption_confirm'].includes(order.status || '') ? 'active' :
                 order.status === 'completed' ? 'completed' :
                 order.status === 'disputed' ? 'disputed' : 'unknown',
       };
