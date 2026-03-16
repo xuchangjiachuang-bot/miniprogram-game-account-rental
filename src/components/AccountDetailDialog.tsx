@@ -1,7 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Shield, Smartphone, Star, Target, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  Smartphone,
+  Star,
+  Target,
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +28,7 @@ interface AccountDetailDialogProps {
 
 function getRankText(rank: string) {
   const rankMap: Record<string, string> = {
-    none: '无',
+    none: '无段位',
     bronze: '青铜',
     silver: '白银',
     gold: '黄金',
@@ -39,7 +47,7 @@ function getRentalDescription(duration?: number) {
   if (duration >= 1) {
     const days = Math.floor(duration);
     const remainingHours = Math.round((duration - days) * 24);
-    return remainingHours > 0 ? `${days}天${remainingHours}小时` : `${days}天`;
+    return remainingHours > 0 ? `${days}天 ${remainingHours}小时` : `${days}天`;
   }
 
   return `${Math.round(duration * 24)}小时`;
@@ -51,6 +59,67 @@ function getValue(value: unknown) {
   }
 
   return String(value);
+}
+
+function getMoney(value: unknown) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+}
+
+function normalizeLoginMethod(value: string) {
+  switch (value) {
+    case 'qq':
+      return 'QQ账号密码';
+    case 'qq_scan':
+      return 'QQ扫码';
+    case 'wechat':
+      return '微信扫码';
+    case 'password':
+      return '账号密码';
+    default:
+      return value || '-';
+  }
+}
+
+function getImageList(account: any) {
+  if (!Array.isArray(account?.images)) return [];
+
+  return account.images.filter((image: unknown) => typeof image === 'string' && image.trim().length > 0);
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+      <span className="shrink-0 text-xs text-slate-500">{label}</span>
+      <span className="text-right text-sm font-medium leading-5 text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'orange' | 'violet' | 'emerald';
+}) {
+  const toneClassName =
+    tone === 'orange'
+      ? 'border-orange-200 bg-orange-50 text-orange-700'
+      : tone === 'violet'
+        ? 'border-violet-200 bg-violet-50 text-violet-700'
+        : tone === 'emerald'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : 'border-slate-200 bg-slate-50 text-slate-700';
+
+  return (
+    <Card className={`rounded-xl border p-3 shadow-none ${toneClassName}`}>
+      <div className="text-[11px] font-medium">{label}</div>
+      <div className="mt-1.5 text-xl font-bold leading-none sm:text-2xl">{value}</div>
+    </Card>
+  );
 }
 
 export function AccountDetailDialog({
@@ -65,38 +134,37 @@ export function AccountDetailDialog({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
 
-  const images = useMemo(() => (Array.isArray(account?.images) ? account.images : []), [account?.images]);
+  const images = useMemo(() => getImageList(account), [account]);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setImageError(false);
+  }, [account?.id, open]);
 
   if (!account) {
     return null;
   }
 
-  const hasImages = images.length > 0;
   const coinsDisplay =
     account.coins_display || (account.coins ? `${Number(account.coins).toFixed(2).replace(/\.00$/, '')}M` : '-');
-  const ratioValue = account.ratio_display || account.ratio || account.customAttributes?.ratio || '-';
-  const platform = account.customAttributes?.platform || account.platform || '-';
-  const rawLoginMethod = account.customAttributes?.loginMethod || account.login_method || '-';
-  const loginMethod =
-    rawLoginMethod === 'qq'
-      ? 'QQ账号密码'
-      : rawLoginMethod === 'qq_scan'
-        ? 'QQ扫码'
-        : rawLoginMethod === 'wechat'
-          ? '微信扫码'
-          : rawLoginMethod === 'password'
-            ? 'Steam账号密码'
-            : rawLoginMethod;
-  const province = account.customAttributes?.province || account.region?.province || account.province || '-';
-  const city = account.customAttributes?.city || account.region?.city || account.city || '-';
-  const region = province !== '-' && city !== '-' ? `${province} ${city}` : province !== '-' ? province : '-';
+  const ratioValue = getValue(account.ratio_display || account.ratio || account.customAttributes?.ratio);
+  const platform = getValue(account.customAttributes?.platform || account.platform);
+  const loginMethod = normalizeLoginMethod(account.customAttributes?.loginMethod || account.login_method || '-');
+  const province = account.customAttributes?.province || account.region?.province || account.province || '';
+  const city = account.customAttributes?.city || account.region?.city || account.city || '';
+  const region = [province, city].filter(Boolean).join(' ') || '-';
   const rentalDisplay = getRentalDescription(account.rental_duration);
-  const skins = Array.isArray(account.skins) ? account.skins : [];
+  const skins = Array.isArray(account.skins) ? account.skins.filter(Boolean) : [];
   const staminaLoadText = `${getValue(account.stamina_level)} / ${getValue(account.load_level)}`;
   const awmBullets = getValue(account.customAttributes?.awmBullets || account.awm_bullets);
   const level6Helmet = getValue(account.customAttributes?.level6Helmet || account.level6_helmet);
   const level6Armor = getValue(account.customAttributes?.level6Armor || account.level6_armor);
-  const remark = account.customAttributes?.remark || account.remark || '';
+  const remark = getValue(account.customAttributes?.remark || account.remark) === '-' ? '' : String(account.customAttributes?.remark || account.remark);
+  const description = getValue(account.description) === '-' ? '' : String(account.description);
+  const availableTime =
+    account.available_time?.start || account.available_time?.end
+      ? `${account.available_time?.start || '-'} - ${account.available_time?.end || '-'}`
+      : '-';
 
   const handleOrderClick = () => {
     if (!isLoggedIn || !isVerified) {
@@ -107,238 +175,191 @@ export function AccountDetailDialog({
     onOrder?.();
   };
 
-  const nextImage = () => {
-    setImageError(false);
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const prevImage = () => {
+  const showPrevImage = () => {
     setImageError(false);
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
+  const showNextImage = () => {
+    setImageError(false);
+    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl">
-        {hasImages ? (
-          <div className="relative border-b bg-gray-100">
-            <div className="relative aspect-[16/9] w-full">
-              {imageError ? (
-                <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">图片加载失败</div>
-              ) : (
-                <img
-                  src={images[currentImageIndex]}
-                  alt={`${account.account_name || '账号图片'}-${currentImageIndex + 1}`}
-                  className="h-full w-full object-contain bg-black/5"
-                  onError={() => setImageError(true)}
-                />
-              )}
-            </div>
-
-            {images.length > 1 ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/95 shadow-lg"
-                  onClick={prevImage}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/95 shadow-lg"
-                  onClick={nextImage}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
+      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[96vw] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
         <ScrollArea className="flex-1">
-          <div className="space-y-4 p-4">
-            <div>
-              <DialogHeader className="mb-3">
-                <DialogTitle className="text-xl font-bold leading-snug text-gray-900">
-                  {account.title || account.account_name || '账号详情'}
-                </DialogTitle>
-              </DialogHeader>
+          <div className="space-y-4 p-4 pb-5 sm:p-5">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              {images.length > 0 ? (
+                <div className="relative border-b border-slate-200 bg-slate-100">
+                  <div className="relative h-[210px] w-full sm:h-[260px] lg:h-[300px]">
+                    {imageError ? (
+                      <div className="flex h-full items-center justify-center text-sm text-slate-500">图片加载失败</div>
+                    ) : (
+                      <img
+                        src={images[currentImageIndex]}
+                        alt={`${account.account_name || '账号图片'}-${currentImageIndex + 1}`}
+                        className="h-full w-full object-contain"
+                        onError={() => setImageError(true)}
+                      />
+                    )}
+                  </div>
 
-              <div className="mb-3 flex flex-wrap gap-2">
-                <Badge variant="outline" className="border-purple-300 bg-purple-50 text-purple-700">
-                  {platform}
-                </Badge>
-                <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700">
-                  {loginMethod}
-                </Badge>
-                <Badge variant="outline" className="border-gray-300 bg-gray-50 text-gray-700">
-                  {region}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 shadow-none">
-                  <div className="text-xs font-medium text-orange-600">哈夫币</div>
-                  <div className="mt-2 text-4xl font-bold text-orange-700">{coinsDisplay}</div>
-                </Card>
-                <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4 shadow-none">
-                  <div className="text-xs font-medium text-violet-600">比例</div>
-                  <div className="mt-2 text-4xl font-bold text-violet-700">{ratioValue}</div>
-                </Card>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              <Card className="p-3 text-center shadow-none">
-                <div className="text-[11px] text-gray-500">安全箱</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">{getValue(account.safebox)}</div>
-              </Card>
-              <Card className="p-3 text-center shadow-none">
-                <div className="text-[11px] text-gray-500">体力/负重</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">{staminaLoadText}</div>
-              </Card>
-              <Card className="p-3 text-center shadow-none">
-                <div className="text-[11px] text-gray-500">等级</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">Lv.{getValue(account.account_level)}</div>
-              </Card>
-              <Card className="p-3 text-center shadow-none">
-                <div className="text-[11px] text-gray-500">段位</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">{getRankText(account.rank)}</div>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-              <Card className="p-3 shadow-none">
-                <div className="text-[11px] text-gray-500">租金/押金</div>
-                <div className="mt-2 text-2xl font-bold text-gray-900">
-                  ¥{account.actual_rental?.toFixed(2) || '0.00'} / ¥{account.deposit?.toFixed(2) || '0.00'}
+                  {images.length > 1 ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="absolute left-3 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-white/95 shadow-sm"
+                        onClick={showPrevImage}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="absolute right-3 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-white/95 shadow-sm"
+                        onClick={showNextImage}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white">
+                        {currentImageIndex + 1} / {images.length}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
-              </Card>
-              <Card className="p-3 shadow-none">
-                <div className="text-[11px] text-gray-500">租期</div>
-                <div className="mt-2 text-2xl font-bold text-gray-900">{rentalDisplay}</div>
-              </Card>
-              <Card className="border-emerald-200 bg-emerald-50 p-3 shadow-none">
-                <div className="text-[11px] text-emerald-600">总计</div>
-                <div className="mt-2 text-2xl font-bold text-emerald-700">¥{account.total_price?.toFixed(2) || '0.00'}</div>
-              </Card>
-            </div>
+              ) : null}
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <Card className="p-3 shadow-none">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <Smartphone className="h-4 w-4 text-purple-600" />
-                  基本信息
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">平台</span>
-                    <span className="font-medium text-gray-900">{platform}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">上号方式</span>
-                    <span className="font-medium text-gray-900">{loginMethod}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">上号时间</span>
-                    <span className="font-medium text-gray-900">
-                      {account.available_time?.start || '-'} - {account.available_time?.end || '-'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">地区</span>
-                    <span className="font-medium text-gray-900">{region}</span>
-                  </div>
-                </div>
-              </Card>
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-3">
+                  <DialogHeader className="space-y-0">
+                    <DialogTitle className="text-lg font-semibold leading-7 text-slate-900 sm:text-xl">
+                      {account.title || account.account_name || '账号详情'}
+                    </DialogTitle>
+                  </DialogHeader>
 
-              <Card className="p-3 shadow-none">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <Star className="h-4 w-4 text-orange-500" />
-                  账号属性
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">KD值</span>
-                    <span className="font-medium text-gray-900">{getValue(account.kd)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">段位</span>
-                    <span className="font-medium text-gray-900">{getRankText(account.rank)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">等级</span>
-                    <span className="font-medium text-gray-900">{getValue(account.account_level)}级</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-3 shadow-none">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <Target className="h-4 w-4 text-green-600" />
-                  游戏道具
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">AWM子弹</span>
-                    <span className="font-medium text-gray-900">{awmBullets}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">6头数量</span>
-                    <span className="font-medium text-gray-900">{level6Helmet}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">6甲数量</span>
-                    <span className="font-medium text-gray-900">{level6Armor}</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            <Card className="p-3 shadow-none">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <Shield className="h-4 w-4 text-pink-500" />
-                皮肤信息
-              </div>
-              {skins.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {skins.map((skin: string, index: number) => (
-                    <Badge key={`${skin}-${index}`} variant="outline" className="border-pink-200 bg-pink-50 text-pink-700">
-                      {skin}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                      {platform}
                     </Badge>
-                  ))}
+                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">
+                      {loginMethod}
+                    </Badge>
+                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+                      {region}
+                    </Badge>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-sm text-gray-400">暂无皮肤信息</div>
-              )}
-            </Card>
 
-            {account.description ? (
-              <Card className="p-3 shadow-none">
-                <div className="mb-2 text-sm font-semibold text-gray-900">账号描述</div>
-                <div className="text-sm leading-6 text-gray-700">{account.description}</div>
-              </Card>
-            ) : null}
+                <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                  <MetricCard label="哈夫币" value={coinsDisplay} tone="orange" />
+                  <MetricCard label="比例" value={ratioValue} tone="violet" />
+                  <MetricCard label="租金 / 押金" value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`} />
+                  <MetricCard label="总价" value={`¥${getMoney(account.total_price)}`} tone="emerald" />
+                </div>
 
-            {remark ? (
-              <Card className="p-3 shadow-none">
-                <div className="mb-2 text-sm font-semibold text-gray-900">备注信息</div>
-                <div className="text-sm leading-6 text-gray-700">{remark}</div>
-              </Card>
-            ) : null}
+                <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                  <DetailItem label="保险箱" value={getValue(account.safebox)} />
+                  <DetailItem label="体力 / 负重" value={staminaLoadText} />
+                  <DetailItem label="等级" value={`Lv.${getValue(account.account_level)}`} />
+                  <DetailItem label="段位" value={getRankText(account.rank)} />
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Card className="rounded-xl border-slate-200 p-3 shadow-none">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <Smartphone className="h-4 w-4 text-blue-600" />
+                        基本信息
+                      </div>
+                      <div className="space-y-2">
+                        <DetailItem label="平台" value={platform} />
+                        <DetailItem label="上号方式" value={loginMethod} />
+                        <DetailItem label="可上号时间" value={availableTime} />
+                        <DetailItem label="地区" value={region} />
+                        <DetailItem label="租期" value={rentalDisplay} />
+                      </div>
+                    </Card>
+
+                    <Card className="rounded-xl border-slate-200 p-3 shadow-none">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        账号属性
+                      </div>
+                      <div className="space-y-2">
+                        <DetailItem label="KD" value={getValue(account.kd)} />
+                        <DetailItem label="段位" value={getRankText(account.rank)} />
+                        <DetailItem label="等级" value={`${getValue(account.account_level)}级`} />
+                        <DetailItem label="保险箱" value={getValue(account.safebox)} />
+                      </div>
+                    </Card>
+                  </div>
+
+                  <Card className="rounded-xl border-slate-200 p-3 shadow-none">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <Target className="h-4 w-4 text-emerald-600" />
+                      游戏道具
+                    </div>
+                    <div className="grid gap-2">
+                      <DetailItem label="AWM 子弹" value={awmBullets} />
+                      <DetailItem label="6头数量" value={level6Helmet} />
+                      <DetailItem label="6甲数量" value={level6Armor} />
+                    </div>
+
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <Shield className="h-4 w-4 text-pink-500" />
+                        皮肤信息
+                      </div>
+                      {skins.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {skins.map((skin: string, index: number) => (
+                            <Badge
+                              key={`${skin}-${index}`}
+                              variant="outline"
+                              className="border-pink-200 bg-pink-50 text-pink-700"
+                            >
+                              {skin}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-400">暂无皮肤信息</div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+
+                {description ? (
+                  <Card className="rounded-xl border-slate-200 p-3 shadow-none">
+                    <div className="mb-2 text-sm font-semibold text-slate-900">账号描述</div>
+                    <div className="text-sm leading-6 text-slate-700">{description}</div>
+                  </Card>
+                ) : null}
+
+                {remark ? (
+                  <Card className="rounded-xl border-slate-200 p-3 shadow-none">
+                    <div className="mb-2 text-sm font-semibold text-slate-900">备注信息</div>
+                    <div className="text-sm leading-6 text-slate-700">{remark}</div>
+                  </Card>
+                ) : null}
+              </div>
+            </section>
           </div>
         </ScrollArea>
 
-        <div className="space-y-2 border-t bg-white p-3">
+        <div className="space-y-2 border-t border-slate-200 bg-white p-3 sm:px-5 sm:py-4">
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               关闭
             </Button>
             <Button
-              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              type="button"
+              className="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
               onClick={handleOrderClick}
             >
               <Check className="mr-2 h-4 w-4" />
@@ -348,13 +369,13 @@ export function AccountDetailDialog({
 
           {!isLoggedIn ? (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-              请先完成登录后再下单
+              请先登录后再下单
             </div>
           ) : null}
 
           {isLoggedIn && !isVerified ? (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-              请先完成实名认证后再进行下单操作
+              请先完成实名认证后再进行下单
             </div>
           ) : null}
         </div>

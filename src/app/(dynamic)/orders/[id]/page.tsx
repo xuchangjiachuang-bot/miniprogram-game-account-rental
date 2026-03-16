@@ -97,6 +97,14 @@ type CustomerServiceConfig = {
   kfUrl?: string;
 };
 
+type ConsumptionCatalogItem = {
+  id: string;
+  name: string;
+  price: number;
+  unitLabel: string;
+  enabled: boolean;
+};
+
 type ConsumptionItemDraft = {
   itemName: string;
   unitPrice: string;
@@ -206,6 +214,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [respondingConsumption, setRespondingConsumption] = useState(false);
   const [consumptionRemark, setConsumptionRemark] = useState('');
   const [consumptionBuyerRemark, setConsumptionBuyerRemark] = useState('');
+  const [consumptionCatalog, setConsumptionCatalog] = useState<ConsumptionCatalogItem[]>([]);
   const [consumptionItems, setConsumptionItems] = useState<ConsumptionItemDraft[]>([
     { itemName: '', unitPrice: '', unitLabel: '个', quantity: '', remark: '' },
   ]);
@@ -221,6 +230,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     void loadCustomerServiceConfig();
+  }, []);
+
+  useEffect(() => {
+    void loadConsumptionCatalog();
   }, []);
 
   useEffect(() => {
@@ -321,6 +334,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       }
     } catch (error) {
       console.error('加载企业微信客服配置失败:', error);
+    }
+  }
+
+  async function loadConsumptionCatalog() {
+    try {
+      const response = await fetch('/api/settings/order-consumption', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const result = await response.json();
+      if (result.success) {
+        setConsumptionCatalog(Array.isArray(result.data?.catalog) ? result.data.catalog : []);
+      }
+    } catch (error) {
+      console.error('加载资源消耗模板失败:', error);
     }
   }
 
@@ -506,6 +534,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   function updateConsumptionItem(index: number, field: keyof ConsumptionItemDraft, value: string) {
     setConsumptionItems((current) => current.map((item, itemIndex) => (
       itemIndex === index ? { ...item, [field]: value } : item
+    )));
+  }
+
+  function applyConsumptionCatalogItem(index: number, catalogItem: ConsumptionCatalogItem) {
+    setConsumptionItems((current) => current.map((item, itemIndex) => (
+      itemIndex === index
+        ? {
+            ...item,
+            itemName: catalogItem.name,
+            unitPrice: String(catalogItem.price),
+            unitLabel: catalogItem.unitLabel || '个',
+          }
+        : item
     )));
   }
 
@@ -900,7 +941,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
                     <div className="text-sm font-medium">卖家发起资源消耗结算</div>
                     {consumptionItems.map((item, index) => (
-                      <div key={`draft-${index}`} className="grid gap-2 sm:grid-cols-5">
+                      <div key={`draft-${index}`} className="space-y-2 rounded-lg border border-dashed p-3">
+                        {consumptionCatalog.filter((catalogItem) => catalogItem.enabled).length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {consumptionCatalog.filter((catalogItem) => catalogItem.enabled).map((catalogItem) => (
+                              <Button
+                                key={catalogItem.id}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => applyConsumptionCatalogItem(index, catalogItem)}
+                              >
+                                {catalogItem.name} / {formatMoney(catalogItem.price)}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="grid gap-2 sm:grid-cols-5">
                         <Input value={item.itemName} onChange={(event) => updateConsumptionItem(index, 'itemName', event.target.value)} placeholder="物品名称" />
                         <Input value={item.unitPrice} onChange={(event) => updateConsumptionItem(index, 'unitPrice', event.target.value)} placeholder="单价" />
                         <Input value={item.unitLabel} onChange={(event) => updateConsumptionItem(index, 'unitLabel', event.target.value)} placeholder="单位" />
@@ -908,6 +965,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         <div className="flex gap-2">
                           <Input value={item.remark} onChange={(event) => updateConsumptionItem(index, 'remark', event.target.value)} placeholder="备注" />
                           <Button type="button" variant="outline" onClick={() => removeConsumptionItem(index)}>删</Button>
+                        </div>
                         </div>
                       </div>
                     ))}

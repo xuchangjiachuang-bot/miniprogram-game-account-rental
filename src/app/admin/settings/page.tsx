@@ -39,6 +39,13 @@ interface PlatformSettings {
   autoApproveVerified: boolean;
   listingDepositAmount: number;
   orderPaymentTimeout: number;
+  orderConsumptionCatalog: Array<{
+    id: string;
+    name: string;
+    price: number;
+    unitLabel: string;
+    enabled: boolean;
+  }>;
 }
 
 interface AgreementData {
@@ -79,11 +86,26 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   autoApproveVerified: false,
   listingDepositAmount: 50,
   orderPaymentTimeout: 180,
+  orderConsumptionCatalog: [
+    { id: 'default-bullet', name: '子弹', price: 1, unitLabel: '个', enabled: true },
+    { id: 'default-armor', name: '护甲', price: 10, unitLabel: '件', enabled: true },
+    { id: 'default-medicine', name: '药品', price: 5, unitLabel: '个', enabled: true },
+  ],
 };
 
 function toNumber(value: string, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function createConsumptionCatalogItem() {
+  return {
+    id: crypto.randomUUID(),
+    name: '',
+    price: 0,
+    unitLabel: '个',
+    enabled: true,
+  };
 }
 
 function hasMissing(fields: string[] | undefined, keyword: string) {
@@ -166,6 +188,7 @@ export default function AdminSettingsPage() {
     autoApproveVerified: settings.autoApproveVerified,
     listingDepositAmount: settings.listingDepositAmount,
     orderPaymentTimeout: settings.orderPaymentTimeout,
+    orderConsumptionCatalog: settings.orderConsumptionCatalog,
   });
 
   const saveSettings = async () => {
@@ -235,6 +258,43 @@ export default function AdminSettingsPage() {
     } catch {
       toast.error(`复制${label}失败`);
     }
+  };
+
+  const updateConsumptionCatalogItem = (
+    index: number,
+    field: 'name' | 'price' | 'unitLabel' | 'enabled',
+    value: string | number | boolean,
+  ) => {
+    setSettings((prev) => ({
+      ...prev,
+      orderConsumptionCatalog: prev.orderConsumptionCatalog.map((item, itemIndex) => (
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: field === 'price'
+                ? Math.max(0, Number(Number(value).toFixed(2)))
+                : value,
+            }
+          : item
+      )),
+    }));
+  };
+
+  const addConsumptionCatalogItem = () => {
+    setSettings((prev) => ({
+      ...prev,
+      orderConsumptionCatalog: [...prev.orderConsumptionCatalog, createConsumptionCatalogItem()],
+    }));
+  };
+
+  const removeConsumptionCatalogItem = (index: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      orderConsumptionCatalog:
+        prev.orderConsumptionCatalog.length <= 1
+          ? [createConsumptionCatalogItem()]
+          : prev.orderConsumptionCatalog.filter((_, itemIndex) => itemIndex !== index),
+    }));
   };
 
   const paymentItems = useMemo(
@@ -357,6 +417,67 @@ export default function AdminSettingsPage() {
               <div className="rounded-xl border border-dashed bg-muted/30 p-4 md:col-span-2 xl:col-span-3"><div className="font-medium">订单押金改为卖家手动填写</div><div className="mt-1 text-sm text-muted-foreground">这里不再配置“押金比例”。买家下单时使用的是卖家上架账号时填写的押金金额。</div></div>
               <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-4"><div><div className="font-medium">新上架人工审核</div><div className="text-sm text-muted-foreground">关闭后会减少人工审核量。</div></div><Switch checked={settings.requireManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireManualReview: checked }))} /></div></div>
               <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-4"><div><div className="font-medium">实名用户自动审核</div><div className="text-sm text-muted-foreground">适合流程稳定后开启。</div></div><Switch checked={settings.autoApproveVerified} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, autoApproveVerified: checked }))} /></div></div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>资源消耗模板</CardTitle>
+              <CardDescription>这里配置卖家发起“资源消耗结算”时可直接套用的名称、单价和单位。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {settings.orderConsumptionCatalog.map((item, index) => (
+                <div key={item.id || index} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto_auto]">
+                  <div className="space-y-2">
+                    <Label>名称</Label>
+                    <Input
+                      value={item.name}
+                      onChange={(event) => updateConsumptionCatalogItem(index, 'name', event.target.value)}
+                      placeholder="例如：子弹、药品、护甲"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>单价</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.price}
+                      onChange={(event) => updateConsumptionCatalogItem(index, 'price', toNumber(event.target.value, item.price))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>单位</Label>
+                    <Input
+                      value={item.unitLabel}
+                      onChange={(event) => updateConsumptionCatalogItem(index, 'unitLabel', event.target.value)}
+                      placeholder="个"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <div className="flex items-center gap-3 rounded-lg border px-3 py-2">
+                      <Switch
+                        checked={item.enabled}
+                        onCheckedChange={(checked) => updateConsumptionCatalogItem(index, 'enabled', checked)}
+                      />
+                      <span className="text-sm text-muted-foreground">启用</span>
+                    </div>
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" variant="outline" onClick={() => removeConsumptionCatalogItem(index)}>
+                      删除
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex items-center justify-between rounded-xl border border-dashed p-4">
+                <div className="text-sm text-muted-foreground">保存后，订单详情里的资源消耗结算表单会直接读取这里的模板。</div>
+                <Button type="button" variant="outline" onClick={addConsumptionCatalogItem}>
+                  新增模板
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

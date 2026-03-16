@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, admins, platformSettings } from '@/lib/db';
+import { getOrderConsumptionCatalog, saveOrderConsumptionCatalog } from '@/lib/order-consumption-config';
 import { broadcastConfigUpdate } from '@/lib/sse-broadcaster';
 
 function sanitizePlatformSetting<T extends Record<string, any>>(setting: T) {
@@ -41,10 +42,14 @@ function getDefaultSettings() {
 export async function GET() {
   try {
     const [setting] = await db.select().from(platformSettings).limit(1);
+    const orderConsumptionCatalog = await getOrderConsumptionCatalog();
 
     return NextResponse.json({
       success: true,
-      data: sanitizePlatformSetting(setting || getDefaultSettings()),
+      data: {
+        ...sanitizePlatformSetting(setting || getDefaultSettings()),
+        orderConsumptionCatalog,
+      },
     });
   } catch (error: any) {
     console.error('获取平台设置失败:', error);
@@ -53,7 +58,7 @@ export async function GET() {
         success: false,
         error: error.message || '获取平台设置失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -112,12 +117,19 @@ export async function PUT(request: NextRequest) {
       await db.insert(platformSettings).values(payload);
     }
 
+    const orderConsumptionCatalog = await saveOrderConsumptionCatalog(
+      body.orderConsumptionCatalog ?? await getOrderConsumptionCatalog(),
+    );
+
     broadcastConfigUpdate('settings');
 
     return NextResponse.json({
       success: true,
       message: '平台设置已更新',
-      data: sanitizePlatformSetting(payload),
+      data: {
+        ...sanitizePlatformSetting(payload),
+        orderConsumptionCatalog,
+      },
     });
   } catch (error: any) {
     console.error('更新平台设置失败:', error);
@@ -126,7 +138,7 @@ export async function PUT(request: NextRequest) {
         success: false,
         error: error.message || '更新平台设置失败',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
