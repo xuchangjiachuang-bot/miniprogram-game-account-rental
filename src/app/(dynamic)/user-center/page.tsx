@@ -18,6 +18,7 @@ import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
 import { getToken } from '@/lib/auth-token';
 import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
+import { formatServerDateTime } from '@/lib/time';
 
 interface GroupChat {
   id: string;
@@ -1503,7 +1504,7 @@ export default function UserCenterPage() {
                               ¥{order.total_amount.toFixed(2)}
                             </span>
                             <span>
-                              {new Date(order.created_at).toLocaleString('zh-CN')}
+                              {formatServerDateTime(order.created_at)}
                             </span>
                           </div>
                         </div>

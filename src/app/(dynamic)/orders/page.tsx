@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getToken } from '@/lib/auth-token';
+import { formatServerDateTime } from '@/lib/time';
 
 interface Order {
   id: string;
@@ -231,7 +232,7 @@ function OrderList({
                   <InfoItem label="哈夫币数量" value={`${order.coins_million}M`} />
                   <InfoItem label="比例" value={`1:${order.price_ratio}`} />
                   <InfoItem label="租期" value={`${order.rent_hours} 小时`} />
-                  <InfoItem label="创建时间" value={new Date(order.created_at).toLocaleString('zh-CN')} />
+                  <InfoItem label="创建时间" value={formatServerDateTime(order.created_at)} />
                 </div>
 
                 <div className="rounded-lg bg-gray-50 p-4">

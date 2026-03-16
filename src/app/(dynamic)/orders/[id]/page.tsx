@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
+import { formatServerDateTime, getServerTimeMs } from '@/lib/time';
 
 type OrderDispute = {
   id: string;
@@ -124,16 +125,7 @@ const statusMeta: Record<string, { label: string; className?: string }> = {
 };
 
 function formatDateTime(value?: string | null) {
-  if (!value) {
-    return '--';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('zh-CN');
+  return formatServerDateTime(value);
 }
 
 function formatMoney(value?: number | string | null) {
@@ -192,7 +184,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
 
     const update = () => {
-      setRemainingMs(new Date(order.endTime!).getTime() - Date.now());
+      const endTimeMs = getServerTimeMs(order.endTime);
+      setRemainingMs(endTimeMs === null ? null : endTimeMs - Date.now());
     };
 
     update();
@@ -206,8 +199,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       return;
     }
 
-    const createdAt = new Date(order.createdAt).getTime();
-    if (Number.isNaN(createdAt)) {
+    const createdAt = getServerTimeMs(order.createdAt);
+    if (createdAt === null) {
       setPendingPaymentMs(null);
       return;
     }

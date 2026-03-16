@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatServerDateTime } from '@/lib/time';
 
 interface OrderDispute {
   id: string;
@@ -78,12 +79,7 @@ function formatMoney(value?: string | number | null) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) {
-    return '--';
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN');
+  return formatServerDateTime(value);
 }
 
 function getSettlementStatusLabel(status?: string | null) {
