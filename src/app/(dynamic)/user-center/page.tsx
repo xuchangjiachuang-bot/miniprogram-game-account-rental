@@ -1452,6 +1452,9 @@ export default function UserCenterPage() {
                             }>
                               {order.status === 'active' ? '进行中' :
                                order.status === 'completed' ? '已完成' :
+                               order.status === 'pending_verification' ? '待验收' :
+                               order.status === 'pending_consumption_confirm' ? '待买家确认结算' :
+                               order.status === 'disputed' ? '争议中' :
                                order.status === 'cancelled' ? '已取消' : '待支付'}
                             </Badge>
                           </div>
