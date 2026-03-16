@@ -544,7 +544,7 @@ export default function UserCenterPage() {
 
     // 如果通知关联订单，跳转到订单详情页
     if (notification.order_id) {
-      window.location.href = `/orders?tab=list&order=${notification.order_id}`;
+      window.location.href = `/orders/${notification.order_id}`;
     }
   };
 

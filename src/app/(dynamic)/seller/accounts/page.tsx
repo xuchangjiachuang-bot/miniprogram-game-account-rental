@@ -43,10 +43,18 @@ interface Account {
   createdAt: string;
 }
 
+function getAccountDisplayStatus(account: Account) {
+  if (account.tradeCount > 0 && account.status === 'rented') {
+    return 'traded';
+  }
+
+  return account.status;
+}
+
 export default function SellerAccounts() {
   const { user } = useUser();
   const router = useRouter();
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'available' | 'rented' | 'sold'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'available' | 'rented' | 'traded'>('all');
   const [auditStatusFilter, setAuditStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -74,7 +82,7 @@ export default function SellerAccounts() {
       params.append('sellerId', user.id);
 
       // 状态过滤
-      if (statusFilter !== 'all') {
+      if (statusFilter !== 'all' && statusFilter !== 'traded') {
         params.append('status', statusFilter);
       }
 
@@ -105,7 +113,8 @@ export default function SellerAccounts() {
   };
 
   const filteredAccounts = accounts.filter(account => {
-    const matchesStatus = statusFilter === 'all' || account.status === statusFilter;
+    const displayStatus = getAccountDisplayStatus(account);
+    const matchesStatus = statusFilter === 'all' || displayStatus === statusFilter;
     const matchesAuditStatus = auditStatusFilter === 'all' || account.auditStatus === auditStatusFilter;
     const matchesSearch = account.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          account.accountId.toLowerCase().includes(searchQuery.toLowerCase());
@@ -133,8 +142,8 @@ export default function SellerAccounts() {
         return <Badge className="bg-blue-500">在售中</Badge>;
       case 'rented':
         return <Badge className="bg-orange-500">租赁中</Badge>;
-      case 'sold':
-        return <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">已售出</Badge>;
+      case 'traded':
+        return <Badge className="bg-slate-700 text-white">已成交历史</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -254,7 +263,7 @@ export default function SellerAccounts() {
                   <SelectItem value="draft">草稿</SelectItem>
                   <SelectItem value="available">在售中</SelectItem>
                   <SelectItem value="rented">租赁中</SelectItem>
-                  <SelectItem value="sold">已售出</SelectItem>
+                  <SelectItem value="traded">已成交历史</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={auditStatusFilter} onValueChange={(value: any) => setAuditStatusFilter(value)}>
@@ -318,7 +327,7 @@ export default function SellerAccounts() {
                         </div>
                         <div className="flex flex-col gap-1">
                           {getAuditStatusBadge(account.auditStatus)}
-                          {getStatusBadge(account.status)}
+                          {getStatusBadge(getAccountDisplayStatus(account))}
                         </div>
                       </div>
                       {account.auditReason && account.auditStatus === 'rejected' && (
@@ -408,8 +417,8 @@ export default function SellerAccounts() {
                             className="flex-1"
                             disabled
                           >
-                            {account.status === 'rented' ? '租赁中' :
-                             account.status === 'sold' ? '已售出' :
+                            {getAccountDisplayStatus(account) === 'rented' ? '租赁中' :
+                             getAccountDisplayStatus(account) === 'traded' ? '已成交历史' :
                              account.auditStatus === 'pending' ? '待审核' :
                              account.auditStatus === 'rejected' ? '已拒绝' :
                              '不可编辑'}
