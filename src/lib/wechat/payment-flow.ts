@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
+import { sendOrderPaidNotification } from '@/lib/notification-service';
+import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
 import { fenToYuan } from '@/lib/wechat/utils';
@@ -34,7 +36,7 @@ export async function markWechatOrderPaid(params: {
   const { orderId, transactionId, totalFeeFen } = params;
   const now = new Date().toISOString();
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const orderList = await tx
       .select()
       .from(orders)
@@ -123,6 +125,13 @@ export async function markWechatOrderPaid(params: {
 
     return { order, alreadyPaid: false };
   });
+
+  if (!result.alreadyPaid) {
+    await sendOrderPaidNotification(result.order.id, false);
+    await ensureOrderGroupChat(result.order.id);
+  }
+
+  return result;
 }
 
 export async function markWechatWalletRechargePaid(params: {
