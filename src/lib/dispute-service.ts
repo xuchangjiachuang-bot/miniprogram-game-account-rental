@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { checkWechatPayConfig } from '@/lib/wechat/config';
 import { refund } from '@/lib/wechat/refund';
 import { generateNonceStr, yuanToFen } from '@/lib/wechat/utils';
-import { db, disputes, orderConsumptionSettlements, orders, paymentRecords, users } from './db';
+import { chatMessages, db, disputes, groupChats, orderConsumptionSettlements, orders, paymentRecords, users } from './db';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
 import { getLatestConsumptionSettlement } from './order-consumption-service';
 import { settleCompletedOrder } from './order-settlement-service';
@@ -30,6 +30,26 @@ export interface DisputeView {
 
 function toNumber(value: unknown) {
   return Number(value) || 0;
+}
+
+async function sendDisputeSystemMessage(orderId: string, content: string) {
+  const groupRows = await db.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
+  const group = groupRows[0];
+  if (!group) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  await db.insert(chatMessages).values({
+    groupChatId: group.id,
+    senderId: '00000000-0000-0000-0000-000000000000',
+    senderType: 'system',
+    content,
+    messageType: 'system',
+    createdAt: now,
+  });
+
+  await db.update(groupChats).set({ updatedAt: now }).where(eq(groupChats.id, group.id));
 }
 
 async function loadDisputeParticipants(initiatorId: string, respondentId: string) {
@@ -146,6 +166,11 @@ export async function createOrderDispute(params: {
       })
       .where(eq(orders.id, order.id));
   });
+
+  await sendDisputeSystemMessage(
+    order.id,
+    `订单已发起纠纷，原因：${params.reason.trim()}。平台将介入处理，请买卖双方在群内补充说明。`,
+  );
 
   return getOrderDispute(params.orderId);
 }
@@ -291,6 +316,11 @@ export async function resolveOrderDispute(params: {
       })
       .where(eq(disputes.id, dispute.id));
 
+    await sendDisputeSystemMessage(
+      order.id,
+      `平台已裁决：全额退款给买家。${params.remark.trim() || '请留意退款处理进度。'}`,
+    );
+
     return {
       success: true,
       message: '已发起全额退款，等待微信回调完成',
@@ -323,8 +353,13 @@ export async function resolveOrderDispute(params: {
           status: resumeStatus,
           updatedAt: now,
         })
-        .where(eq(orders.id, order.id));
+      .where(eq(orders.id, order.id));
     });
+
+    await sendDisputeSystemMessage(
+      order.id,
+      `平台已裁决：驳回本次纠纷，订单恢复为${resumeStatus === 'pending_verification' ? '待验收' : '进行中'}。${params.remark.trim() || ''}`.trim(),
+    );
 
     return {
       success: true,
@@ -382,6 +417,11 @@ export async function resolveOrderDispute(params: {
         resolvedAt: now,
       })
       .where(eq(disputes.id, dispute.id));
+
+    await sendDisputeSystemMessage(
+      order.id,
+      `平台已裁决：驳回本次纠纷并完成订单结算。${params.remark.trim() || '请在订单页查看最终处理结果。'}`,
+    );
 
     return {
       success: true,
