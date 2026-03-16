@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       .from(orders)
       .where(and(
         eq(orders.id, orderId),
-        eq(orders.buyerId, user.id),
+        or(eq(orders.buyerId, user.id), eq(orders.sellerId, user.id)),
       ))
       .limit(1);
 

@@ -165,6 +165,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [loadingLoginInfo, setLoadingLoginInfo] = useState(false);
   const [loginPayload, setLoginPayload] = useState<LoginPayload | null>(null);
   const [completingOrder, setCompletingOrder] = useState(false);
+  const [openingSupportChat, setOpeningSupportChat] = useState(false);
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [verifyingOrder, setVerifyingOrder] = useState<'pass' | 'reject' | null>(null);
@@ -281,6 +282,39 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   function handlePayNow() {
     if (!order) return;
     window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+  }
+
+  async function handleOpenSupportChat() {
+    if (!order) {
+      return;
+    }
+
+    try {
+      setOpeningSupportChat(true);
+      const response = await fetch('/api/chat/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || '打开群聊失败');
+      }
+
+      const groupId = result.data?.id;
+      const query = groupId
+        ? `tab=chats&groupId=${groupId}`
+        : `tab=chats&orderId=${order.id}`;
+
+      window.location.href = `/user-center?${query}`;
+    } catch (error: any) {
+      console.error('打开售后群聊失败:', error);
+      toast.error(error.message || '打开群聊失败');
+    } finally {
+      setOpeningSupportChat(false);
+    }
   }
 
   async function handleCancelOrder() {
@@ -968,11 +1002,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => {
-                    window.location.href = `/user-center?tab=chats&orderId=${order.id}`;
-                  }}
+                  onClick={handleOpenSupportChat}
+                  disabled={openingSupportChat}
                 >
-                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                   联系客服
                 </Button>
               </CardContent>
