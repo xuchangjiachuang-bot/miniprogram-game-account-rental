@@ -84,11 +84,20 @@ export default function UserCenterPage() {
         setCurrentUrl(url);
         const urlParams = new URLSearchParams(window.location.search);
         const tabParam = urlParams.get('tab');
+        const groupIdParam = urlParams.get('groupId');
+        const orderIdParam = urlParams.get('orderId');
         const validTab = tabParam && ['profile', 'verification', 'chats', 'orders', 'accounts', 'wallet', 'notifications'].includes(tabParam);
         if (validTab) {
           setActiveTab(tabParam);
         } else if (tabParam === null) {
           setActiveTab('profile');
+        }
+
+        if (groupIdParam || orderIdParam) {
+          setPendingChatTarget({
+            groupId: groupIdParam || undefined,
+            orderId: orderIdParam || undefined,
+          });
         }
       }
     };
@@ -125,6 +134,7 @@ export default function UserCenterPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingChats, setLoadingChats] = useState(false);
+  const [pendingChatTarget, setPendingChatTarget] = useState<{ groupId?: string; orderId?: string } | null>(null);
 
   // 钱包状态
   const [balance, setBalance] = useState<any>(null);
@@ -317,6 +327,12 @@ export default function UserCenterPage() {
       }
     };
   }, [activeTab, selectedChat?.id, user?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'chats' && selectedChat?.id) {
+      void loadChatMessages(selectedChat.id);
+    }
+  }, [activeTab, selectedChat?.id]);
 
   // 加载钱包数据
   const loadPublicPlatformSettings = async () => {
@@ -752,6 +768,17 @@ export default function UserCenterPage() {
       if (result.success && result.data) {
         setGroupChats(result.data);
         setSelectedChat((current) => {
+          const matchedTarget = pendingChatTarget?.groupId
+            ? result.data.find((chat: GroupChat) => chat.id === pendingChatTarget.groupId)
+            : pendingChatTarget?.orderId
+              ? result.data.find((chat: GroupChat) => chat.orderId === pendingChatTarget.orderId)
+              : null;
+
+          if (matchedTarget) {
+            setPendingChatTarget(null);
+            return matchedTarget;
+          }
+
           if (!current) {
             return current;
           }

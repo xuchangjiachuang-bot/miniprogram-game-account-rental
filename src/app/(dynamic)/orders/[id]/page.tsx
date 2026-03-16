@@ -965,7 +965,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <CardTitle>帮助支持</CardTitle>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full" disabled>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    window.location.href = `/user-center?tab=chats&orderId=${order.id}`;
+                  }}
+                >
                   <MessageSquare className="mr-2 h-4 w-4" />
                   联系客服
                 </Button>
