@@ -65,7 +65,67 @@ export const disputes = pgTable("disputes", {
 			columns: [table.handlerId],
 			foreignColumns: [users.id],
 			name: "disputes_handler_id_users_id_fk"
+	}),
+]);
+
+export const orderConsumptionSettlements = pgTable("order_consumption_settlements", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	orderId: uuid("order_id").notNull(),
+	sellerId: uuid("seller_id").notNull(),
+	buyerId: uuid("buyer_id").notNull(),
+	status: varchar({ length: 30 }).default('pending_buyer_confirmation').notNull(),
+	pricingVersion: varchar("pricing_version", { length: 50 }).default('default-v1').notNull(),
+	requestedAmount: numeric("requested_amount", { precision: 10, scale: 2 }).default('0').notNull(),
+	approvedAmount: numeric("approved_amount", { precision: 10, scale: 2 }).default('0').notNull(),
+	offlineSettledAmount: numeric("offline_settled_amount", { precision: 10, scale: 2 }).default('0').notNull(),
+	depositDeductedAmount: numeric("deposit_deducted_amount", { precision: 10, scale: 2 }).default('0').notNull(),
+	buyerRefundAmount: numeric("buyer_refund_amount", { precision: 10, scale: 2 }).default('0').notNull(),
+	sellerRemark: text("seller_remark"),
+	buyerRemark: text("buyer_remark"),
+	evidence: jsonb(),
+	submittedAt: timestamp("submitted_at", { mode: 'string' }).defaultNow(),
+	buyerConfirmedAt: timestamp("buyer_confirmed_at", { mode: 'string' }),
+	resolvedAt: timestamp("resolved_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("order_consumption_settlements_order_id_idx").using("btree", table.orderId.asc().nullsLast().op("uuid_ops")),
+	index("order_consumption_settlements_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.orderId],
+			foreignColumns: [orders.id],
+			name: "order_consumption_settlements_order_id_orders_id_fk"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.sellerId],
+			foreignColumns: [users.id],
+			name: "order_consumption_settlements_seller_id_users_id_fk"
 		}),
+	foreignKey({
+			columns: [table.buyerId],
+			foreignColumns: [users.id],
+			name: "order_consumption_settlements_buyer_id_users_id_fk"
+		}),
+]);
+
+export const orderConsumptionSettlementItems = pgTable("order_consumption_settlement_items", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	settlementId: uuid("settlement_id").notNull(),
+	itemName: varchar("item_name", { length: 100 }).notNull(),
+	unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).default('0').notNull(),
+	unitLabel: varchar("unit_label", { length: 20 }).default('个').notNull(),
+	quantity: numeric({ precision: 10, scale: 2 }).default('0').notNull(),
+	subtotal: numeric({ precision: 10, scale: 2 }).default('0').notNull(),
+	remark: text(),
+	sortOrder: integer("sort_order").default(0).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("order_consumption_settlement_items_settlement_id_idx").using("btree", table.settlementId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.settlementId],
+			foreignColumns: [orderConsumptionSettlements.id],
+			name: "order_consumption_settlement_items_settlement_id_fk"
+		}).onDelete("cascade"),
 ]);
 
 export const systemConfig = pgTable("system_config", {
@@ -278,6 +338,30 @@ export const balanceTransactions = pgTable("balance_transactions", {
 	description: text(),
 	createdAt: timestamp("created_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const financeAuditLogs = pgTable("finance_audit_logs", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	eventType: varchar("event_type", { length: 50 }).notNull(),
+	status: varchar({ length: 20 }).default('success').notNull(),
+	userId: varchar("user_id", { length: 36 }),
+	orderId: varchar("order_id", { length: 36 }),
+	paymentRecordId: varchar("payment_record_id", { length: 36 }),
+	withdrawalId: varchar("withdrawal_id", { length: 36 }),
+	accountId: varchar("account_id", { length: 36 }),
+	amount: numeric({ precision: 10, scale:  2 }),
+	currency: varchar({ length: 10 }).default('CNY').notNull(),
+	balanceBefore: numeric("balance_before", { precision: 10, scale:  2 }),
+	balanceAfter: numeric("balance_after", { precision: 10, scale:  2 }),
+	details: jsonb(),
+	errorMessage: text("error_message"),
+	createdAt: timestamp("created_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+	index("finance_audit_logs_event_type_idx").using("btree", table.eventType.asc().nullsLast().op("text_ops")),
+	index("finance_audit_logs_order_id_idx").using("btree", table.orderId.asc().nullsLast().op("text_ops")),
+	index("finance_audit_logs_payment_record_id_idx").using("btree", table.paymentRecordId.asc().nullsLast().op("text_ops")),
+	index("finance_audit_logs_user_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("finance_audit_logs_withdrawal_id_idx").using("btree", table.withdrawalId.asc().nullsLast().op("text_ops")),
+]);
 
 export const accountDeposits = pgTable("account_deposits", {
 	id: uuid().defaultRandom().primaryKey().notNull(),

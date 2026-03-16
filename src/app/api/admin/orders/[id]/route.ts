@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
+import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service';
 import { getOrderDispute } from '@/lib/dispute-service';
 import { requireAdmin } from '@/lib/admin-auth';
 
@@ -28,12 +29,14 @@ export async function GET(
 
     const order = orderList[0];
     const dispute = await getOrderDispute(order.id);
+    const consumptionSettlement = await getLatestConsumptionSettlement(order.id);
 
     return NextResponse.json({
       success: true,
       data: {
         ...order,
         dispute,
+        consumptionSettlement,
       },
     });
   } catch (error: any) {

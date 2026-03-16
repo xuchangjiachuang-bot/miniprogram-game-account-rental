@@ -7,9 +7,9 @@
 import { OrderStatus, RefundType, calculateOrderCompletionSplit, calculateRefundSplit, getOrderStatusText } from './split-service';
 import { UserType, TransactionType, changeBalance, unfreezeBalance, getUserBalance, ChangeBalanceParams } from './balance-service';
 import { sendNotification } from './notification-service';
-import { getAccountById } from './account-service';
+import { getAccountById, restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
 import { chatManager } from '@/storage/database/chatManager';
-import { db, orders } from '@/lib/db';
+import { accounts, db, orders } from '@/lib/db';
 import { eq, and, desc, or } from 'drizzle-orm';
 
 // ==================== 类型定义 ====================
@@ -300,22 +300,41 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
   // 生成订单ID和订单号
   const orderId = crypto.randomUUID();
   const orderNo = generateOrderNo();
+  const now = new Date().toISOString();
 
-  // 插入订单到数据库
-  const [insertedOrder] = await db.insert(orders).values({
-    id: orderId,
-    orderNo: orderNo,
-    accountId: params.account_id,
-    buyerId: params.buyer_id,
-    sellerId: params.seller_id,
-    status: 'pending_payment',
-    rentalDuration: params.rent_hours,
-    rentalPrice: params.rent_amount.toString(),
-    deposit: params.deposit_amount.toString(),
-    totalPrice: params.total_amount.toString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }).returning();
+  await db.transaction(async (tx) => {
+    const occupiedAccount = await tx
+      .update(accounts)
+      .set({
+        status: 'rented',
+        updatedAt: now,
+      })
+      .where(and(
+        eq(accounts.id, params.account_id),
+        eq(accounts.status, 'available'),
+        eq(accounts.isDeleted, false),
+      ))
+      .returning({ id: accounts.id });
+
+    if (occupiedAccount.length === 0) {
+      throw new Error('ACCOUNT_NOT_AVAILABLE');
+    }
+
+    await tx.insert(orders).values({
+      id: orderId,
+      orderNo: orderNo,
+      accountId: params.account_id,
+      buyerId: params.buyer_id,
+      sellerId: params.seller_id,
+      status: 'pending_payment',
+      rentalDuration: params.rent_hours,
+      rentalPrice: params.rent_amount.toString(),
+      deposit: params.deposit_amount.toString(),
+      totalPrice: params.total_amount.toString(),
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
 
   // 查询完整的订单信息（包含账号信息）
   const orderData = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
@@ -556,7 +575,9 @@ export async function completeOrder(orderId: string): Promise<CompleteOrderResul
     };
 
     // 执行余额变动
-    changeBalance(buyerTransaction);
+    if ((order as any).paymentMethod === 'wallet') {
+      changeBalance(buyerTransaction);
+    }
     changeBalance(sellerTransaction);
     changeBalance(platformTransaction);
 
@@ -657,6 +678,8 @@ export async function cancelOrder(orderId: string, reason: string = '用户取�
       })
       .where(eq(orders.id, orderId));
 
+    await restoreAccountAvailabilityIfNoBlockingOrders(order.account_id);
+
     // 2. 执行退款
     const buyerTransaction: ChangeBalanceParams = {
       user_id: order.buyer_id,
@@ -668,7 +691,9 @@ export async function cancelOrder(orderId: string, reason: string = '用户取�
     };
 
     // 执行余额变动
-    changeBalance(buyerTransaction);
+    if ((order as any).paymentMethod === 'wallet') {
+      changeBalance(buyerTransaction);
+    }
 
     // 发送通知给买家：订单已取消
     const account = await getAccountById(order.account_id);

@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { accounts, db, orders, paymentRecords, userBalances, users } from '@/lib/db';
+import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import type { User } from '@/lib/user-service';
 import {
   buildJsapiPaymentParams,
@@ -101,6 +102,19 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
     });
 
     const jsapiParams = await buildJsapiPaymentParams(payment.prepay_id);
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_payment_wechat_created',
+      status: 'pending',
+      userId: user.id,
+      orderId: order.id,
+      amount: Number(order.totalPrice || 0),
+      details: {
+        orderNo: order.orderNo,
+        channel,
+        outTradeNo,
+      },
+    });
+
     return {
       ...jsapiParams,
       orderId: order.id,
@@ -119,6 +133,19 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
       appUrl: getWechatNotifyBaseUrl(request),
     });
 
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_payment_wechat_created',
+      status: 'pending',
+      userId: user.id,
+      orderId: order.id,
+      amount: Number(order.totalPrice || 0),
+      details: {
+        orderNo: order.orderNo,
+        channel,
+        outTradeNo,
+      },
+    });
+
     return {
       orderId: order.id,
       totalPrice: Number(order.totalPrice || 0),
@@ -132,6 +159,19 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
     totalFeeFen,
     notifyUrl,
     attach,
+  });
+
+  await safeLogFinanceAuditEvent({
+    eventType: 'order_payment_wechat_created',
+    status: 'pending',
+    userId: user.id,
+    orderId: order.id,
+    amount: Number(order.totalPrice || 0),
+    details: {
+      orderNo: order.orderNo,
+      channel,
+      outTradeNo,
+    },
   });
 
   return {
@@ -189,6 +229,20 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
     status: 'pending',
     createdAt: now,
     updatedAt: now,
+  });
+
+  await safeLogFinanceAuditEvent({
+    eventType: 'wallet_recharge_wechat_created',
+    status: 'pending',
+    userId: user.id,
+    paymentRecordId: paymentRecordId,
+    orderId: paymentRecordId,
+    amount: resolvedAmount,
+    details: {
+      orderNo,
+      channel,
+      outTradeNo,
+    },
   });
 
   const description = `钱包充值 ${resolvedAmount.toFixed(2)} 元`;

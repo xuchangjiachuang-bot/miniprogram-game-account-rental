@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { checkWechatPayConfig } from '@/lib/wechat/config';
 import { refund } from '@/lib/wechat/refund';
 import { generateNonceStr, yuanToFen } from '@/lib/wechat/utils';
-import { db, disputes, orders, paymentRecords, users } from './db';
-import { executeAutoSplit } from './platform-split-service';
+import { db, disputes, orderConsumptionSettlements, orders, paymentRecords, users } from './db';
+import { safeLogFinanceAuditEvent } from './finance-audit-service';
+import { getLatestConsumptionSettlement } from './order-consumption-service';
+import { settleCompletedOrder } from './order-settlement-service';
 
 export type DisputeDecision = 'refund_buyer_full' | 'resume_order' | 'complete_order';
 
@@ -104,7 +106,7 @@ export async function createOrderDispute(params: {
     throw new Error('无权为该订单发起纠纷');
   }
 
-  if (!['active', 'pending_verification', 'disputed'].includes(order.status || '')) {
+  if (!['active', 'pending_verification', 'pending_consumption_confirm', 'disputed'].includes(order.status || '')) {
     throw new Error(`当前订单状态不支持发起纠纷：${order.status}`);
   }
 
@@ -219,6 +221,20 @@ async function requestFullRefund(orderId: string, reason: string) {
         updatedAt: now,
       })
       .where(eq(orders.id, order.id));
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_refund_requested',
+      status: 'pending',
+      userId: order.buyerId,
+      orderId: order.id,
+      amount: refundAmount,
+      details: {
+        orderNo: order.orderNo,
+        outRefundNo,
+        reason,
+        transactionId: order.transactionId,
+      },
+    }, tx);
   });
 
   return {
@@ -325,6 +341,8 @@ export async function resolveOrderDispute(params: {
       throw new Error('订单已分账，不能重复处理');
     }
 
+    const consumptionSettlement = await getLatestConsumptionSettlement(order.id);
+
     await db
       .update(orders)
       .set({
@@ -335,7 +353,22 @@ export async function resolveOrderDispute(params: {
       })
       .where(eq(orders.id, order.id));
 
-    const splitResult = await executeAutoSplit(order.id);
+    if (
+      consumptionSettlement
+      && ['pending_buyer_confirmation', 'disputed'].includes(consumptionSettlement.status)
+    ) {
+      await db
+        .update(orderConsumptionSettlements)
+        .set({
+          status: 'confirmed',
+          buyerRemark: params.remark.trim() || '平台裁定按资源消耗结算执行',
+          resolvedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(orderConsumptionSettlements.id, consumptionSettlement.id));
+    }
+
+    const splitResult = await settleCompletedOrder(order.id);
     if (!splitResult.success) {
       throw new Error(splitResult.message);
     }
@@ -356,6 +389,8 @@ export async function resolveOrderDispute(params: {
       data: {
         decision: params.decision,
         orderStatus: 'completed',
+        isSettled: splitResult.settled,
+        pendingDepositRefund: splitResult.pendingRefund,
         sellerIncome: splitResult.sellerIncome,
         platformCommission: splitResult.platformCommission,
       },

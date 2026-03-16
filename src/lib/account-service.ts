@@ -4,8 +4,8 @@
  */
 
 import { db } from './db';
-import { accounts } from '../storage/database/shared/schema';
-import { eq } from 'drizzle-orm';
+import { accounts, orders } from '../storage/database/shared/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 
 // ==================== 类型定义 ====================
 
@@ -271,6 +271,40 @@ export async function updateAccountStatus(accountId: string, newStatus: string):
     return true;
   } catch (error) {
     console.error('更新账号状态失败:', error);
+    return false;
+  }
+}
+
+export async function restoreAccountAvailabilityIfNoBlockingOrders(accountId: string): Promise<boolean> {
+  try {
+    const blockingOrderList = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(
+        eq(orders.accountId, accountId),
+        inArray(orders.status, ['pending_payment', 'paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'refunding']),
+      ))
+      .limit(1);
+
+    if (blockingOrderList.length > 0) {
+      return false;
+    }
+
+    await db
+      .update(accounts)
+      .set({
+        status: 'available',
+        updatedAt: new Date().toISOString()
+      })
+      .where(and(
+        eq(accounts.id, accountId),
+        eq(accounts.status, 'rented'),
+        eq(accounts.isDeleted, false),
+      ));
+
+    return true;
+  } catch (error) {
+    console.error('恢复账号上架状态失败:', error);
     return false;
   }
 }

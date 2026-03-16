@@ -1,6 +1,6 @@
 import { and, eq, lt } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
-import { executeAutoSplit } from '@/lib/platform-split-service';
+import { settleCompletedOrder } from '@/lib/order-settlement-service';
 
 async function moveOrderToPendingVerification(orderId: string, now: string) {
   const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
@@ -35,7 +35,7 @@ async function autoCompleteVerifiedOrder(orderId: string, now: string) {
     })
     .where(eq(orders.id, orderId));
 
-  const splitResult = await executeAutoSplit(orderId);
+  const splitResult = await settleCompletedOrder(orderId);
   if (!splitResult.success) {
     throw new Error(splitResult.message);
   }

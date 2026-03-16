@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { createTransferBill } from '@/lib/wechat/v3';
 import { balanceTransactions, db, userBalances, users, withdrawals } from './db';
+import { safeLogFinanceAuditEvent } from './finance-audit-service';
 
 function isValidWithdrawalRecord(withdrawal: any) {
   return Number(withdrawal?.amount || 0) > 0 && Number(withdrawal?.actualAmount || 0) > 0;
@@ -183,6 +184,24 @@ async function approveWithdrawalByWechatTransfer(params: {
       createdAt: now,
     });
 
+    await safeLogFinanceAuditEvent({
+      eventType: 'withdrawal_approved_transfer',
+      status: 'success',
+      userId: withdrawal.userId,
+      withdrawalId: withdrawal.id,
+      amount,
+      balanceBefore: '0',
+      balanceAfter: '0',
+      details: {
+        actualAmount,
+        fee,
+        reviewerId,
+        reviewComment: reviewComment || 'Transfer initiated',
+        transferBillNo: transferResult.transfer_bill_no || transferResult.out_bill_no,
+        transferState: transferResult.state,
+      },
+    }, tx);
+
     await tx
       .update(withdrawals)
       .set({
@@ -245,6 +264,16 @@ export async function reviewWithdrawalRequest(params: {
       },
     };
   } catch (error: any) {
+    await safeLogFinanceAuditEvent({
+      eventType: 'withdrawal_review_failed',
+      status: 'failed',
+      withdrawalId: params.withdrawalId,
+      details: {
+        reviewerId: params.reviewerId,
+        status: params.status,
+      },
+      errorMessage: error.message || 'WITHDRAWAL_REVIEW_FAILED',
+    });
     console.error('Failed to review withdrawal request:', error);
     return {
       success: false,

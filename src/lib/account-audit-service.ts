@@ -102,13 +102,7 @@ export async function submitForAudit(accountId: string): Promise<AuditResult> {
 
         // 如果有保证金记录，更新状态为已释放（账号已上架）
         if (account.depositId) {
-          await tx
-            .update(accountDeposits)
-            .set({
-              status: 'released',
-              updatedAt: new Date().toISOString()
-            })
-            .where(eq(accountDeposits.id, account.depositId));
+          // 上架保证金应在账号上架期间保持冻结，避免保证金记录与钱包冻结余额不一致。
         }
       });
 
@@ -204,13 +198,7 @@ export async function approveAccount(
 
       // 2. 如果有保证金记录，更新状态为已释放（账号已上架）
       if (account.depositId) {
-        await tx
-          .update(accountDeposits)
-          .set({
-            status: 'released',
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(accountDeposits.id, account.depositId));
+        // 上架保证金应在账号上架期间保持冻结，避免保证金记录与钱包冻结余额不一致。
       }
     });
 

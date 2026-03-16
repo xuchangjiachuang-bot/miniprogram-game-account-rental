@@ -5,6 +5,7 @@
 
 import { and, eq, lt } from 'drizzle-orm';
 import { db, orders, userBalances, balanceTransactions, platformSettings } from './db';
+import { restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
 
 const DEFAULT_PAYMENT_TIMEOUT_SECONDS = 180;
 
@@ -58,12 +59,15 @@ export async function checkAndCancelTimeoutOrders(): Promise<TimeoutCheckResult>
           })
           .where(eq(orders.id, order.id));
 
-        const buyerBalances = await tx
-          .select()
-          .from(userBalances)
-          .where(eq(userBalances.userId, order.buyerId));
+        const shouldRefundWallet = order.paymentMethod === 'wallet';
+        const buyerBalances = shouldRefundWallet
+          ? await tx
+            .select()
+            .from(userBalances)
+            .where(eq(userBalances.userId, order.buyerId))
+          : [];
 
-        if (buyerBalances.length > 0) {
+        if (shouldRefundWallet && buyerBalances.length > 0) {
           const balance = buyerBalances[0];
           const oldFrozen = Number(balance.frozenBalance) || 0;
           const oldAvailable = Number(balance.availableBalance) || 0;
@@ -99,6 +103,10 @@ export async function checkAndCancelTimeoutOrders(): Promise<TimeoutCheckResult>
         cancelledCount += 1;
       }
     });
+
+    for (const order of timeoutOrders) {
+      await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
+    }
 
     return {
       success: true,

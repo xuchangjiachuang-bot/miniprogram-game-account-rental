@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, orders } from '@/lib/db';
+import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service';
 import { getOrderDispute } from '@/lib/dispute-service';
 import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { cancelOrder, transformDbOrderToApiFormat } from '@/lib/order-service';
@@ -54,12 +55,14 @@ export async function GET(
     }
 
     const dispute = await getOrderDispute(order.id);
+    const consumptionSettlement = await getLatestConsumptionSettlement(order.id);
 
     return NextResponse.json({
       success: true,
       data: {
         ...transformDbOrderToApiFormat(order),
         dispute,
+        consumptionSettlement,
       },
     });
   } catch (error: any) {

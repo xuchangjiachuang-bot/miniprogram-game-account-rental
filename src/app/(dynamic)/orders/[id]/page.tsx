@@ -57,6 +57,26 @@ type OrderDetail = {
   verificationRemark?: string | null;
   disputeReason?: string | null;
   dispute?: OrderDispute | null;
+  consumptionSettlement?: {
+    id: string;
+    status: string;
+    requestedAmount: string;
+    approvedAmount: string;
+    depositDeductedAmount: string;
+    buyerRefundAmount: string;
+    offlineSettledAmount: string;
+    sellerRemark?: string | null;
+    buyerRemark?: string | null;
+    items?: Array<{
+      id: string;
+      itemName: string;
+      unitPrice: string;
+      unitLabel: string;
+      quantity: string;
+      subtotal: string;
+      remark?: string | null;
+    }>;
+  } | null;
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
@@ -73,6 +93,22 @@ type LoginPayload = {
     expiryTime?: string;
   };
 };
+
+type ConsumptionItemDraft = {
+  itemName: string;
+  unitPrice: string;
+  unitLabel: string;
+  quantity: string;
+  remark: string;
+};
+
+function getConsumptionDraftTotal(items: ConsumptionItemDraft[]) {
+  return items.reduce((sum, item) => {
+    const unitPrice = Number(item.unitPrice || 0);
+    const quantity = Number(item.quantity || 0);
+    return sum + (Number.isFinite(unitPrice) ? unitPrice : 0) * (Number.isFinite(quantity) ? quantity : 0);
+  }, 0);
+}
 
 const statusMeta: Record<string, { label: string; className?: string }> = {
   pending_payment: { label: '待支付' },
@@ -135,6 +171,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [pendingPaymentMs, setPendingPaymentMs] = useState<number | null>(null);
   const [cancellingOrder, setCancellingOrder] = useState(false);
+  const [submittingConsumption, setSubmittingConsumption] = useState(false);
+  const [respondingConsumption, setRespondingConsumption] = useState(false);
+  const [consumptionRemark, setConsumptionRemark] = useState('');
+  const [consumptionBuyerRemark, setConsumptionBuyerRemark] = useState('');
+  const [consumptionItems, setConsumptionItems] = useState<ConsumptionItemDraft[]>([
+    { itemName: '', unitPrice: '', unitLabel: '个', quantity: '', remark: '' },
+  ]);
 
   useEffect(() => {
     void loadOrderDetail();
@@ -177,6 +220,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }, [order?.createdAt, order?.status]);
 
   const statusBadge = useMemo(() => {
+    if (order?.status === 'pending_consumption_confirm') {
+      return <Badge className="bg-amber-500 text-black hover:bg-amber-500">待买家确认结算</Badge>;
+    }
+
     const meta = statusMeta[order?.status || ''] || { label: order?.status || '--' };
     return (
       <Badge className={meta.className} variant={meta.className ? 'default' : 'secondary'}>
@@ -322,6 +369,84 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  function updateConsumptionItem(index: number, field: keyof ConsumptionItemDraft, value: string) {
+    setConsumptionItems((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: value } : item
+    )));
+  }
+
+  function addConsumptionItem() {
+    setConsumptionItems((current) => [
+      ...current,
+      { itemName: '', unitPrice: '', unitLabel: '个', quantity: '', remark: '' },
+    ]);
+  }
+
+  function removeConsumptionItem(index: number) {
+    setConsumptionItems((current) => (
+      current.length <= 1
+        ? [{ itemName: '', unitPrice: '', unitLabel: '个', quantity: '', remark: '' }]
+        : current.filter((_, itemIndex) => itemIndex !== index)
+    ));
+  }
+
+  async function handleSubmitConsumptionSettlement() {
+    try {
+      setSubmittingConsumption(true);
+      const response = await fetch(`/api/orders/${id}/consumption-settlement`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          items: consumptionItems,
+          sellerRemark: consumptionRemark,
+        }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '提交资源消耗结算失败');
+      }
+
+      toast.success(result.message || '资源消耗结算单已提交');
+      setConsumptionRemark('');
+      setConsumptionItems([{ itemName: '', unitPrice: '', unitLabel: '个', quantity: '', remark: '' }]);
+      await loadOrderDetail();
+    } catch (error: any) {
+      console.error('提交资源消耗结算失败:', error);
+      toast.error(error.message || '提交资源消耗结算失败');
+    } finally {
+      setSubmittingConsumption(false);
+    }
+  }
+
+  async function handleRespondConsumptionSettlement(action: 'confirm' | 'reject') {
+    try {
+      setRespondingConsumption(true);
+      const response = await fetch(`/api/orders/${id}/consumption-settlement/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action,
+          buyerRemark: consumptionBuyerRemark,
+        }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '处理资源消耗结算失败');
+      }
+
+      toast.success(result.message || '资源消耗结算已处理');
+      setConsumptionBuyerRemark('');
+      await loadOrderDetail();
+    } catch (error: any) {
+      console.error('处理资源消耗结算失败:', error);
+      toast.error(error.message || '处理资源消耗结算失败');
+    } finally {
+      setRespondingConsumption(false);
+    }
+  }
+
   async function handleCreateDispute() {
     if (!disputeReason.trim()) {
       toast.error('请先填写纠纷原因');
@@ -372,8 +497,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const showLoginCard = ['paid', 'active'].includes(order.status);
+  const isConsumptionPending = order.status === 'pending_consumption_confirm';
+  const consumptionDraftTotal = getConsumptionDraftTotal(consumptionItems);
   const canCreateDispute =
-    ['active', 'pending_verification', 'disputed'].includes(order.status) &&
+    ['active', 'pending_verification', 'pending_consumption_confirm', 'disputed'].includes(order.status) &&
     order.dispute?.status !== 'pending';
 
   return (
@@ -443,6 +570,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <div className="mt-1 text-yellow-700">
                       验收截止时间：{formatDateTime(order.verificationDeadline)}
                     </div>
+                  </div>
+                ) : null}
+
+                {isConsumptionPending ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    已进入资源消耗结算确认阶段，订单会在买家确认后再执行最终结算。
                   </div>
                 ) : null}
 
@@ -583,6 +716,105 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </CardContent>
               </Card>
             ) : null}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>资源消耗结算</CardTitle>
+                <CardDescription>卖家可在最终结算前提交资源消耗明细，买家确认后系统再扣押金并结算。</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.consumptionSettlement ? (
+                  <div className="rounded-xl border p-4 text-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="font-medium">当前结算单</div>
+                      <Badge variant="secondary">{order.consumptionSettlement.status}</Badge>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div>申请金额：{formatMoney(order.consumptionSettlement.requestedAmount)}</div>
+                      <div>押金内扣：{formatMoney(order.consumptionSettlement.depositDeductedAmount)}</div>
+                      <div>买家应退：{formatMoney(order.consumptionSettlement.buyerRefundAmount)}</div>
+                      <div>线下已结：{formatMoney(order.consumptionSettlement.offlineSettledAmount)}</div>
+                    </div>
+                    {order.consumptionSettlement.items?.length ? (
+                      <div className="mt-3 space-y-2 border-t pt-3">
+                        {order.consumptionSettlement.items.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                            <div>
+                              <div className="font-medium">{item.itemName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.quantity}{item.unitLabel} x {formatMoney(item.unitPrice)}
+                              </div>
+                            </div>
+                            <div className="font-medium">{formatMoney(item.subtotal)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {order.consumptionSettlement.sellerRemark ? (
+                      <div className="mt-3 text-muted-foreground">卖家备注：{order.consumptionSettlement.sellerRemark}</div>
+                    ) : null}
+                    {order.consumptionSettlement.buyerRemark ? (
+                      <div className="mt-1 text-muted-foreground">买家备注：{order.consumptionSettlement.buyerRemark}</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    当前订单还没有资源消耗结算单。
+                  </div>
+                )}
+
+                {order.status === 'pending_verification' ? (
+                  <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
+                    <div className="text-sm font-medium">卖家发起资源消耗结算</div>
+                    {consumptionItems.map((item, index) => (
+                      <div key={`draft-${index}`} className="grid gap-2 sm:grid-cols-5">
+                        <Input value={item.itemName} onChange={(event) => updateConsumptionItem(index, 'itemName', event.target.value)} placeholder="物品名称" />
+                        <Input value={item.unitPrice} onChange={(event) => updateConsumptionItem(index, 'unitPrice', event.target.value)} placeholder="单价" />
+                        <Input value={item.unitLabel} onChange={(event) => updateConsumptionItem(index, 'unitLabel', event.target.value)} placeholder="单位" />
+                        <Input value={item.quantity} onChange={(event) => updateConsumptionItem(index, 'quantity', event.target.value)} placeholder="数量" />
+                        <div className="flex gap-2">
+                          <Input value={item.remark} onChange={(event) => updateConsumptionItem(index, 'remark', event.target.value)} placeholder="备注" />
+                          <Button type="button" variant="outline" onClick={() => removeConsumptionItem(index)}>删</Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between text-sm">
+                      <Button type="button" variant="outline" onClick={addConsumptionItem}>新增一项</Button>
+                      <div>申请扣款：{formatMoney(consumptionDraftTotal)}</div>
+                    </div>
+                    <Textarea
+                      value={consumptionRemark}
+                      onChange={(event) => setConsumptionRemark(event.target.value)}
+                      placeholder="补充说明资源消耗原因或协商备注"
+                    />
+                    <Button onClick={handleSubmitConsumptionSettlement} disabled={submittingConsumption}>
+                      {submittingConsumption ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      提交买家确认
+                    </Button>
+                  </div>
+                ) : null}
+
+                {isConsumptionPending ? (
+                  <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
+                    <Textarea
+                      value={consumptionBuyerRemark}
+                      onChange={(event) => setConsumptionBuyerRemark(event.target.value)}
+                      placeholder="买家可填写确认备注或拒绝原因"
+                    />
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button onClick={() => handleRespondConsumptionSettlement('confirm')} disabled={respondingConsumption}>
+                        {respondingConsumption ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        同意并结算
+                      </Button>
+                      <Button variant="destructive" onClick={() => handleRespondConsumptionSettlement('reject')} disabled={respondingConsumption}>
+                        {respondingConsumption ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        拒绝并转争议
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>

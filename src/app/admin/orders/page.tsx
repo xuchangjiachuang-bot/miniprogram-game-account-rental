@@ -21,6 +21,16 @@ interface OrderDispute {
   resolvedAt?: string | null;
 }
 
+interface ConsumptionSettlementItem {
+  id: string;
+  itemName: string;
+  unitPrice: string;
+  unitLabel: string;
+  quantity: string;
+  subtotal: string;
+  remark?: string | null;
+}
+
 interface Order {
   id: string;
   orderNo: string;
@@ -45,15 +55,82 @@ interface Order {
   verificationRemark?: string;
   disputeReason?: string;
   dispute?: OrderDispute | null;
+  consumptionSettlement?: {
+    id?: string;
+    status: string;
+    requestedAmount: string;
+    approvedAmount?: string;
+    depositDeductedAmount: string;
+    buyerRefundAmount: string;
+    offlineSettledAmount?: string;
+    sellerRemark?: string | null;
+    buyerRemark?: string | null;
+    items?: ConsumptionSettlementItem[];
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
 
 const PAGE_SIZE = 20;
 
+function formatMoney(value?: string | number | null) {
+  return `¥${Number(value || 0).toFixed(2)}`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return '--';
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN');
+}
+
+function getSettlementStatusLabel(status?: string | null) {
+  switch (status) {
+    case 'pending_buyer_confirmation':
+      return '待买家确认';
+    case 'confirmed':
+      return '已确认';
+    case 'rejected':
+      return '已拒绝';
+    case 'disputed':
+      return '争议中';
+    case 'cancelled':
+      return '已取消';
+    default:
+      return status || '--';
+  }
+}
+
+function getOrderStatusBadge(status: string) {
+  switch (status) {
+    case 'pending_payment':
+      return <Badge variant="secondary">待支付</Badge>;
+    case 'pending_verification':
+      return <Badge className="bg-yellow-500 text-black hover:bg-yellow-500">待验收</Badge>;
+    case 'pending_consumption_confirm':
+      return <Badge className="bg-amber-500 text-black hover:bg-amber-500">待买家确认结算</Badge>;
+    case 'active':
+      return <Badge className="bg-purple-500 hover:bg-purple-500">进行中</Badge>;
+    case 'completed':
+      return <Badge className="bg-green-500 hover:bg-green-500">已完成</Badge>;
+    case 'cancelled':
+      return <Badge variant="destructive">已取消</Badge>;
+    case 'disputed':
+      return <Badge className="bg-red-500 hover:bg-red-500">争议中</Badge>;
+    case 'refunding':
+      return <Badge className="bg-orange-500 hover:bg-orange-500">退款中</Badge>;
+    case 'refunded':
+      return <Badge className="bg-slate-500 hover:bg-slate-500">已退款</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
+}
+
 export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<
-    'all' | 'pending_payment' | 'pending_verification' | 'active' | 'completed' | 'cancelled' | 'disputed'
+    'all' | 'pending_payment' | 'pending_verification' | 'pending_consumption_confirm' | 'active' | 'completed' | 'cancelled' | 'disputed'
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -66,12 +143,12 @@ export default function AdminOrders() {
   const [disputeActionLoading, setDisputeActionLoading] = useState(false);
 
   useEffect(() => {
-    loadOrders();
+    void loadOrders();
   }, [statusFilter, page, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const loadOrders = async () => {
+  async function loadOrders() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -101,9 +178,9 @@ export default function AdminOrders() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const openOrderDetail = async (order: Order) => {
+  async function openOrderDetail(order: Order) {
     try {
       setDetailLoading(true);
       const response = await fetch(`/api/admin/orders/${order.id}`, {
@@ -123,9 +200,9 @@ export default function AdminOrders() {
     } finally {
       setDetailLoading(false);
     }
-  };
+  }
 
-  const handleDisputeDecision = async (decision: 'refund_buyer_full' | 'resume_order' | 'complete_order') => {
+  async function handleDisputeDecision(decision: 'refund_buyer_full' | 'resume_order' | 'complete_order') {
     if (!selectedOrder) {
       return;
     }
@@ -144,51 +221,28 @@ export default function AdminOrders() {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || '处理纠纷失败');
+        throw new Error(result.error || '处理争议失败');
       }
 
-      toast.success(result.message || '纠纷处理成功');
+      toast.success(result.message || '争议处理成功');
       await loadOrders();
       await openOrderDetail(selectedOrder);
     } catch (error: any) {
-      console.error('处理纠纷失败:', error);
-      toast.error(error.message || '处理纠纷失败');
+      console.error('处理争议失败:', error);
+      toast.error(error.message || '处理争议失败');
     } finally {
       setDisputeActionLoading(false);
     }
-  };
-
-  const getOrderStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending_payment':
-        return <Badge variant="secondary">待付款</Badge>;
-      case 'pending_verification':
-        return <Badge className="bg-yellow-500">待验收</Badge>;
-      case 'active':
-        return <Badge className="bg-purple-500">进行中</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-500">已完成</Badge>;
-      case 'cancelled':
-        return <Badge variant="destructive">已取消</Badge>;
-      case 'disputed':
-        return <Badge className="bg-red-500">争议中</Badge>;
-      case 'refunding':
-        return <Badge className="bg-orange-500">退款中</Badge>;
-      case 'refunded':
-        return <Badge className="bg-slate-500">已退款</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">订单管理</h1>
-          <p className="mt-1 text-sm text-gray-600">查看订单状态、验收结果与纠纷处理。</p>
+          <p className="mt-1 text-sm text-gray-600">查看订单状态、验收结果、资源消耗结算和争议处理情况。</p>
         </div>
-        <Button variant="outline" onClick={loadOrders} disabled={loading}>
+        <Button variant="outline" onClick={() => void loadOrders()} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           刷新
         </Button>
@@ -201,16 +255,17 @@ export default function AdminOrders() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="搜索订单号..."
+                  placeholder="搜索订单号"
                   value={searchQuery}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     setPage(1);
-                    setSearchQuery(e.target.value);
+                    setSearchQuery(event.target.value);
                   }}
                   className="pl-9"
                 />
               </div>
             </div>
+
             <Select
               value={statusFilter}
               onValueChange={(value: typeof statusFilter) => {
@@ -218,14 +273,15 @@ export default function AdminOrders() {
                 setStatusFilter(value);
               }}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="状态筛选" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="pending_payment">待付款</SelectItem>
-                <SelectItem value="pending_verification">待验收</SelectItem>
+                <SelectItem value="pending_payment">待支付</SelectItem>
                 <SelectItem value="active">进行中</SelectItem>
+                <SelectItem value="pending_verification">待验收</SelectItem>
+                <SelectItem value="pending_consumption_confirm">待买家确认结算</SelectItem>
                 <SelectItem value="completed">已完成</SelectItem>
                 <SelectItem value="cancelled">已取消</SelectItem>
                 <SelectItem value="disputed">争议中</SelectItem>
@@ -260,50 +316,25 @@ export default function AdminOrders() {
                     </div>
 
                     <div className="mb-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-gray-500">买家</p>
-                        <p className="text-sm font-medium">{order.buyerName}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">卖家</p>
-                        <p className="text-sm font-medium">{order.sellerName}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">账号</p>
-                        <p className="text-sm">{order.accountTitle}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">哈夫币</p>
-                        <p className="text-sm">{order.coinsM}M</p>
-                      </div>
+                      <InfoBlock label="买家" value={order.buyerName} />
+                      <InfoBlock label="卖家" value={order.sellerName} />
+                      <InfoBlock label="账号" value={order.accountTitle} />
+                      <InfoBlock label="哈夫币" value={`${order.coinsM}M`} />
                     </div>
 
                     <div className="mb-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-gray-500">租金</p>
-                        <p className="text-lg font-bold">¥{Number(order.rentalPrice || 0).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">押金</p>
-                        <p className="text-sm">¥{Number(order.deposit || 0).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">总价</p>
-                        <p className="text-sm font-medium text-green-600">¥{Number(order.totalPrice || 0).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">租期</p>
-                        <p className="text-sm">{order.rentalDuration} 天</p>
-                      </div>
+                      <InfoBlock label="租金" value={formatMoney(order.rentalPrice)} strong />
+                      <InfoBlock label="押金" value={formatMoney(order.deposit)} />
+                      <InfoBlock label="总额" value={formatMoney(order.totalPrice)} strong valueClassName="text-green-600" />
+                      <InfoBlock label="租期" value={`${order.rentalDuration} 天`} />
                     </div>
 
                     <div className="text-sm text-gray-500">
-                      <span>创建时间：</span>
-                      {new Date(order.createdAt).toLocaleString('zh-CN')}
+                      创建时间：{formatDate(order.createdAt)}
                     </div>
                   </div>
 
-                  <Button variant="outline" size="sm" onClick={() => openOrderDetail(order)} disabled={detailLoading}>
+                  <Button variant="outline" size="sm" onClick={() => void openOrderDetail(order)} disabled={detailLoading}>
                     <Eye className="mr-2 h-4 w-4" />
                     查看
                   </Button>
@@ -328,12 +359,12 @@ export default function AdminOrders() {
 
       {selectedOrder ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+          <Card className="max-h-[90vh] w-full max-w-3xl overflow-y-auto">
             <CardHeader>
               <CardTitle>订单详情</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
+            <CardContent className="space-y-5">
+              <section>
                 <h3 className="mb-2 font-semibold">基本信息</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <p><span className="text-gray-500">订单号：</span>{selectedOrder.orderNo}</p>
@@ -343,51 +374,97 @@ export default function AdminOrders() {
                   <p><span className="text-gray-500">账号：</span>{selectedOrder.accountTitle}</p>
                   <p><span className="text-gray-500">哈夫币：</span>{selectedOrder.coinsM}M</p>
                 </div>
-              </div>
+              </section>
 
-              <div>
+              <section>
                 <h3 className="mb-2 font-semibold">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <p><span className="text-gray-500">租金：</span>¥{Number(selectedOrder.rentalPrice || 0).toFixed(2)}</p>
-                  <p><span className="text-gray-500">押金：</span>¥{Number(selectedOrder.deposit || 0).toFixed(2)}</p>
-                  <p><span className="text-gray-500">总价：</span>¥{Number(selectedOrder.totalPrice || 0).toFixed(2)}</p>
+                  <p><span className="text-gray-500">租金：</span>{formatMoney(selectedOrder.rentalPrice)}</p>
+                  <p><span className="text-gray-500">押金：</span>{formatMoney(selectedOrder.deposit)}</p>
+                  <p><span className="text-gray-500">总额：</span>{formatMoney(selectedOrder.totalPrice)}</p>
                   <p><span className="text-gray-500">租期：</span>{selectedOrder.rentalDuration} 天</p>
                 </div>
-              </div>
+              </section>
 
-              <div>
+              <section>
                 <h3 className="mb-2 font-semibold">时间信息</h3>
                 <div className="space-y-1 text-sm">
-                  <p><span className="text-gray-500">创建时间：</span>{new Date(selectedOrder.createdAt).toLocaleString('zh-CN')}</p>
-                  {selectedOrder.paymentTime ? <p><span className="text-gray-500">支付时间：</span>{new Date(selectedOrder.paymentTime).toLocaleString('zh-CN')}</p> : null}
-                  {selectedOrder.startTime ? <p><span className="text-gray-500">开始时间：</span>{new Date(selectedOrder.startTime).toLocaleString('zh-CN')}</p> : null}
-                  {selectedOrder.endTime ? <p><span className="text-gray-500">结束时间：</span>{new Date(selectedOrder.endTime).toLocaleString('zh-CN')}</p> : null}
-                  {selectedOrder.verificationDeadline ? <p><span className="text-gray-500">验收截止：</span>{new Date(selectedOrder.verificationDeadline).toLocaleString('zh-CN')}</p> : null}
+                  <p><span className="text-gray-500">创建时间：</span>{formatDate(selectedOrder.createdAt)}</p>
+                  {selectedOrder.paymentTime ? <p><span className="text-gray-500">支付时间：</span>{formatDate(selectedOrder.paymentTime)}</p> : null}
+                  {selectedOrder.startTime ? <p><span className="text-gray-500">开始时间：</span>{formatDate(selectedOrder.startTime)}</p> : null}
+                  {selectedOrder.endTime ? <p><span className="text-gray-500">结束时间：</span>{formatDate(selectedOrder.endTime)}</p> : null}
+                  {selectedOrder.verificationDeadline ? <p><span className="text-gray-500">验收截止：</span>{formatDate(selectedOrder.verificationDeadline)}</p> : null}
                 </div>
-              </div>
+              </section>
 
               {(selectedOrder.verificationResult || selectedOrder.verificationRemark || selectedOrder.disputeReason) ? (
-                <div>
-                  <h3 className="mb-2 font-semibold">验收 / 纠纷信息</h3>
+                <section>
+                  <h3 className="mb-2 font-semibold">验收 / 争议信息</h3>
                   <div className="space-y-1 text-sm">
                     {selectedOrder.verificationResult ? <p><span className="text-gray-500">验收结果：</span>{selectedOrder.verificationResult}</p> : null}
                     {selectedOrder.verificationRemark ? <p><span className="text-gray-500">验收备注：</span>{selectedOrder.verificationRemark}</p> : null}
-                    {selectedOrder.disputeReason ? <p><span className="text-gray-500">纠纷原因：</span>{selectedOrder.disputeReason}</p> : null}
+                    {selectedOrder.disputeReason ? <p><span className="text-gray-500">争议原因：</span>{selectedOrder.disputeReason}</p> : null}
                   </div>
-                </div>
+                </section>
+              ) : null}
+
+              {selectedOrder.consumptionSettlement ? (
+                <section className="rounded-lg border bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="font-semibold">资源消耗结算</h3>
+                    <Badge variant="secondary">{getSettlementStatusLabel(selectedOrder.consumptionSettlement.status)}</Badge>
+                  </div>
+
+                  <div className="grid gap-2 text-sm md:grid-cols-2">
+                    <p><span className="text-gray-500">申请金额：</span>{formatMoney(selectedOrder.consumptionSettlement.requestedAmount)}</p>
+                    <p><span className="text-gray-500">批准金额：</span>{formatMoney(selectedOrder.consumptionSettlement.approvedAmount)}</p>
+                    <p><span className="text-gray-500">押金内扣：</span>{formatMoney(selectedOrder.consumptionSettlement.depositDeductedAmount)}</p>
+                    <p><span className="text-gray-500">买家应退：</span>{formatMoney(selectedOrder.consumptionSettlement.buyerRefundAmount)}</p>
+                    <p><span className="text-gray-500">线下已结：</span>{formatMoney(selectedOrder.consumptionSettlement.offlineSettledAmount)}</p>
+                  </div>
+
+                  {selectedOrder.consumptionSettlement.items?.length ? (
+                    <div className="mt-4 space-y-2">
+                      {selectedOrder.consumptionSettlement.items.map((item) => (
+                        <div key={item.id} className="rounded-lg border bg-white px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <div className="font-medium">{item.itemName}</div>
+                              <div className="text-xs text-gray-500">
+                                {item.quantity}
+                                {item.unitLabel}
+                                {' x '}
+                                {formatMoney(item.unitPrice)}
+                              </div>
+                            </div>
+                            <div className="font-medium">{formatMoney(item.subtotal)}</div>
+                          </div>
+                          {item.remark ? <div className="mt-1 text-xs text-gray-500">备注：{item.remark}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {selectedOrder.consumptionSettlement.sellerRemark ? (
+                    <p className="mt-3 text-sm text-gray-600">卖家备注：{selectedOrder.consumptionSettlement.sellerRemark}</p>
+                  ) : null}
+                  {selectedOrder.consumptionSettlement.buyerRemark ? (
+                    <p className="mt-1 text-sm text-gray-600">买家备注：{selectedOrder.consumptionSettlement.buyerRemark}</p>
+                  ) : null}
+                </section>
               ) : null}
 
               {selectedOrder.dispute ? (
-                <div className="space-y-3 rounded-lg border bg-slate-50 p-4">
+                <section className="space-y-3 rounded-lg border bg-slate-50 p-4">
                   <div>
-                    <h3 className="mb-2 font-semibold">纠纷单</h3>
+                    <h3 className="mb-2 font-semibold">争议单</h3>
                     <div className="space-y-1 text-sm">
                       <p><span className="text-gray-500">状态：</span>{selectedOrder.dispute.status}</p>
                       <p><span className="text-gray-500">类型：</span>{selectedOrder.dispute.disputeType}</p>
                       <p><span className="text-gray-500">发起人：</span>{selectedOrder.dispute.initiatorName}</p>
                       <p><span className="text-gray-500">对方：</span>{selectedOrder.dispute.respondentName}</p>
                       <p><span className="text-gray-500">原因：</span>{selectedOrder.dispute.reason}</p>
-                      {selectedOrder.dispute.createdAt ? <p><span className="text-gray-500">创建时间：</span>{new Date(selectedOrder.dispute.createdAt).toLocaleString('zh-CN')}</p> : null}
+                      {selectedOrder.dispute.createdAt ? <p><span className="text-gray-500">创建时间：</span>{formatDate(selectedOrder.dispute.createdAt)}</p> : null}
                       {selectedOrder.dispute.resolution ? <p><span className="text-gray-500">处理结果：</span>{selectedOrder.dispute.resolution}</p> : null}
                     </div>
                   </div>
@@ -396,13 +473,13 @@ export default function AdminOrders() {
                     <div className="space-y-3 border-t pt-3">
                       <Input
                         value={disputeRemark}
-                        onChange={(e) => setDisputeRemark(e.target.value)}
-                        placeholder="填写处理备注，例如判定依据或资金说明"
+                        onChange={(event) => setDisputeRemark(event.target.value)}
+                        placeholder="填写处理备注，例如判定依据或资金处理说明"
                       />
                       <div className="grid gap-2 sm:grid-cols-3">
                         <Button
                           variant="destructive"
-                          onClick={() => handleDisputeDecision('refund_buyer_full')}
+                          onClick={() => void handleDisputeDecision('refund_buyer_full')}
                           disabled={disputeActionLoading}
                         >
                           {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -410,14 +487,14 @@ export default function AdminOrders() {
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => handleDisputeDecision('resume_order')}
+                          onClick={() => void handleDisputeDecision('resume_order')}
                           disabled={disputeActionLoading}
                         >
                           {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                           恢复订单
                         </Button>
                         <Button
-                          onClick={() => handleDisputeDecision('complete_order')}
+                          onClick={() => void handleDisputeDecision('complete_order')}
                           disabled={disputeActionLoading}
                         >
                           {disputeActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -426,7 +503,7 @@ export default function AdminOrders() {
                       </div>
                     </div>
                   ) : null}
-                </div>
+                </section>
               ) : null}
 
               <Button onClick={() => setSelectedOrder(null)} className="w-full">
@@ -436,6 +513,25 @@ export default function AdminOrders() {
           </Card>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function InfoBlock({
+  label,
+  value,
+  strong = false,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  valueClassName?: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`${strong ? 'text-lg font-bold' : 'text-sm'} ${valueClassName || ''}`}>{value}</p>
     </div>
   );
 }

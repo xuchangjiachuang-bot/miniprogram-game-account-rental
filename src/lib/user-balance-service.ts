@@ -7,6 +7,7 @@ import {
   userBalances,
   withdrawals,
 } from './db';
+import { safeLogFinanceAuditEvent } from './finance-audit-service';
 
 export interface UserBalance {
   userId: string;
@@ -195,6 +196,20 @@ export async function addNonWithdrawableBalance(
       balanceBefore: oldBalance,
       balanceAfter: newBalance,
       description,
+    });
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'test_balance_credit',
+      status: 'success',
+      userId,
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      details: {
+        nonWithdrawableBalanceBefore: balance.nonWithdrawableBalance,
+        nonWithdrawableBalanceAfter: newNonWithdrawableBalance,
+        description,
+      },
     });
 
     return {
@@ -394,6 +409,22 @@ export async function requestWithdrawal(
         createdAt: new Date().toISOString(),
       });
 
+      await safeLogFinanceAuditEvent({
+        eventType: 'withdrawal_requested',
+        status: 'pending',
+        userId,
+        withdrawalId,
+        amount,
+        balanceBefore: balance.availableBalance,
+        balanceAfter: balance.availableBalance - amount,
+        details: {
+          fee,
+          actualAmount,
+          withdrawalNo,
+          reviewRequired,
+        },
+      }, tx);
+
       await tx.insert(withdrawals).values({
         id: withdrawalId,
         withdrawalNo,
@@ -420,6 +451,16 @@ export async function requestWithdrawal(
       actualAmount,
     };
   } catch (error: any) {
+    await safeLogFinanceAuditEvent({
+      eventType: 'withdrawal_request_failed',
+      status: 'failed',
+      userId,
+      amount,
+      details: {
+        accountInfo,
+      },
+      errorMessage: error?.message || 'WITHDRAWAL_REQUEST_FAILED',
+    });
     console.error('[user-balance] requestWithdrawal failed:', error);
     return {
       success: false,
@@ -484,6 +525,22 @@ export async function reviewWithdrawal(
           createdAt: new Date().toISOString(),
         });
 
+        await safeLogFinanceAuditEvent({
+          eventType: 'withdrawal_approved_manual',
+          status: 'success',
+          userId: withdrawal.userId,
+          withdrawalId: withdrawal.id,
+          amount,
+          balanceBefore: balance.availableBalance,
+          balanceAfter: balance.availableBalance,
+          details: {
+            fee,
+            actualAmount,
+            reviewerId,
+            remark,
+          },
+        }, tx);
+
         await tx
           .update(withdrawals)
           .set({
@@ -519,6 +576,22 @@ export async function reviewWithdrawal(
         createdAt: new Date().toISOString(),
       });
 
+      await safeLogFinanceAuditEvent({
+        eventType: 'withdrawal_rejected',
+        status: 'success',
+        userId: withdrawal.userId,
+        withdrawalId: withdrawal.id,
+        amount,
+        balanceBefore: balance.availableBalance,
+        balanceAfter: balance.availableBalance + amount,
+        details: {
+          fee,
+          actualAmount,
+          reviewerId,
+          remark,
+        },
+      }, tx);
+
       await tx
         .update(withdrawals)
         .set({
@@ -539,6 +612,17 @@ export async function reviewWithdrawal(
       actualAmount,
     };
   } catch (error: any) {
+    await safeLogFinanceAuditEvent({
+      eventType: approved ? 'withdrawal_approve_failed' : 'withdrawal_reject_failed',
+      status: 'failed',
+      withdrawalId,
+      details: {
+        reviewerId,
+        approved,
+        remark,
+      },
+      errorMessage: error?.message || 'WITHDRAWAL_REVIEW_FAILED',
+    });
     console.error('[user-balance] reviewWithdrawal failed:', error);
     return {
       success: false,

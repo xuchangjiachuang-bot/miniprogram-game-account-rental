@@ -1,407 +1,280 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, accounts } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { accounts, db } from '@/lib/db';
 import { submitForAudit } from '@/lib/account-audit-service';
+import { refundListingDepositIfFrozen } from '@/lib/account-deposit-service';
+import { requireAdmin } from '@/lib/admin-auth';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
 
-/**
- * 获取账号详情
- * GET /api/accounts/[id]
- *
- * 支持两种查询方式：
- * 1. 通过UUID查询：传入账号的UUID id
- * 2. 通过account_id查询：传入账号的account_id字符串
- */
+async function resolveRequestIdentity(request: NextRequest) {
+  const adminAuth = await requireAdmin(request);
+  if (!adminAuth.error) {
+    return { isAdmin: true, user: null };
+  }
+
+  const token = getServerToken(request);
+  const user = token ? await verifyToken(token) : null;
+  return { isAdmin: false, user };
+}
+
+async function findAccountByIdOrAccountId(id: string) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (isUuid) {
+    const byId = await db.select().from(accounts).where(eq(accounts.id, id)).limit(1);
+    if (byId[0]) {
+      return byId[0];
+    }
+  }
+
+  const byAccountId = await db.select().from(accounts).where(eq(accounts.accountId, id)).limit(1);
+  return byAccountId[0] || null;
+}
+
+function generateAccountTitle(data: {
+  coinsM: number;
+  safeboxCount: number;
+  energyValue: number;
+  staminaValue: number;
+  hasSkins: boolean;
+  skinTier?: string | null;
+  skinCount: number;
+  hasBattlepass: boolean;
+  battlepassLevel: number;
+}) {
+  const parts: string[] = [];
+  parts.push(`哈夫币 ${data.coinsM}M`);
+
+  const safeboxType = data.safeboxCount === 4 ? '2x2' : data.safeboxCount === 6 ? '2x3' : '3x3';
+  const safeboxLabel = data.safeboxCount === 9 ? '顶级保险箱' : `${data.safeboxCount}格保险箱`;
+  parts.push(`${safeboxLabel}(${safeboxType})`);
+  parts.push(`${data.staminaValue}体力`);
+  parts.push(`${data.energyValue}负重`);
+
+  if (data.hasSkins && data.skinTier) {
+    parts.push(data.skinTier);
+    if (data.skinCount > 0) {
+      parts.push(`${data.skinCount}个皮肤`);
+    }
+  }
+
+  if (data.hasBattlepass) {
+    parts.push(`BP${data.battlepassLevel}级`);
+  }
+
+  return `${parts.join('  |  ')}  |  `;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    console.log('GET /api/accounts/[id] - id:', id);
+    const identity = await resolveRequestIdentity(request);
+    const account = await findAccountByIdOrAccountId(id);
 
-    // 判断是否是UUID格式
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    console.log('是否是UUID格式:', isUUID);
-
-    let accountList: any[] = [];
-
-    // 如果是UUID格式，尝试通过UUID的id查询
-    if (isUUID) {
-      accountList = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.id, id));
-      console.log('通过UUID查询结果数量:', accountList.length);
+    if (!account) {
+      return NextResponse.json({ success: false, error: '账号不存在' }, { status: 404 });
     }
 
-    // 如果没找到或不是UUID，尝试通过account_id查询
-    if (accountList.length === 0) {
-      accountList = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.accountId, id));
-      console.log('通过accountId查询结果数量:', accountList.length);
+    const isPublicAccount =
+      account.auditStatus === 'approved' &&
+      account.status === 'available' &&
+      !account.isDeleted;
+
+    if (!isPublicAccount && !identity.isAdmin && identity.user?.id !== account.sellerId) {
+      return NextResponse.json({ success: false, error: '无权查看该账号' }, { status: 403 });
     }
 
-    if (accountList.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '账号不存在'
-      }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: accountList[0]
-    });
+    return NextResponse.json({ success: true, data: account });
   } catch (error: any) {
     console.error('获取账号详情失败:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || '获取账号详情失败'
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || '获取账号详情失败' },
+      { status: 500 },
+    );
   }
 }
 
-/**
- * 更新账号
- * PUT /api/accounts/[id]
- *
- * 支持两种查询方式：
- * 1. 通过UUID查询：传入账号的UUID id
- * 2. 通过account_id查询：传入账号的account_id字符串
- */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const identity = await resolveRequestIdentity(request);
 
-    // 验证请求体
-    let body;
-    try {
-      body = await request.json();
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        error: '请求体格式错误，请发送有效的JSON数据'
-      }, { status: 400 });
+    if (!identity.isAdmin && !identity.user) {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
     }
 
-    console.log('PUT /api/accounts/[id] - id:', id, 'body keys:', Object.keys(body));
-
-    // 验证必填字段
+    const body = await request.json();
     if (!body.coinsM && !body.coins_value) {
-      return NextResponse.json({
-        success: false,
-        error: '缺少必填字段：哈夫币数量 (coinsM 或 coins_value)'
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: '缺少必填字段：哈夫币数量' },
+        { status: 400 },
+      );
     }
 
-    // 判断是否是UUID格式
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-    let existingAccounts: any[] = [];
-
-    // 如果是UUID格式，尝试通过UUID的id查询
-    if (isUUID) {
-      existingAccounts = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.id, id));
+    const existingAccount = await findAccountByIdOrAccountId(id);
+    if (!existingAccount) {
+      return NextResponse.json({ success: false, error: `账号不存在，ID: ${id}` }, { status: 404 });
     }
 
-    // 如果没找到或不是UUID，尝试通过account_id查询
-    if (existingAccounts.length === 0) {
-      existingAccounts = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.accountId, id));
+    if (!identity.isAdmin && identity.user?.id !== existingAccount.sellerId) {
+      return NextResponse.json({ success: false, error: '无权修改该账号' }, { status: 403 });
     }
 
-    if (existingAccounts.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: `账号不存在，ID：${id}`
-      }, { status: 404 });
+    if (['rented', 'sold'].includes(existingAccount.status || '')) {
+      return NextResponse.json(
+        { success: false, error: '账号正在交易中，暂不支持编辑' },
+        { status: 400 },
+      );
     }
 
-    const existingAccount = existingAccounts[0];
-
-    // 检查账号是否可以编辑
-    if (existingAccount.status === 'rented' || existingAccount.status === 'sold') {
-      const statusText = existingAccount.status === 'rented' ? '租赁中' : '已售出';
-      return NextResponse.json({
-        success: false,
-        error: `账号${statusText}，无法编辑。请等待交易完成后再操作。`,
-        details: {
-          currentStatus: existingAccount.status,
-          suggestion: '如需紧急处理，请联系客服'
-        }
-      }, { status: 400 });
+    if ((existingAccount.tradeCount || 0) > 0) {
+      return NextResponse.json(
+        { success: false, error: '账号已有交易记录，不能再修改' },
+        { status: 400 },
+      );
     }
 
-    if (existingAccount.tradeCount > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `账号已有${existingAccount.tradeCount}笔交易记录，无法编辑。为了保证交易安全，已交易的账号不允许修改。`,
-        details: {
-          tradeCount: existingAccount.tradeCount,
-          suggestion: '如需上架新账号，请创建新账号'
-        }
-      }, { status: 400 });
-    }
-
-    // 生成格式化的账号标题
-    const generateAccountTitle = (data: any) => {
-      const parts = [];
-
-      // 哈夫币数量
-      parts.push(`哈夫币${data.coinsM}M`);
-
-      // 安全箱类型
-      const safeboxType = data.safeboxCount === 4 ? '2x2' : data.safeboxCount === 6 ? '2x3' : '3x3';
-      const safeboxLabel = data.safeboxCount === 9 ? '顶级安全箱' : `${data.safeboxCount}格安全箱`;
-      parts.push(`${safeboxLabel}(${safeboxType})`);
-
-      // 体力等级
-      parts.push(`${data.staminaValue}体力`);
-
-      // 负重等级
-      parts.push(`${data.energyValue}负重`);
-
-      // 皮肤信息
-      if (data.hasSkins && data.skinTier) {
-        parts.push(data.skinTier);
-        if (data.skinCount > 0) parts.push(`${data.skinCount}个皮肤`);
-      }
-
-      // 战斗通行证
-      if (data.hasBattlepass) {
-        parts.push(`BP${data.battlepassLevel}级`);
-      }
-
-      return parts.join('  |  ') + '  |  ';
-    };
-
-    const autoGeneratedTitle = generateAccountTitle(body);
-
-    // 计算变更的字段
-    const changedFields: string[] = [];
-    const oldData = existingAccount;
-    const newData = body;
-
-    // 比较关键字段，记录变更
-    const fieldsToCompare = [
-      'title', 'description', 'coinsM', 'safeboxCount', 'energyValue', 'staminaValue',
-      'hasSkins', 'skinTier', 'skinCount', 'hasBattlepass', 'battlepassLevel',
-      'deposit', 'recommendedRental', 'totalPrice', 'rentalRatio'
-    ];
-
-    fieldsToCompare.forEach(field => {
-      if (JSON.stringify(oldData[field as keyof typeof oldData]) !== JSON.stringify(newData[field])) {
-        changedFields.push(field);
-      }
+    const autoGeneratedTitle = generateAccountTitle({
+      coinsM: Number(body.coinsM || body.coins_value || 0),
+      safeboxCount: Number(body.safeboxCount || 0),
+      energyValue: Number(body.energyValue || 0),
+      staminaValue: Number(body.staminaValue || 0),
+      hasSkins: Boolean(body.hasSkins),
+      skinTier: body.skinTier || null,
+      skinCount: Number(body.skinCount || 0),
+      hasBattlepass: Boolean(body.hasBattlepass),
+      battlepassLevel: Number(body.battlepassLevel || 0),
     });
 
-    // 保存编辑历史记录
     try {
       const { accountEditHistory } = await import('@/lib/db');
       await db.insert(accountEditHistory).values({
         accountId: existingAccount.id,
         sellerId: existingAccount.sellerId,
-        oldData: oldData,
-        newData: newData,
+        oldData: existingAccount,
+        newData: body,
         changeType: 'update',
-        changedFields: changedFields,
+        changedFields: [],
         reason: body.editReason || null,
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
         userAgent: request.headers.get('user-agent') || null,
       });
-      console.log('账号编辑历史已保存');
     } catch (historyError) {
-      console.error('保存编辑历史失败:', historyError);
-      // 即使历史记录保存失败，也不影响账号更新，只记录日志
+      console.error('保存账号编辑历史失败:', historyError);
     }
 
-    // 更新账号信息
-    const updatedAccount = await db
+    const [updatedAccount] = await db
       .update(accounts)
       .set({
         title: autoGeneratedTitle,
         description: body.description || null,
         screenshots: body.screenshots || null,
-        coinsM: body.coinsM.toString(),
-        safeboxCount: body.safeboxCount,
-        energyValue: body.energyValue,
-        staminaValue: body.staminaValue,
-        hasSkins: body.hasSkins || false,
+        coinsM: String(body.coinsM || body.coins_value || 0),
+        safeboxCount: Number(body.safeboxCount || 0),
+        energyValue: Number(body.energyValue || 0),
+        staminaValue: Number(body.staminaValue || 0),
+        hasSkins: Boolean(body.hasSkins),
         skinTier: body.skinTier || null,
-        skinCount: body.skinCount || 0,
-        hasBattlepass: body.hasBattlepass || false,
-        battlepassLevel: body.battlepassLevel || 0,
+        skinCount: Number(body.skinCount || 0),
+        hasBattlepass: Boolean(body.hasBattlepass),
+        battlepassLevel: Number(body.battlepassLevel || 0),
         customAttributes: body.customAttributes || {},
         tags: body.tags || [],
-        accountValue: body.accountValue ? body.accountValue.toString() : null,
-        recommendedRental: body.recommendedRental ? body.recommendedRental.toString() : null,
-        rentalRatio: body.rentalRatio ? body.rentalRatio.toString() : null,
-        deposit: body.deposit.toString(),
-        totalPrice: body.totalPrice ? body.totalPrice.toString() : null,
-        rentalDays: body.rentalDays ? body.rentalDays.toString() : null,
-        rentalHours: body.rentalHours ? body.rentalHours.toString() : null,
+        accountValue: body.accountValue ? String(body.accountValue) : null,
+        recommendedRental: body.recommendedRental ? String(body.recommendedRental) : null,
+        rentalRatio: body.rentalRatio ? String(body.rentalRatio) : null,
+        deposit: String(body.deposit || 0),
+        totalPrice: body.totalPrice ? String(body.totalPrice) : null,
+        rentalDays: body.rentalDays ? String(body.rentalDays) : null,
+        rentalHours: body.rentalHours ? String(body.rentalHours) : null,
         rentalDescription: body.rentalDescription || null,
-        // 重置审核状态
         auditStatus: 'pending',
         status: 'draft',
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       })
-      .where(eq(accounts.id, existingAccount.id)) // 使用实际查询到的UUID
+      .where(eq(accounts.id, existingAccount.id))
       .returning();
 
-    if (updatedAccount.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '更新账号失败，数据库未返回更新结果',
-        details: {
-          accountId: existingAccount.accountId,
-          internalId: existingAccount.id
-        }
-      }, { status: 500 });
+    if (!updatedAccount) {
+      return NextResponse.json({ success: false, error: '更新账号失败' }, { status: 500 });
     }
 
-    // 重新提交审核
-    let auditResult;
-    try {
-      auditResult = await submitForAudit(existingAccount.id); // 使用实际查询到的UUID
-    } catch (auditError: any) {
-      console.error('提交审核失败:', auditError);
-      // 即使审核提交失败，账号已经更新，返回成功信息但提示审核状态
-      return NextResponse.json({
-        success: true,
-        message: '账号信息已更新，但自动审核提交失败。账号处于草稿状态，请联系管理员手动审核。',
-        data: {
-          account: updatedAccount[0],
-          warning: '审核自动提交失败',
-          auditError: auditError.message
-        }
-      });
-    }
+    const auditResult = await submitForAudit(existingAccount.id);
 
     return NextResponse.json({
       success: true,
       message: '账号修改成功，已重新提交审核',
       data: {
-        account: updatedAccount[0],
-        auditStatus: updatedAccount[0].auditStatus,
-        auditDetails: auditResult
-      }
+        account: updatedAccount,
+        auditDetails: auditResult,
+      },
     });
   } catch (error: any) {
     console.error('更新账号失败:', error);
-
-    // 根据错误类型返回不同的错误信息
-    let errorMessage = '更新账号失败';
-    let statusCode = 500;
-
-    if (error.code === '23505') {
-      errorMessage = '数据冲突，可能是账号ID已存在';
-      statusCode = 409;
-    } else if (error.code === '23503') {
-      errorMessage = '外键约束错误，请检查关联数据是否存在';
-      statusCode = 400;
-    } else if (error.code === '22P02') {
-      errorMessage = '数据格式错误，请检查输入的数据类型';
-      statusCode = 400;
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? {
-        code: error.code,
-        message: error.message,
-        stack: error.stack
-      } : undefined
-    }, { status: statusCode });
+    return NextResponse.json(
+      { success: false, error: error.message || '更新账号失败' },
+      { status: 500 },
+    );
   }
 }
 
-/**
- * 删除账号
- * DELETE /api/accounts/[id]
- *
- * 支持两种查询方式：
- * 1. 通过UUID查询：传入账号的UUID id
- * 2. 通过account_id查询：传入账号的account_id字符串
- */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    console.log('DELETE /api/accounts/[id] - id:', id);
+    const identity = await resolveRequestIdentity(request);
 
-    // 判断是否是UUID格式
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-    let existingAccounts: any[] = [];
-
-    // 如果是UUID格式，尝试通过UUID的id查询
-    if (isUUID) {
-      existingAccounts = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.id, id));
+    if (!identity.isAdmin && !identity.user) {
+      return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
     }
 
-    // 如果没找到或不是UUID，尝试通过account_id查询
-    if (existingAccounts.length === 0) {
-      existingAccounts = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.accountId, id));
+    const existingAccount = await findAccountByIdOrAccountId(id);
+    if (!existingAccount) {
+      return NextResponse.json({ success: false, error: '账号不存在' }, { status: 404 });
     }
 
-    if (existingAccounts.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '账号不存在'
-      }, { status: 404 });
+    if (!identity.isAdmin && identity.user?.id !== existingAccount.sellerId) {
+      return NextResponse.json({ success: false, error: '无权下架该账号' }, { status: 403 });
     }
 
-    const existingAccount = existingAccounts[0];
-
-    // 检查账号是否可以删除
-    if (existingAccount.status === 'rented' || existingAccount.status === 'sold') {
-      return NextResponse.json({
-        success: false,
-        error: '账号正在租赁或已售出，无法删除'
-      }, { status: 400 });
+    if (['rented', 'sold'].includes(existingAccount.status || '')) {
+      return NextResponse.json(
+        { success: false, error: '账号正在交易中或已售出，无法下架' },
+        { status: 400 },
+      );
     }
 
-    // 软删除账号
+    const depositRefundResult = await refundListingDepositIfFrozen(existingAccount.id, 'cancelled');
+    if (!depositRefundResult.success) {
+      return NextResponse.json(
+        { success: false, error: depositRefundResult.message || '下架账号时退还保证金失败' },
+        { status: 500 },
+      );
+    }
+
     await db
       .update(accounts)
       .set({
-        isDeleted: true,
-        status: 'deleted',
-        updatedAt: new Date().toISOString()
+        status: 'archived',
+        updatedAt: new Date().toISOString(),
       })
-      .where(eq(accounts.id, existingAccount.id)) // 使用实际查询到的UUID
+      .where(eq(accounts.id, existingAccount.id));
 
-    return NextResponse.json({
-      success: true,
-      message: '账号已删除'
-    });
+    return NextResponse.json({ success: true, message: '账号已下架归档，历史记录已保留' });
   } catch (error: any) {
-    console.error('删除账号失败:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || '删除账号失败'
-    }, { status: 500 });
+    console.error('下架账号失败:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || '下架账号失败' },
+      { status: 500 },
+    );
   }
 }

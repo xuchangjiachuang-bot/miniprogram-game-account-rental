@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Ban, CheckCircle, Loader2, RefreshCw, Search, Wallet } from 'lucide-react';
+import { Ban, CheckCircle, Loader2, RefreshCw, Search, Trash2, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,27 @@ interface WalletAdjustFormState {
   reason: string;
 }
 
+interface LegacyCleanupPreview {
+  candidates: Array<{
+    id: string;
+    phone: string;
+    nickname: string;
+    createdAt: string | null;
+  }>;
+  summary: {
+    users: number;
+    accounts: number;
+    orders: number;
+    groupChats: number;
+    balanceRecords: number;
+    withdrawalRecords: number;
+    paymentRecords: number;
+    splitRecords: number;
+    disputes: number;
+    accountDeposits: number;
+  };
+}
+
 const PAGE_SIZE = 20;
 
 export default function AdminUsers() {
@@ -43,10 +64,17 @@ export default function AdminUsers() {
   const [total, setTotal] = useState(0);
   const [walletAdjustForm, setWalletAdjustForm] = useState<WalletAdjustFormState | null>(null);
   const [walletAdjusting, setWalletAdjusting] = useState(false);
+  const [cleanupPreview, setCleanupPreview] = useState<LegacyCleanupPreview | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupExecuting, setCleanupExecuting] = useState(false);
 
   useEffect(() => {
     loadUsers();
   }, [roleFilter, statusFilter, page, searchQuery]);
+
+  useEffect(() => {
+    loadCleanupPreview();
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -82,6 +110,64 @@ export default function AdminUsers() {
       toast.error('加载用户列表失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCleanupPreview = async () => {
+    try {
+      setCleanupLoading(true);
+      const response = await fetch('/api/admin/users/legacy-phone-cleanup', {
+        credentials: 'include',
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || '加载旧手机号测试数据预览失败');
+        return;
+      }
+
+      setCleanupPreview(result.data || null);
+    } catch (error) {
+      console.error('加载旧手机号测试数据预览失败:', error);
+      toast.error('加载旧手机号测试数据预览失败');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const executeCleanup = async () => {
+    if (!cleanupPreview?.summary.users) {
+      toast.success('当前没有需要清理的旧手机号测试数据');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确认删除 ${cleanupPreview.summary.users} 个旧手机号测试用户，以及它们关联的账号、订单、余额和支付记录吗？此操作不可恢复。`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCleanupExecuting(true);
+      const response = await fetch('/api/admin/users/legacy-phone-cleanup', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || '清理旧手机号测试数据失败');
+        return;
+      }
+
+      toast.success(result.message || '旧手机号测试数据已清理');
+      await Promise.all([loadUsers(), loadCleanupPreview()]);
+    } catch (error) {
+      console.error('清理旧手机号测试数据失败:', error);
+      toast.error('清理旧手机号测试数据失败');
+    } finally {
+      setCleanupExecuting(false);
     }
   };
 
@@ -231,6 +317,57 @@ export default function AdminUsers() {
                 <SelectItem value="suspended">已禁用</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="text-base font-semibold text-gray-900">旧手机号测试数据清理</div>
+              <p className="text-sm text-gray-600">
+                清理没有任何微信绑定、仅由旧手机号登录遗留的测试用户，并同步删除其关联账号、订单、余额与支付流水。
+              </p>
+              {cleanupPreview ? (
+                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                  <Badge variant="outline">用户 {cleanupPreview.summary.users}</Badge>
+                  <Badge variant="outline">账号 {cleanupPreview.summary.accounts}</Badge>
+                  <Badge variant="outline">订单 {cleanupPreview.summary.orders}</Badge>
+                  <Badge variant="outline">余额流水 {cleanupPreview.summary.balanceRecords}</Badge>
+                  <Badge variant="outline">支付记录 {cleanupPreview.summary.paymentRecords}</Badge>
+                </div>
+              ) : null}
+              {cleanupPreview?.candidates?.length ? (
+                <div className="text-xs text-gray-500">
+                  将清理:
+                  {' '}
+                  {cleanupPreview.candidates
+                    .slice(0, 4)
+                    .map((item) => `${item.nickname || item.phone}(${item.phone})`)
+                    .join('，')}
+                  {cleanupPreview.candidates.length > 4 ? ` 等 ${cleanupPreview.candidates.length} 个用户` : ''}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500">
+                  {cleanupLoading ? '正在加载清理预览...' : '当前没有可清理的旧手机号测试数据'}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={loadCleanupPreview} disabled={cleanupLoading || cleanupExecuting}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${cleanupLoading ? 'animate-spin' : ''}`} />
+                刷新预览
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={executeCleanup}
+                disabled={cleanupLoading || cleanupExecuting || !cleanupPreview?.summary.users}
+              >
+                {cleanupExecuting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                一键清理旧手机号测试数据
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

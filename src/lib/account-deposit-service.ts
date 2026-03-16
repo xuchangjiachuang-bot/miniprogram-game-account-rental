@@ -5,6 +5,7 @@
 
 import { db, accounts, userBalances, balanceTransactions, accountDeposits, platformSettings } from './db';
 import { eq } from 'drizzle-orm';
+import { safeLogFinanceAuditEvent } from './finance-audit-service';
 
 // ==================== 类型定义 ====================
 
@@ -115,6 +116,20 @@ export async function freezeListingDeposit(
         description: `账号上架保证金冻结，账号ID：${accountId}`,
         createdAt: new Date().toISOString()
       });
+
+      await safeLogFinanceAuditEvent({
+        eventType: 'listing_deposit_frozen',
+        status: 'success',
+        userId,
+        accountId,
+        amount: depositAmount,
+        balanceBefore: oldAvailable,
+        balanceAfter: newAvailable,
+        details: {
+          frozenBalanceBefore: oldFrozen,
+          frozenBalanceAfter: newFrozen,
+        },
+      }, tx);
 
       // 4.3 创建保证金记录
       const depositId = crypto.randomUUID();
@@ -250,6 +265,21 @@ export async function refundListingDeposit(
           description: `账号保证金退还，原因：${reason}，账号ID：${accountId}`,
           createdAt: new Date().toISOString()
         });
+
+        await safeLogFinanceAuditEvent({
+          eventType: 'listing_deposit_refunded',
+          status: 'success',
+          userId: account.sellerId,
+          accountId,
+          amount: depositAmount,
+          balanceBefore: oldAvailable,
+          balanceAfter: newAvailable,
+          details: {
+            refundReason: reason,
+            frozenBalanceBefore: oldFrozen,
+            frozenBalanceAfter: newFrozen,
+          },
+        }, tx);
       }
 
       // 3.2 更新保证金记录
@@ -280,6 +310,50 @@ export async function refundListingDeposit(
     return {
       success: false,
       message: error.message || '退还保证金失败'
+    };
+  }
+}
+
+export async function refundListingDepositIfFrozen(
+  accountId: string,
+  reason: 'cancelled' | 'completed' | 'rejected'
+): Promise<DepositResult> {
+  try {
+    const accountList = await db.select().from(accounts).where(eq(accounts.id, accountId));
+    const account = accountList[0];
+
+    if (!account) {
+      return { success: true, message: '账号不存在，无需退还保证金' };
+    }
+
+    if (!account.depositId) {
+      return { success: true, message: '账号没有保证金记录，无需退还' };
+    }
+
+    const depositList = await db
+      .select()
+      .from(accountDeposits)
+      .where(eq(accountDeposits.id, account.depositId));
+
+    const deposit = depositList[0];
+    if (!deposit) {
+      return { success: true, message: '保证金记录不存在，按已退还处理' };
+    }
+
+    if (deposit.status !== 'frozen') {
+      return {
+        success: true,
+        message: `保证金当前状态为 ${deposit.status}，无需重复退还`,
+        deposit,
+      };
+    }
+
+    return refundListingDeposit(accountId, reason);
+  } catch (error: any) {
+    console.error('安全退还保证金失败:', error);
+    return {
+      success: false,
+      message: error.message || '安全退还保证金失败'
     };
   }
 }

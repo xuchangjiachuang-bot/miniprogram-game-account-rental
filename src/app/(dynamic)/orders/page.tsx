@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle, Clock, ShoppingCart, Store } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
-import { OrderStatus } from '@/lib/split-service';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,26 +21,36 @@ interface Order {
   deposit_amount: number;
   total_amount: number;
   rent_hours: number;
-  status: OrderStatus | string;
+  status: string;
   refund_amount?: number;
   created_at: string;
 }
 
-const statusMeta: Record<string, { label: string; className: string }> = {
-  pending: { label: '待支付', className: '' },
+const statusMeta: Record<string, { label: string; className?: string }> = {
+  pending: { label: '待支付' },
+  pending_payment: { label: '待支付' },
   paid: { label: '已支付', className: 'bg-blue-600 text-white' },
   active: { label: '租赁中', className: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0' },
-  pending_verification: { label: '待验收', className: 'bg-yellow-500 text-white' },
+  pending_verification: { label: '待验收', className: 'bg-yellow-500 text-black' },
+  pending_consumption_confirm: { label: '待买家确认结算', className: 'bg-amber-500 text-black' },
   completed: { label: '已完成', className: 'bg-green-600 text-white' },
-  disputed: { label: '争议中', className: 'bg-yellow-500 text-white' },
+  disputed: { label: '争议中', className: 'bg-red-500 text-white' },
   refunding: { label: '退款中', className: 'bg-orange-500 text-white' },
-  refunded: { label: '已退款', className: 'bg-gray-500 text-white' },
-  cancelled: { label: '已取消', className: 'bg-red-500 text-white' },
+  refunded: { label: '已退款', className: 'bg-slate-500 text-white' },
+  cancelled: { label: '已取消', className: 'bg-gray-500 text-white' },
 };
 
+function formatMoney(amount: number) {
+  return `¥${Number(amount || 0).toFixed(2)}`;
+}
+
 function OrderStatusBadge({ status }: { status: string }) {
-  const meta = statusMeta[status] || { label: status, className: '' };
-  return <Badge className={meta.className}>{meta.label}</Badge>;
+  const meta = statusMeta[status] || { label: status };
+  return (
+    <Badge className={meta.className} variant={meta.className ? 'default' : 'secondary'}>
+      {meta.label}
+    </Badge>
+  );
 }
 
 export default function OrdersPage() {
@@ -65,18 +74,18 @@ export default function OrdersPage() {
         const token = getToken();
         const response = await fetch('/api/orders', {
           cache: 'no-store',
-          headers: token ? {
-            'Authorization': `Bearer ${token}`
-          } : {}
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const result = await response.json();
 
-        if (!cancelled) {
-          if (result.success) {
-            setOrders(result.data?.orders || []);
-          } else {
-            setOrders([]);
-          }
+        if (cancelled) {
+          return;
+        }
+
+        if (result.success) {
+          setOrders(result.data?.orders || []);
+        } else {
+          setOrders([]);
         }
       } catch (error) {
         console.error('加载订单失败:', error);
@@ -90,7 +99,7 @@ export default function OrdersPage() {
       }
     }
 
-    loadOrders();
+    void loadOrders();
     return () => {
       cancelled = true;
     };
@@ -102,18 +111,16 @@ export default function OrdersPage() {
     }
 
     return orders.filter((order) =>
-      activeTab === 'buyer' ? order.buyer_id === user.id : order.seller_id === user.id
+      activeTab === 'buyer' ? order.buyer_id === user.id : order.seller_id === user.id,
     );
   }, [activeTab, orders, user?.id]);
 
-  const stats = useMemo(() => {
-    return {
-      total: filteredOrders.length,
-      pending: filteredOrders.filter((order) => order.status === OrderStatus.PENDING).length,
-      active: filteredOrders.filter((order) => order.status === OrderStatus.ACTIVE).length,
-      completed: filteredOrders.filter((order) => order.status === OrderStatus.COMPLETED).length,
-    };
-  }, [filteredOrders]);
+  const stats = useMemo(() => ({
+    total: filteredOrders.length,
+    pending: filteredOrders.filter((order) => ['pending', 'pending_payment'].includes(order.status)).length,
+    active: filteredOrders.filter((order) => order.status === 'active').length,
+    completed: filteredOrders.filter((order) => order.status === 'completed').length,
+  }), [filteredOrders]);
 
   if (!userLoading && !user) {
     return (
@@ -123,7 +130,7 @@ export default function OrdersPage() {
             <CardContent className="py-16 text-center">
               <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-gray-300" />
               <h1 className="text-2xl font-semibold text-gray-900">请先登录后查看订单</h1>
-              <p className="mt-2 text-sm text-gray-500">登录后就能看到你购买和出租的全部订单记录。</p>
+              <p className="mt-2 text-sm text-gray-500">登录后可以查看你买入和卖出的全部订单记录。</p>
               <Button asChild className="mt-6">
                 <Link href="/login">去登录</Link>
               </Button>
@@ -139,7 +146,7 @@ export default function OrdersPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">我的订单</h1>
-          <p className="mt-1 text-gray-600">查看和管理你的租赁订单</p>
+          <p className="mt-1 text-gray-600">查看和管理你的交易订单。</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'buyer' | 'seller')}>
@@ -230,19 +237,19 @@ function OrderList({
                 <div className="rounded-lg bg-gray-50 p-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">租金</span>
-                    <span className="font-semibold">￥{order.rent_amount.toFixed(2)}</span>
+                    <span className="font-semibold">{formatMoney(order.rent_amount)}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="text-gray-600">押金</span>
-                    <span className="font-semibold">￥{order.deposit_amount.toFixed(2)}</span>
+                    <span className="font-semibold">{formatMoney(order.deposit_amount)}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t pt-3">
                     <span className="font-semibold">订单总额</span>
-                    <span className="text-lg font-bold text-green-600">￥{order.total_amount.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-green-600">{formatMoney(order.total_amount)}</span>
                   </div>
                   {!!order.refund_amount && (
                     <div className="mt-2 text-right text-sm text-gray-500">
-                      已退款: ￥{order.refund_amount.toFixed(2)}
+                      已退款 {formatMoney(order.refund_amount)}
                     </div>
                   )}
                 </div>

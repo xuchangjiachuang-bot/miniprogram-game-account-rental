@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
 import { createOrderDispute } from '@/lib/dispute-service';
-import { executeAutoSplit } from '@/lib/platform-split-service';
+import { settleCompletedOrder } from '@/lib/order-settlement-service';
 import { getServerUserId } from '@/lib/server-auth';
 import { requireAdmin } from '@/lib/admin-auth';
 
@@ -74,18 +74,24 @@ export async function POST(
         })
         .where(eq(orders.id, id));
 
-      const splitResult = await executeAutoSplit(id);
+      const splitResult = await settleCompletedOrder(id);
       if (!splitResult.success) {
         throw new Error(splitResult.message);
       }
 
       return NextResponse.json({
         success: true,
-        message: action === 'auto' ? '已自动验收通过并完成分账' : '验收通过，订单已完成并分账',
+        message: splitResult.pendingRefund
+          ? '验收已通过，买家押金原路退款处理中，退款成功后自动完成结算'
+          : action === 'auto'
+            ? '已自动验收通过并完成分账'
+            : '验收通过，订单已完成并分账',
         data: {
           orderId: id,
           orderNo: order.orderNo,
           status: 'completed',
+          isSettled: splitResult.settled,
+          pendingDepositRefund: splitResult.pendingRefund,
           platformCommission: splitResult.platformCommission,
           sellerIncome: splitResult.sellerIncome,
           buyerRefund: splitResult.buyerRefund,
@@ -105,6 +111,7 @@ export async function POST(
       await db
         .update(orders)
         .set({
+          status: 'disputed',
           verificationResult: 'rejected',
           verificationRemark: remark || '验收失败，发起纠纷',
           disputeEvidence: evidence ?? null,

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
+import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
 import { fenToYuan } from '@/lib/wechat/utils';
@@ -106,6 +107,19 @@ export async function markWechatOrderPaid(params: {
         eq(accounts.id, order.accountId),
         eq(accounts.status, 'available'),
       ));
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_payment_wechat_paid',
+      status: 'success',
+      userId: order.buyerId,
+      orderId: order.id,
+      amount: typeof totalFeeFen === 'number' ? fenToYuan(totalFeeFen) : String(order.totalPrice),
+      details: {
+        orderNo: order.orderNo,
+        transactionId: transactionId || order.transactionId || '',
+        paymentMethod: 'wechat',
+      },
+    }, tx);
 
     return { order, alreadyPaid: false };
   });
@@ -213,6 +227,22 @@ export async function markWechatWalletRechargePaid(params: {
       })
       .where(eq(paymentRecords.id, paymentRecord.id));
 
+    await safeLogFinanceAuditEvent({
+      eventType: 'wallet_recharge_wechat_paid',
+      status: 'success',
+      userId: paymentRecord.userId,
+      orderId: paymentRecord.orderId,
+      paymentRecordId: paymentRecord.id,
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      details: {
+        orderNo: paymentRecord.orderNo,
+        transactionId: transactionId || paymentRecord.transactionId || '',
+        paymentMethod: 'wechat',
+      },
+    }, tx);
+
     return { paymentRecord, alreadyPaid: false };
   });
 }
@@ -226,6 +256,14 @@ async function markWechatPaymentFailed(recordId: string, tradeState: string, fai
       updatedAt: new Date().toISOString(),
     })
     .where(eq(paymentRecords.id, recordId));
+
+  await safeLogFinanceAuditEvent({
+    eventType: 'wechat_payment_failed',
+    status: 'failed',
+    paymentRecordId: recordId,
+    details: { tradeState },
+    errorMessage: failureReason || tradeState,
+  });
 }
 
 export async function reconcileWechatWalletRechargeStatus(params: {

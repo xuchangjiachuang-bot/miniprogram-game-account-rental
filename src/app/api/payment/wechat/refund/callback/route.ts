@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { accounts, db, orders, paymentRecords } from '@/lib/db';
+import { db, orders, paymentRecords } from '@/lib/db';
+import { restoreAccountAvailabilityIfNoBlockingOrders } from '@/lib/account-service';
+import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
+import { settleCompletedOrder } from '@/lib/order-settlement-service';
 import { fenToYuan, objectToXML, verifySign, xmlToObject } from '@/lib/wechat/utils';
 import { getWechatPayConfig } from '@/lib/wechat/config';
 
@@ -87,7 +90,33 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(paymentRecords.id, refundRecord.id));
 
+    await safeLogFinanceAuditEvent({
+      eventType: refundRecord.type === 'deposit_refund' ? 'order_deposit_refund_callback' : 'order_refund_callback',
+      status: status === 'success' ? 'success' : status === 'failed' ? 'failed' : 'pending',
+      userId: refundRecord.userId,
+      orderId: refundRecord.orderId,
+      paymentRecordId: refundRecord.id,
+      amount: Number(refundRecord.amount) || 0,
+      details: {
+        outRefundNo,
+        refundId,
+        refundStatus,
+      },
+      errorMessage: status === 'failed' ? (callbackData.err_code_des as string || callbackData.return_msg as string || refundStatus) : null,
+    });
+
     if (status === 'success') {
+      if (refundRecord.type === 'deposit_refund') {
+        await settleCompletedOrder(refundRecord.orderId);
+
+        return new NextResponse(objectToXML({
+          return_code: 'SUCCESS',
+          return_msg: 'OK',
+        }), {
+          headers: { 'Content-Type': 'application/xml' },
+        });
+      }
+
       const orderList = await db
         .select()
         .from(orders)
@@ -106,13 +135,7 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(orders.id, order.id));
 
-        await db
-          .update(accounts)
-          .set({
-            status: 'available',
-            updatedAt: now,
-          })
-          .where(eq(accounts.id, order.accountId));
+        await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
       }
     }
 

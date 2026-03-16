@@ -240,16 +240,6 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
         role: 'seller',
         joinedAt: now,
       },
-      ...(supportMember.inserted
-        ? [
-            {
-              groupChatId: group.id,
-              userId: supportMember.user.id,
-              role: 'admin' as const,
-              joinedAt: now,
-            },
-          ]
-        : []),
     ]);
 
     await tx.insert(chatMessages).values({

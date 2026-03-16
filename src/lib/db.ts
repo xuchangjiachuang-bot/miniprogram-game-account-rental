@@ -3,6 +3,8 @@ import postgres from 'postgres';
 import { initAdminTable } from './init-admin';
 import { initAgreementsTable } from './init-agreements';
 import { initSearchContentTables } from './init-search-content';
+import { initFinanceAuditTable } from './init-finance-audit';
+import { initOrderConsumptionTables } from './init-order-consumption';
 import { ensureUserBalanceSchema } from './init-user-balance';
 import { smsConfigManager } from '../storage/database/smsConfigManager';
 import * as adminSchema from '../storage/database/shared/admin-schema';
@@ -64,6 +66,8 @@ export async function ensureDatabaseInitialized() {
           ensureAdminInitialized(),
           ensureAgreementsInitialized(),
           initSearchContentTables(),
+          initFinanceAuditTable(),
+          initOrderConsumptionTables(),
           ensureUserBalanceSchema(),
           ensureSmsConfigsInitialized(),
         ]);
