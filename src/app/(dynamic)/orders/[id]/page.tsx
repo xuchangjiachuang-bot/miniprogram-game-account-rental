@@ -80,6 +80,7 @@ type OrderDetail = {
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
+  paymentTimeoutSeconds?: number;
 };
 
 type LoginPayload = {
@@ -211,14 +212,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       return;
     }
 
+    const timeoutSeconds = Number(order.paymentTimeoutSeconds || 180);
     const update = () => {
-      setPendingPaymentMs(createdAt + 3 * 60 * 1000 - Date.now());
+      setPendingPaymentMs(createdAt + timeoutSeconds * 1000 - Date.now());
     };
 
     update();
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
-  }, [order?.createdAt, order?.status]);
+  }, [order?.createdAt, order?.status, order?.paymentTimeoutSeconds]);
+
+  const paymentTimeoutLabel = useMemo(() => {
+    const timeoutSeconds = Number(order?.paymentTimeoutSeconds || 180);
+    if (timeoutSeconds % 60 === 0) {
+      return `${timeoutSeconds / 60} 分钟`;
+    }
+
+    return `${timeoutSeconds} 秒`;
+  }, [order?.paymentTimeoutSeconds]);
 
   const statusBadge = useMemo(() => {
     if (order?.status === 'pending_consumption_confirm') {
@@ -615,7 +626,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                 {order.status === 'pending_payment' ? (
                   <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                    <div>订单已创建，等待支付。未支付订单会在 3 分钟后自动取消。</div>
+                    <div>订单已创建，等待支付。未支付订单会在 {paymentTimeoutLabel} 后自动取消。</div>
                     <div className="mt-1 text-blue-700">
                       剩余支付时间：{pendingPaymentMs === null ? '--' : formatCountdown(pendingPaymentMs)}
                     </div>

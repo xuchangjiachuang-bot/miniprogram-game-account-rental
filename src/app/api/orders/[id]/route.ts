@@ -5,7 +5,7 @@ import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service'
 import { getOrderDispute } from '@/lib/dispute-service';
 import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { cancelOrder, transformDbOrderToApiFormat } from '@/lib/order-service';
-import { isOrderTimeout } from '@/lib/order-timeout-service';
+import { getPaymentTimeoutSeconds, isOrderTimeout } from '@/lib/order-timeout-service';
 import { getServerUserId } from '@/lib/server-auth';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
 
@@ -56,6 +56,7 @@ export async function GET(
 
     const dispute = await getOrderDispute(order.id);
     const consumptionSettlement = await getLatestConsumptionSettlement(order.id);
+    const paymentTimeoutSeconds = await getPaymentTimeoutSeconds();
 
     return NextResponse.json({
       success: true,
@@ -63,6 +64,7 @@ export async function GET(
         ...transformDbOrderToApiFormat(order),
         dispute,
         consumptionSettlement,
+        paymentTimeoutSeconds,
       },
     });
   } catch (error: any) {

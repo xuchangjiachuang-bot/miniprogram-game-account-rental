@@ -406,7 +406,7 @@ export const platformSettings = pgTable("platform_settings", {
 	requireManualReview: boolean("require_manual_review").default(true),
 	autoApproveVerified: boolean("auto_approve_verified").default(false),
 	listingDepositAmount: numeric("listing_deposit_amount", { precision: 10, scale: 2 }).default('50'), // 新增：上架保证金金额
-	orderPaymentTimeout: integer("order_payment_timeout").default(1800), // 新增：订单支付超时时间（秒），默认30分钟
+	orderPaymentTimeout: integer("order_payment_timeout").default(180), // 新增：订单支付超时时间（秒），默认3分钟
 	wechatMpAppId: varchar("wechat_mp_app_id", { length: 100 }), // 公众号 AppID
 	wechatMpAppSecret: varchar("wechat_mp_app_secret", { length: 100 }), // 公众号 AppSecret
 	wechatOpenAppId: varchar("wechat_open_app_id", { length: 100 }), // 开放平台 AppID

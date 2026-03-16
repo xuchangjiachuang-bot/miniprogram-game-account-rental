@@ -528,7 +528,7 @@ export const platformSettings = pgTable("platform_settings", {
 	createdAt: timestamp("created_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
 	listingDepositAmount: numeric("listing_deposit_amount", { precision: 10, scale:  2 }).default('50.00'),
-	orderPaymentTimeout: integer("order_payment_timeout").default(1800),
+	orderPaymentTimeout: integer("order_payment_timeout").default(180),
 	wechatMpAppId: varchar("wechat_mp_app_id", { length: 100 }),
 	wechatMpAppSecret: varchar("wechat_mp_app_secret", { length: 100 }),
 	wechatOpenAppId: varchar("wechat_open_app_id", { length: 100 }),

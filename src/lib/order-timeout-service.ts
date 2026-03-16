@@ -15,7 +15,7 @@ export interface TimeoutCheckResult {
   cancelledCount: number;
 }
 
-async function getPaymentTimeoutSeconds() {
+export async function getPaymentTimeoutSeconds() {
   const settingsList = await db.select().from(platformSettings);
   const configuredValue = Number(settingsList[0]?.orderPaymentTimeout);
 
