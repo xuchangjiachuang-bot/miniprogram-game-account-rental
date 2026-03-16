@@ -164,10 +164,10 @@ export function AccountDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl">
         <div className="border-b bg-white p-3 md:p-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.95fr)] md:gap-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.95fr)] lg:gap-4">
             {hasImages ? (
               <div className="relative overflow-hidden rounded-xl bg-gray-100">
-                <div className="relative aspect-[4/3] w-full md:aspect-[16/10]">
+                <div className="relative aspect-video w-full lg:aspect-[16/10]">
                   {imageError ? (
                     <div className="flex h-full w-full items-center justify-center">
                       <div className="text-center">
@@ -222,7 +222,7 @@ export function AccountDetailDialog({
 
             <div className="min-w-0 rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-3 md:p-4">
               <DialogHeader className="mb-3">
-                <DialogTitle className="text-base font-bold leading-tight text-gray-900 md:text-lg">
+                <DialogTitle className="text-base font-bold leading-snug text-gray-900 md:text-lg">
                   {account.title || account.account_name || '账号详情'}
                 </DialogTitle>
               </DialogHeader>
@@ -250,7 +250,7 @@ export function AccountDetailDialog({
                 </Card>
               </div>
 
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                 <div className="rounded-lg border border-gray-200 bg-white px-2 py-2">
                   <p className="text-[10px] text-gray-500">安全箱</p>
                   <p className="mt-1 text-xs font-semibold text-gray-900">{titleInfo.safebox || account.safebox || '-'}</p>
@@ -269,7 +269,7 @@ export function AccountDetailDialog({
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Card className="border-gray-200 p-2 shadow-none">
                   <p className="text-[10px] text-gray-500">租金/押金</p>
                   <p className="mt-1 text-sm font-bold text-gray-900">
@@ -300,7 +300,7 @@ export function AccountDetailDialog({
               </h3>
 
               <Card className="p-2 border-gray-200 shadow-none">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div>
                     <p className="text-[10px] text-gray-600 mb-0.5">租金</p>
                     <p className="text-base font-bold text-gray-900">¥{account.actual_rental?.toFixed(2) || '0.00'}</p>
@@ -331,7 +331,7 @@ export function AccountDetailDialog({
                 账号信息
               </h3>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <div className="rounded-lg border border-gray-200 p-2">
                   <div className="mb-0.5 flex items-center gap-1 text-gray-600">
                     <Smartphone className="h-3 w-3" />
