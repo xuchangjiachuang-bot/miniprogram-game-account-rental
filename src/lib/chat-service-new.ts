@@ -36,6 +36,14 @@ export interface ChatMessageSummary {
 
 type ChatMemberRole = 'buyer' | 'seller' | 'admin';
 
+function normalizeMessagePreview(content: string, messageType?: string | null) {
+  if (messageType === 'image') {
+    return '[图片]';
+  }
+
+  return content;
+}
+
 function getGroupSortTime(group: { updatedAt?: string | null; createdAt?: string | null }) {
   return group.updatedAt || group.createdAt || '';
 }
@@ -157,6 +165,7 @@ async function loadLastMessages(groupIds: string[]) {
     .select({
       groupChatId: chatMessages.groupChatId,
       content: chatMessages.content,
+      messageType: chatMessages.messageType,
       senderType: chatMessages.senderType,
       createdAt: chatMessages.createdAt,
     })
@@ -168,7 +177,7 @@ async function loadLastMessages(groupIds: string[]) {
   for (const message of messages) {
     if (!map.has(message.groupChatId)) {
       map.set(message.groupChatId, {
-        content: message.content,
+        content: normalizeMessagePreview(message.content, message.messageType),
         sender: message.senderType === 'system' ? '系统' : message.senderType,
         time: message.createdAt || '',
       });
@@ -450,6 +459,7 @@ export async function sendGroupMessageForUser(params: {
   groupId: string;
   userId: string;
   content: string;
+  messageType?: 'text' | 'image';
 }): Promise<ChatMessageSummary> {
   const membership = await getMembershipRecord(params.groupId, params.userId);
   if (!membership) {
@@ -457,8 +467,14 @@ export async function sendGroupMessageForUser(params: {
   }
 
   const content = params.content.trim();
+  const messageType = params.messageType || 'text';
+
   if (!content) {
     throw new Error('CHAT_MESSAGE_EMPTY');
+  }
+
+  if (!['text', 'image'].includes(messageType)) {
+    throw new Error('CHAT_MESSAGE_TYPE_UNSUPPORTED');
   }
 
   const now = new Date().toISOString();
@@ -470,7 +486,7 @@ export async function sendGroupMessageForUser(params: {
       senderId: params.userId,
       senderType: membership.role as ChatMemberRole,
       content,
-      messageType: 'text',
+      messageType,
       createdAt: now,
     })
     .returning();
@@ -508,7 +524,7 @@ export async function sendMessage(params: {
   messageType?: 'text' | 'image' | 'system';
   content?: string;
 }) {
-  if (params.messageType && params.messageType !== 'text') {
+  if (params.messageType && !['text', 'image'].includes(params.messageType)) {
     throw new Error('CHAT_MESSAGE_TYPE_UNSUPPORTED');
   }
 
@@ -516,5 +532,6 @@ export async function sendMessage(params: {
     groupId: params.groupChatId,
     userId: params.userId,
     content: params.content || '',
+    messageType: (params.messageType as 'text' | 'image' | undefined) || 'text',
   });
 }

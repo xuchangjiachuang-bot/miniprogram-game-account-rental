@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       groupId,
       userId: user.id,
       content: typeof body.content === 'string' ? body.content : '',
+      messageType: body.messageType === 'image' ? 'image' : 'text',
     });
 
     return NextResponse.json({ success: true, data: message });
@@ -71,6 +72,10 @@ export async function POST(request: NextRequest) {
 
     if (error.message === 'CHAT_MESSAGE_EMPTY') {
       return NextResponse.json({ success: false, error: '消息内容不能为空' }, { status: 400 });
+    }
+
+    if (error.message === 'CHAT_MESSAGE_TYPE_UNSUPPORTED') {
+      return NextResponse.json({ success: false, error: '暂不支持该消息类型' }, { status: 400 });
     }
 
     console.error('[POST /api/chat/groups/[groupId]/messages] Error:', error);

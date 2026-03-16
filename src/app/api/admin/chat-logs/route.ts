@@ -148,6 +148,7 @@ export async function GET(request: NextRequest) {
       .select({
         groupChatId: chatMessages.groupChatId,
         content: chatMessages.content,
+        messageType: chatMessages.messageType,
         createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
@@ -161,7 +162,7 @@ export async function GET(request: NextRequest) {
     lastMessages.forEach(msg => {
       if (!processedGroups.has(msg.groupChatId)) {
         lastMessageMap.set(msg.groupChatId, {
-          content: msg.content,
+          content: msg.messageType === 'image' ? '[图片]' : msg.content,
           createdAt: msg.createdAt || new Date().toISOString()
         });
         processedGroups.add(msg.groupChatId);

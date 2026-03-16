@@ -34,6 +34,26 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+async function uploadChatImage(file: File): Promise<string> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', 'screenshot');
+
+  const response = await fetch('/api/storage/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.success || !payload.url) {
+    throw new Error(payload.error || '图片上传失败');
+  }
+
+  return payload.url as string;
+}
+
 function buildHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -74,6 +94,20 @@ export async function sendGroupMessage(groupId: string, content: string): Promis
       ...buildHeaders(),
     },
     body: JSON.stringify({ content }),
+  });
+
+  return parseJson(response);
+}
+
+export async function sendGroupImageMessage(groupId: string, file: File): Promise<ChatMessage> {
+  const imageUrl = await uploadChatImage(file);
+  const response = await fetch(`/api/chat/groups/${groupId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildHeaders(),
+    },
+    body: JSON.stringify({ content: imageUrl, messageType: 'image' }),
   });
 
   return parseJson(response);

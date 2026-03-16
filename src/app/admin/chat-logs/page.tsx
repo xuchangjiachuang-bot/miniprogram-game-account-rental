@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Bot, Clock, ImagePlus, Loader2, Search, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Search, User, Bot, Clock, ArrowLeft } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
-  orderId: string;
   sender: string;
   senderType: 'buyer' | 'seller' | 'admin' | 'system';
   senderName: string;
   content: string;
+  messageType?: 'text' | 'image' | 'system';
   timestamp: string;
 }
 
@@ -41,6 +41,50 @@ interface ChatGroup {
   status: 'active' | 'completed' | 'disputed' | 'unknown';
 }
 
+function formatDateTime(dateStr: string) {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'active':
+      return <Badge className="bg-purple-500">进行中</Badge>;
+    case 'completed':
+      return <Badge className="bg-green-500">已完成</Badge>;
+    case 'disputed':
+      return <Badge variant="destructive">争议中</Badge>;
+    default:
+      return <Badge variant="secondary">未知</Badge>;
+  }
+}
+
+function getSenderRoleBadge(role: string) {
+  switch (role) {
+    case 'buyer':
+      return <Badge className="bg-purple-500 text-xs">买家</Badge>;
+    case 'seller':
+      return <Badge className="bg-green-500 text-xs">卖家</Badge>;
+    case 'admin':
+      return <Badge className="bg-blue-500 text-xs">客服</Badge>;
+    case 'system':
+      return <Badge variant="secondary" className="text-xs">系统</Badge>;
+    default:
+      return <Badge variant="secondary" className="text-xs">未知</Badge>;
+  }
+}
+
+function getSenderIcon(role: string) {
+  return role === 'system' ? Bot : User;
+}
+
 export default function AdminChatLogs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'disputed'>('all');
@@ -50,11 +94,12 @@ export default function AdminChatLogs() {
   const [loading, setLoading] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const [uploadingReplyImage, setUploadingReplyImage] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const replyImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 获取聊天记录列表
   const fetchChatLogs = async () => {
     try {
       setLoading(true);
@@ -72,14 +117,9 @@ export default function AdminChatLogs() {
       }
 
       const response = await fetch(`/api/admin/chat-logs?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error('获取聊天记录失败');
-      }
-
       const result = await response.json();
 
-      if (!result.success) {
+      if (!response.ok || !result.success) {
         throw new Error(result.error || '获取聊天记录失败');
       }
 
@@ -95,19 +135,13 @@ export default function AdminChatLogs() {
     }
   };
 
-  // 获取聊天详情
   const fetchChatDetail = async (orderId: string) => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(orderId)}`);
-
-      if (!response.ok) {
-        throw new Error('获取聊天详情失败');
-      }
-
       const result = await response.json();
 
-      if (!result.success) {
+      if (!response.ok || !result.success) {
         throw new Error(result.error || '获取聊天详情失败');
       }
 
@@ -133,9 +167,9 @@ export default function AdminChatLogs() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: replyContent.trim() }),
       });
-
       const result = await response.json();
-      if (!result.success) {
+
+      if (!response.ok || !result.success) {
         throw new Error(result.error || '发送消息失败');
       }
 
@@ -150,94 +184,174 @@ export default function AdminChatLogs() {
     }
   };
 
+  const uploadChatImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'screenshot');
+
+    const response = await fetch('/api/storage/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (!response.ok || !result.success || !result.url) {
+      throw new Error(result.error || '图片上传失败');
+    }
+
+    return result.url as string;
+  };
+
+  const sendImageReply = async (file: File) => {
+    if (!selectedGroup) {
+      alert('请先进入一个群聊');
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('仅支持 JPG、PNG、WEBP 图片');
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('图片不能超过 3MB');
+      return;
+    }
+
+    try {
+      setUploadingReplyImage(true);
+      const imageUrl = await uploadChatImage(file);
+      const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(selectedGroup.orderId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: imageUrl, messageType: 'image' }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '发送图片失败');
+      }
+
+      await fetchChatDetail(selectedGroup.orderId);
+      await fetchChatLogs();
+    } catch (error: any) {
+      console.error('发送客服图片失败:', error);
+      alert(error.message || '发送图片失败');
+    } finally {
+      setUploadingReplyImage(false);
+      if (replyImageInputRef.current) {
+        replyImageInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleReplyPaste = async (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const item = Array.from(event.clipboardData.items).find((clipboardItem) => clipboardItem.type.startsWith('image/'));
+    if (!item) {
+      return;
+    }
+
+    const file = item.getAsFile();
+    if (!file) {
+      return;
+    }
+
+    event.preventDefault();
+    await sendImageReply(file);
+  };
+
   useEffect(() => {
     if (!selectedGroup) {
-      fetchChatLogs();
+      void fetchChatLogs();
     }
   }, [page, statusFilter]);
 
   useEffect(() => {
     if (selectedGroup) {
-      fetchChatDetail(selectedGroup.orderId);
+      void fetchChatDetail(selectedGroup.orderId);
     }
   }, [selectedGroup]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchChatLogs();
+    void fetchChatLogs();
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-purple-500">进行中</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-500">已完成</Badge>;
-      case 'disputed':
-        return <Badge variant="destructive">争议中</Badge>;
-      default:
-        return <Badge variant="secondary">未知</Badge>;
-    }
-  };
-
-  const getSenderRoleBadge = (role: string) => {
-    switch (role) {
-      case 'buyer':
-        return <Badge className="bg-purple-500 text-xs">买家</Badge>;
-      case 'seller':
-        return <Badge className="bg-green-500 text-xs">卖家</Badge>;
-      case 'admin':
-        return <Badge className="bg-purple-500 text-xs">管理员</Badge>;
-      case 'system':
-        return <Badge variant="secondary" className="text-xs">系统</Badge>;
-      default:
-        return <Badge variant="secondary" className="text-xs">未知</Badge>;
-    }
-  };
-
-  const getSenderIcon = (role: string) => {
-    return role === 'system' ? Bot : User;
-  };
+  const renderReplyComposer = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>客服回复</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <input
+          ref={replyImageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void sendImageReply(file);
+            }
+          }}
+        />
+        <Input
+          value={replyContent}
+          onChange={(event) => setReplyContent(event.target.value)}
+          onPaste={(event) => void handleReplyPaste(event)}
+          placeholder="输入客服消息，或直接粘贴二维码截图发送"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              void sendReply();
+            }
+          }}
+        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => replyImageInputRef.current?.click()}
+            disabled={sendingReply || uploadingReplyImage}
+          >
+            {uploadingReplyImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          </Button>
+          <Button
+            onClick={() => void sendReply()}
+            disabled={sendingReply || uploadingReplyImage || !replyContent.trim()}
+          >
+            {sendingReply ? '发送中...' : '发送客服消息'}
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500">支持 JPG、PNG、WEBP，最大 3MB，也支持截图后直接粘贴发送。</p>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">交易群聊天记录</h1>
-          <p className="text-sm text-gray-600 mt-1">查询和管理订单交易群聊记录</p>
+          <h1 className="text-2xl font-bold text-gray-900">交易群聊记录</h1>
+          <p className="mt-1 text-sm text-gray-600">查询和处理订单群聊记录</p>
         </div>
       </div>
 
-      {/* 筛选和搜索 */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="搜索订单号..."
+                  placeholder="搜索订单号"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyPress}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      handleSearch();
+                    }
+                  }}
                   className="pl-9"
                 />
               </div>
@@ -258,59 +372,55 @@ export default function AdminChatLogs() {
         </CardContent>
       </Card>
 
-      {/* 聊天群组列表 */}
-      {!selectedGroup && (
+      {!selectedGroup ? (
         <div className="space-y-4">
           {loading ? (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-8 text-gray-500">加载中...</div>
+                <div className="py-8 text-center text-gray-500">加载中...</div>
               </CardContent>
             </Card>
           ) : chatGroups.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-8 text-gray-500">暂无聊天记录</div>
+                <div className="py-8 text-center text-gray-500">暂无聊天记录</div>
               </CardContent>
             </Card>
           ) : (
             chatGroups.map((group) => (
-              <Card key={group.id} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={group.id} className="cursor-pointer transition-shadow hover:shadow-md">
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
+                      <div className="mb-3 flex items-center gap-3">
                         <div className="text-sm font-medium text-gray-500">{group.orderId}</div>
                         {getStatusBadge(group.status)}
                       </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">买家</div>
+                          <div className="mb-1 text-xs text-gray-500">买家</div>
                           <div className="text-sm font-medium">{group.buyer}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">卖家</div>
+                          <div className="mb-1 text-xs text-gray-500">卖家</div>
                           <div className="text-sm font-medium">{group.seller}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">消息数</div>
-                          <div className="text-sm font-medium">{group.messageCount}条</div>
+                          <div className="mb-1 text-xs text-gray-500">消息数</div>
+                          <div className="text-sm font-medium">{group.messageCount} 条</div>
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">创建时间</div>
+                          <div className="mb-1 text-xs text-gray-500">创建时间</div>
                           <div className="text-sm">{formatDateTime(group.createdAt)}</div>
                         </div>
                       </div>
-
-                      <div className="mt-3 pt-3 border-t">
+                      <div className="mt-3 border-t pt-3">
                         <div className="text-sm text-gray-600">
                           最后消息：<span className="font-medium">{group.lastMessage}</span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">{formatDateTime(group.lastMessageTime)}</div>
+                        <div className="mt-1 text-xs text-gray-500">{formatDateTime(group.lastMessageTime)}</div>
                       </div>
                     </div>
-
                     <Button
                       variant="outline"
                       size="sm"
@@ -325,72 +435,52 @@ export default function AdminChatLogs() {
             ))
           )}
 
-          {/* 分页 */}
-          {!loading && chatGroups.length > 0 && total > pageSize && (
-            <div className="flex justify-center gap-2 mt-4">
+          {!loading && chatGroups.length > 0 && total > pageSize ? (
+            <div className="mt-4 flex justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page === 1}
               >
                 上一页
               </Button>
-              <span className="text-sm text-gray-600 flex items-center">
+              <span className="flex items-center text-sm text-gray-600">
                 {page} / {Math.ceil(total / pageSize)}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => Math.min(Math.ceil(total / pageSize), p + 1))}
+                onClick={() => setPage((current) => Math.min(Math.ceil(total / pageSize), current + 1))}
                 disabled={page >= Math.ceil(total / pageSize)}
               >
                 下一页
               </Button>
             </div>
-          )}
+          ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>客服回复</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="以平台客服身份发送消息给买家和卖家"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    void sendReply();
-                  }
-                }}
-              />
-              <Button onClick={() => void sendReply()} disabled={sendingReply || !replyContent.trim()}>
-                {sendingReply ? '发送中...' : '发送客服消息'}
-              </Button>
-            </CardContent>
-          </Card>
+          {renderReplyComposer()}
         </div>
-      )}
-
-      {/* 聊天记录详情 */}
-      {selectedGroup && (
+      ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => {
-                setSelectedGroup(null);
-                setChatDetail(null);
-                setReplyContent('');
-              }}>
-                <ArrowLeft className="h-4 w-4 mr-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedGroup(null);
+                  setChatDetail(null);
+                  setReplyContent('');
+                }}
+              >
+                <ArrowLeft className="mr-1 h-4 w-4" />
                 返回
               </Button>
               <div>
                 <h3 className="text-lg font-semibold">{selectedGroup.orderId}</h3>
                 <div className="text-sm text-gray-600">
-                  {selectedGroup.buyer} ↔ {selectedGroup.seller}
+                  {selectedGroup.buyer} {'->'} {selectedGroup.seller}
                 </div>
               </div>
               {getStatusBadge(selectedGroup.status)}
@@ -400,7 +490,7 @@ export default function AdminChatLogs() {
           {loading ? (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-8 text-gray-500">加载中...</div>
+                <div className="py-8 text-center text-gray-500">加载中...</div>
               </CardContent>
             </Card>
           ) : chatDetail && chatDetail.messages.length > 0 ? (
@@ -415,39 +505,57 @@ export default function AdminChatLogs() {
                     const isSystem = message.senderType === 'system';
 
                     return (
-                      <div
-                        key={message.id}
-                        className={`flex gap-3 ${isSystem ? 'justify-center' : ''}`}
-                      >
-                        {!isSystem && (
+                      <div key={message.id} className={`flex gap-3 ${isSystem ? 'justify-center' : ''}`}>
+                        {!isSystem ? (
                           <div className="flex-shrink-0">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              message.senderType === 'buyer' ? 'bg-purple-100' :
-                              message.senderType === 'seller' ? 'bg-green-100' : 'bg-purple-100'
-                            }`}>
+                            <div
+                              className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                                message.senderType === 'buyer'
+                                  ? 'bg-purple-100'
+                                  : message.senderType === 'seller'
+                                    ? 'bg-green-100'
+                                    : 'bg-blue-100'
+                              }`}
+                            >
                               <SenderIcon className="h-4 w-4 text-gray-600" />
                             </div>
                           </div>
-                        )}
+                        ) : null}
                         <div className={`flex-1 ${isSystem ? 'max-w-2xl' : ''}`}>
-                          <div className={`flex items-center gap-2 mb-1 ${isSystem ? 'justify-center' : ''}`}>
-                            {!isSystem && (
+                          <div className={`mb-1 flex items-center gap-2 ${isSystem ? 'justify-center' : ''}`}>
+                            {!isSystem ? (
                               <>
                                 <span className="text-sm font-medium">{message.senderName}</span>
                                 {getSenderRoleBadge(message.senderType)}
                               </>
-                            )}
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                            ) : null}
+                            <span className="flex items-center gap-1 text-xs text-gray-500">
                               <Clock className="h-3 w-3" />
                               {formatDateTime(message.timestamp)}
                             </span>
                           </div>
-                          <div className={`p-3 rounded-lg ${
-                            isSystem ? 'bg-gray-100 text-center text-sm' :
-                            message.senderType === 'buyer' ? 'bg-purple-50' :
-                            message.senderType === 'seller' ? 'bg-green-50' : 'bg-purple-50'
-                          }`}>
-                            {message.content}
+                          <div
+                            className={`rounded-lg p-3 ${
+                              isSystem
+                                ? 'bg-gray-100 text-center text-sm'
+                                : message.senderType === 'buyer'
+                                  ? 'bg-purple-50'
+                                  : message.senderType === 'seller'
+                                    ? 'bg-green-50'
+                                    : 'bg-blue-50'
+                            }`}
+                          >
+                            {message.messageType === 'image' ? (
+                              <a href={message.content} target="_blank" rel="noreferrer">
+                                <img
+                                  src={message.content}
+                                  alt="聊天图片"
+                                  className="max-h-72 max-w-full rounded-lg object-contain"
+                                />
+                              </a>
+                            ) : (
+                              message.content
+                            )}
                           </div>
                         </div>
                       </div>
@@ -459,31 +567,12 @@ export default function AdminChatLogs() {
           ) : (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-8 text-gray-500">暂无聊天消息</div>
+                <div className="py-8 text-center text-gray-500">暂无聊天消息</div>
               </CardContent>
             </Card>
           )}
-          <Card>
-            <CardHeader>
-              <CardTitle>客服回复</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="以平台客服身份发送消息给买家和卖家"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    void sendReply();
-                  }
-                }}
-              />
-              <Button onClick={() => void sendReply()} disabled={sendingReply || !replyContent.trim()}>
-                {sendingReply ? '发送中...' : '发送客服消息'}
-              </Button>
-            </CardContent>
-          </Card>
+
+          {renderReplyComposer()}
         </div>
       )}
     </div>

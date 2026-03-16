@@ -44,6 +44,7 @@ export function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false); // 标记 logo 是否已加载
   const router = useRouter();
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -171,13 +172,26 @@ export function Header() {
     if (!user?.id) return;
 
     try {
-      const res = await fetch(`/api/notifications?userId=${user.id}&includeRead=false`);
+      setNotificationsLoading(true);
+      const token = getToken();
+      const res = await fetch('/api/notifications/list?limit=20&offset=0', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      });
       const result = await res.json();
-      if (result.success && result.data) {
-        setNotifications(result.data);
+      if (result.success) {
+        const list = Array.isArray(result.notifications)
+          ? result.notifications
+          : Array.isArray(result.data)
+            ? result.data
+            : [];
+        const unreadOnly = list.filter((item: any) => !(item.isRead ?? item.is_read));
+        setNotifications(unreadOnly);
       }
     } catch (error) {
       console.error('加载通知列表失败:', error);
+    } finally {
+      setNotificationsLoading(false);
     }
   };
 
@@ -370,7 +384,11 @@ export function Header() {
                       )}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {notifications.length === 0 ? (
+                    {notificationsLoading ? (
+                      <div className="p-4 text-center text-sm text-gray-500">
+                        正在加载通知...
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="p-4 text-center text-sm text-gray-500">
                         暂无通知
                       </div>

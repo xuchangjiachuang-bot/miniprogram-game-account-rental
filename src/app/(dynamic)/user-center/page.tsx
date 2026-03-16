@@ -647,6 +647,19 @@ export default function UserCenterPage() {
     }
   };
 
+  const canEnterOrderChat = (status: string) => {
+    return [
+      'paid',
+      'active',
+      'pending_verification',
+      'pending_consumption_confirm',
+      'completed',
+      'disputed',
+      'refunding',
+      'refunded',
+    ].includes(status);
+  };
+
   // 充值
   const handleRecharge = async () => {
     if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) {
@@ -1506,6 +1519,34 @@ export default function UserCenterPage() {
                             <span>
                               {formatServerDateTime(order.created_at)}
                             </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {canEnterOrderChat(String(order.status)) ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setActiveTab('chats');
+                                  setPendingChatTarget({ orderId: order.id });
+                                }}
+                              >
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                进入群聊
+                              </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                window.location.href = `/orders/${order.id}`;
+                              }}
+                            >
+                              查看详情
+                            </Button>
                           </div>
                         </div>
                       ))}

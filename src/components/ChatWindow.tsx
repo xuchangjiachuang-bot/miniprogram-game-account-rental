@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { MessageSquare, Send } from 'lucide-react';
+import { ImagePlus, Loader2, MessageSquare, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@/contexts/UserContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,12 +11,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getGroupMessages, sendGroupMessage, type ChatGroup, type ChatMessage } from '@/lib/chat-service';
+import {
+  getGroupMessages,
+  sendGroupImageMessage,
+  sendGroupMessage,
+  type ChatGroup,
+  type ChatMessage,
+} from '@/lib/chat-service';
 
 interface ChatWindowProps {
   group: ChatGroup;
   onClose?: () => void;
 }
+
+const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
+const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function ChatWindow({ group, onClose }: ChatWindowProps) {
   const { user } = useUser();
@@ -24,7 +33,9 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const title = useMemo(() => group.orderTitle || '订单群聊', [group.orderTitle]);
 
@@ -70,7 +81,7 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
 
   const handleSend = async () => {
     const content = newMessage.trim();
-    if (!content || sending) {
+    if (!content || sending || uploadingImage) {
       return;
     }
 
@@ -86,6 +97,62 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
     } finally {
       setSending(false);
     }
+  };
+
+  const validateImageFile = (file: File) => {
+    if (!ACCEPTED_CHAT_IMAGE_TYPES.includes(file.type)) {
+      throw new Error('仅支持 JPG、PNG、WEBP 图片');
+    }
+
+    if (file.size > MAX_CHAT_IMAGE_SIZE) {
+      throw new Error('图片不能超过 3MB');
+    }
+  };
+
+  const handleSendImageFile = async (file: File) => {
+    try {
+      validateImageFile(file);
+      setUploadingImage(true);
+      const message = await sendGroupImageMessage(group.id, file);
+      setMessages((current) => [...current, message]);
+      scrollToBottom();
+      toast.success('图片发送成功');
+    } catch (error: any) {
+      console.error('发送图片消息失败:', error);
+      toast.error(error?.message || '发送图片消息失败');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    await handleSendImageFile(file);
+  };
+
+  const handlePaste = async (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const item = Array.from(event.clipboardData.items).find((clipboardItem) =>
+      clipboardItem.type.startsWith('image/'),
+    );
+
+    if (!item) {
+      return;
+    }
+
+    const file = item.getAsFile();
+    if (!file) {
+      return;
+    }
+
+    event.preventDefault();
+    await handleSendImageFile(file);
   };
 
   const formatTime = (value: string) => {
@@ -106,7 +173,7 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
         <div className="min-w-0">
           <CardTitle className="truncate text-lg font-medium">{title}</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            下单后自动创建，仅订单买卖双方可见
+            下单后自动创建，买家、卖家和平台客服都可以在这里沟通。
           </p>
         </div>
         {onClose ? (
@@ -159,7 +226,17 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
                           : 'rounded-2xl rounded-tl-sm bg-muted px-4 py-2 text-sm text-foreground'
                       }
                     >
-                      {message.content}
+                      {message.messageType === 'image' ? (
+                        <a href={message.content} target="_blank" rel="noreferrer">
+                          <img
+                            src={message.content}
+                            alt="聊天图片"
+                            className="max-h-72 max-w-full rounded-lg object-contain"
+                          />
+                        </a>
+                      ) : (
+                        message.content
+                      )}
                     </div>
                     <span className="mt-1 text-xs text-muted-foreground">{formatTime(message.createdAt)}</span>
                   </div>
@@ -171,11 +248,19 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
       </ScrollArea>
 
       <div className="border-t p-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_CHAT_IMAGE_TYPES.join(',')}
+          className="hidden"
+          onChange={(event) => void handleFileChange(event)}
+        />
         <div className="flex gap-2">
           <Input
             value={newMessage}
             onChange={(event) => setNewMessage(event.target.value)}
-            placeholder="输入消息，和订单另一方沟通"
+            onPaste={(event) => void handlePaste(event)}
+            placeholder="输入消息，或直接粘贴二维码截图发送"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
@@ -183,10 +268,21 @@ export function ChatWindow({ group, onClose }: ChatWindowProps) {
               }
             }}
           />
-          <Button onClick={() => void handleSend()} disabled={!newMessage.trim() || sending}>
-            <Send className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending || uploadingImage}
+          >
+            {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          </Button>
+          <Button onClick={() => void handleSend()} disabled={!newMessage.trim() || sending || uploadingImage}>
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          支持 JPG、PNG、WEBP，最大 3MB，也支持截图后直接粘贴发送。
+        </p>
       </div>
     </Card>
   );
