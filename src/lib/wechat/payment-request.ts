@@ -72,7 +72,7 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
   }
 
   const { order, buyer } = orderList[0];
-  if (['paid', 'completed'].includes(order.status || '')) {
+  if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status || '')) {
     throw new Error('ORDER_ALREADY_PAID');
   }
   if (order.status === 'cancelled') {

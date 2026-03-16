@@ -234,7 +234,7 @@ function WechatJSAPIPaymentContent() {
           status: orderResult.data.status,
         });
 
-        if (['paid', 'completed'].includes(orderResult.data.status || '')) {
+        if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(orderResult.data.status || '')) {
           setPaymentStatus('success');
           setPolling(true);
         }
@@ -345,7 +345,11 @@ function WechatJSAPIPaymentContent() {
         });
         const result = await parseJsonResponse<any>(response);
 
-        if (result.success && result.data && ['paid', 'completed'].includes(result.data.status || '')) {
+        if (
+          result.success
+          && result.data
+          && ['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(result.data.status || '')
+        ) {
           setPolling(false);
           router.push(`/orders/${orderId}`);
           return true;
