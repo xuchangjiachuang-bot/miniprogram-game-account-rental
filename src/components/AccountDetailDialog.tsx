@@ -76,18 +76,25 @@ function normalizeLoginMethod(value?: string) {
 }
 
 function getImageList(account: any) {
-  if (!Array.isArray(account?.images)) {
-    return [];
+  const sources = [account?.images, account?.screenshots];
+
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      const items = source.filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
+      if (items.length > 0) {
+        return items;
+      }
+    }
   }
 
-  return account.images.filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
+  return [];
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
-      <span className="text-xs leading-5 text-slate-500">{label}</span>
-      <span className="text-sm font-medium leading-5 text-slate-900 break-all sm:break-normal">{value}</span>
+    <div className="grid grid-cols-[82px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+      <span className="text-[12px] leading-4 text-slate-500">{label}</span>
+      <span className="text-sm font-medium leading-4 text-slate-900 break-all sm:break-normal">{value}</span>
     </div>
   );
 }
@@ -96,10 +103,12 @@ function MetricCard({
   label,
   value,
   tone = 'slate',
+  compact = false,
 }: {
   label: string;
   value: string;
   tone?: 'slate' | 'orange' | 'violet' | 'emerald';
+  compact?: boolean;
 }) {
   const className =
     tone === 'orange'
@@ -111,9 +120,11 @@ function MetricCard({
           : 'border-slate-200 bg-slate-50 text-slate-700';
 
   return (
-    <Card className={`rounded-xl border p-3 shadow-none ${className}`}>
-      <div className="text-[11px] font-medium">{label}</div>
-      <div className="mt-1 text-lg font-bold leading-none sm:text-xl">{value}</div>
+    <Card className={`rounded-2xl border px-4 py-3 shadow-none ${className}`}>
+      <div className="text-[11px] font-medium tracking-[0.01em]">{label}</div>
+      <div className={`mt-2 font-bold leading-none ${compact ? 'whitespace-nowrap text-[1.05rem] sm:text-[1.45rem]' : 'text-xl sm:text-[1.9rem]'}`}>
+        {value}
+      </div>
     </Card>
   );
 }
@@ -128,8 +139,8 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="rounded-xl border-slate-200 p-3 shadow-none">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+    <Card className="rounded-2xl border border-slate-200/90 bg-slate-50/55 p-3 shadow-none">
+      <div className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-slate-900">
         {icon}
         {title}
       </div>
@@ -184,15 +195,9 @@ export function AccountDetailDialog({
   const summaryRows = [
     { label: '保险箱', value: getTextValue(account.safebox) },
     { label: '体力 / 负重', value: `${getTextValue(account.stamina_level)} / ${getTextValue(account.load_level)}` },
-    { label: '等级', value: `Lv.${getTextValue(account.account_level)}` },
-    { label: '段位', value: getRankText(account.rank) },
     { label: 'KD', value: getTextValue(account.kd) },
-    { label: '租期', value: rentalDisplay },
     { label: '可上号时间', value: availableTime },
-    { label: '地区', value: region },
-  ];
-
-  const gameRows = [
+    { label: '账号等级', value: `${getTextValue(account.account_level)}级` },
     { label: 'AWM 子弹', value: getTextValue(account.customAttributes?.awmBullets || account.awm_bullets) },
     { label: '6头数量', value: getTextValue(account.customAttributes?.level6Helmet || account.level6_helmet) },
     { label: '6甲数量', value: getTextValue(account.customAttributes?.level6Armor || account.level6_armor) },
@@ -211,17 +216,13 @@ export function AccountDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl p-0 sm:w-[96vw] sm:max-w-[1100px]">
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-3 p-3 pb-4 sm:p-4">
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[28px] border-none bg-transparent p-0 shadow-none sm:w-[96vw] sm:max-w-[1100px]">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="space-y-3 p-3 pb-3 sm:p-4">
               {currentImage ? (
-                <div className="relative border-b border-slate-200 bg-slate-950/5">
-                  <div
-                    className="absolute inset-0 scale-105 bg-cover bg-center opacity-20 blur-2xl"
-                    style={{ backgroundImage: `url(${currentImage})` }}
-                  />
-                  <div className="relative h-[220px] w-full px-3 py-3 sm:h-[260px] sm:px-4 sm:py-4 lg:h-[300px]">
+                <div className="relative border-b border-slate-200 bg-white">
+                  <div className="relative flex h-[210px] w-full items-center justify-center overflow-hidden px-3 py-3 sm:h-[240px] sm:px-4 sm:py-4 lg:h-[260px]">
                     {imageError ? (
                       <div className="flex h-full items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-500">
                         图片加载失败
@@ -230,7 +231,7 @@ export function AccountDetailDialog({
                       <img
                         src={currentImage}
                         alt={`${accountTitle}-${currentImageIndex + 1}`}
-                        className="h-full w-full rounded-xl object-contain"
+                        className="max-h-full max-w-full rounded-xl object-contain shadow-[0_8px_30px_rgba(15,23,42,0.08)]"
                         onError={() => setImageError(true)}
                       />
                     )}
@@ -270,126 +271,108 @@ export function AccountDetailDialog({
                 </div>
               ) : null}
 
-              <div className="space-y-3 p-3 sm:p-4">
+              <div className="space-y-3">
                 <div className="space-y-2">
                   <DialogHeader className="space-y-0">
-                    <DialogTitle className="text-lg font-semibold leading-7 text-slate-900 sm:text-xl">
+                    <DialogTitle className="text-lg font-semibold leading-7 text-slate-900 sm:text-[1.9rem] sm:leading-9">
                       {accountTitle}
                     </DialogTitle>
                   </DialogHeader>
 
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                    <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[12px] text-blue-700">
                       {platform}
                     </Badge>
-                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">
+                    <Badge variant="outline" className="rounded-full border-violet-200 bg-violet-50 px-2.5 py-0.5 text-[12px] text-violet-700">
                       {loginMethod}
                     </Badge>
-                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+                    <Badge variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[12px] text-slate-700">
                       {region}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
                   <MetricCard label="哈夫币" value={coinsDisplay} tone="orange" />
                   <MetricCard label="比例" value={ratioValue} tone="violet" />
-                  <MetricCard label="租金 / 押金" value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`} />
+                  <MetricCard label="租金 / 押金" value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`} compact />
                   <MetricCard label="总价" value={`¥${getMoney(account.total_price)}`} tone="emerald" />
+                  <MetricCard label="租期" value={rentalDisplay} />
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="grid gap-3">
-                    <SectionCard title="基本信息" icon={<Smartphone className="h-4 w-4 text-blue-600" />}>
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {summaryRows.map((item) => (
-                          <InfoRow key={item.label} label={item.label} value={item.value} />
-                        ))}
-                      </div>
-                    </SectionCard>
+                <SectionCard title="账号概览" icon={<Smartphone className="h-4 w-4 text-blue-600" />}>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    {summaryRows.map((item) => (
+                      <InfoRow key={item.label} label={item.label} value={item.value} />
+                    ))}
+                  </div>
+                </SectionCard>
 
-                    {(description || remark) ? (
-                      <div className="grid gap-3 xl:grid-cols-2">
-                        {description ? (
-                          <SectionCard title="账号描述" icon={<Star className="h-4 w-4 text-amber-500" />}>
-                            <div className="text-sm leading-6 text-slate-700">{description}</div>
-                          </SectionCard>
-                        ) : null}
+                <SectionCard title="皮肤信息" icon={<Shield className="h-4 w-4 text-pink-500" />}>
+                  {skins.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {skins.map((skin: string, index: number) => (
+                        <Badge
+                          key={`${skin}-${index}`}
+                          variant="outline"
+                          className="rounded-full border-pink-200 bg-pink-50 px-2.5 py-0.5 text-[12px] text-pink-700"
+                        >
+                          {skin}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-400">暂无皮肤信息</div>
+                  )}
+                </SectionCard>
 
-                        {remark ? (
-                          <SectionCard title="备注信息" icon={<Shield className="h-4 w-4 text-pink-500" />}>
-                            <div className="text-sm leading-6 text-slate-700">{remark}</div>
-                          </SectionCard>
-                        ) : null}
-                      </div>
+                {description || remark ? (
+                  <div className="grid items-start gap-3 xl:grid-cols-2">
+                    {description ? (
+                      <SectionCard title="账号描述" icon={<Star className="h-4 w-4 text-amber-500" />}>
+                        <div className="text-sm leading-6 text-slate-700">{description}</div>
+                      </SectionCard>
+                    ) : null}
+
+                    {remark ? (
+                      <SectionCard title="备注信息" icon={<Shield className="h-4 w-4 text-pink-500" />}>
+                        <div className="text-sm leading-6 text-slate-700">{remark}</div>
+                      </SectionCard>
                     ) : null}
                   </div>
-
-                  <div className="grid gap-3">
-                    <SectionCard title="账号属性" icon={<Star className="h-4 w-4 text-amber-500" />}>
-                      <div className="grid gap-2">
-                        <InfoRow label="平台" value={platform} />
-                        <InfoRow label="上号方式" value={loginMethod} />
-                        <InfoRow label="段位" value={getRankText(account.rank)} />
-                        <InfoRow label="等级" value={`${getTextValue(account.account_level)}级`} />
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard title="游戏道具" icon={<Target className="h-4 w-4 text-emerald-600" />}>
-                      <div className="grid gap-2">
-                        {gameRows.map((item) => (
-                          <InfoRow key={item.label} label={item.label} value={item.value} />
-                        ))}
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard title="皮肤信息" icon={<Shield className="h-4 w-4 text-pink-500" />}>
-                      {skins.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {skins.map((skin: string, index: number) => (
-                            <Badge key={`${skin}-${index}`} variant="outline" className="border-pink-200 bg-pink-50 text-pink-700">
-                              {skin}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-slate-400">暂无皮肤信息</div>
-                      )}
-                    </SectionCard>
-                  </div>
-                </div>
+                ) : null}
               </div>
-            </section>
-          </div>
-        </ScrollArea>
-
-        <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-3 sm:px-4 sm:py-3">
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
-              关闭
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
-              onClick={handleOrderClick}
-            >
-              <Check className="mr-2 h-4 w-4" />
-              立即下单
-            </Button>
-          </div>
-
-          {!isLoggedIn ? (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-              请先登录后再下单
             </div>
-          ) : null}
+          </ScrollArea>
 
-          {isLoggedIn && !isVerified ? (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
-              请先完成实名认证后再进行下单
+          <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white px-3 pb-3 pt-2.5 sm:px-4 sm:pb-4 sm:pt-3">
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="h-11 flex-1 rounded-xl" onClick={() => onOpenChange(false)}>
+                关闭
+              </Button>
+              <Button
+                type="button"
+                className="h-11 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
+                onClick={handleOrderClick}
+              >
+                <Check className="mr-2 h-4 w-4" />
+                立即下单
+              </Button>
             </div>
-          ) : null}
-        </div>
+
+            {!isLoggedIn ? (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
+                请先登录后再下单
+              </div>
+            ) : null}
+
+            {isLoggedIn && !isVerified ? (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
+                请先完成实名认证后再进行下单
+              </div>
+            ) : null}
+          </div>
+        </section>
       </DialogContent>
     </Dialog>
   );
