@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, admins, orders, users, groupChats, chatMessages } from '@/lib/db';
 import { eq, desc, and, like, count, sql, inArray } from 'drizzle-orm';
+import { formatServerDateTime } from '@/lib/time';
 
 /**
  * 获取聊天记录列表（基于订单群聊）
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
       if (!processedGroups.has(msg.groupChatId)) {
         lastMessageMap.set(msg.groupChatId, {
           content: msg.messageType === 'image' ? '[图片]' : msg.content,
-          createdAt: msg.createdAt || new Date().toISOString()
+          createdAt: formatServerDateTime(msg.createdAt || new Date().toISOString())
         });
         processedGroups.add(msg.groupChatId);
       }
@@ -187,9 +188,9 @@ export async function GET(request: NextRequest) {
         orderId: order.orderNo,
         buyer: buyer?.nickname || buyer?.phone || '未知',
         seller: seller?.nickname || seller?.phone || '未知',
-        createdAt: chat.createdAt,
+        createdAt: formatServerDateTime(chat.createdAt),
         lastMessage: lastMsg?.content || '群聊已创建',
-        lastMessageTime: lastMsg?.createdAt || chat.updatedAt,
+        lastMessageTime: lastMsg?.createdAt || formatServerDateTime(chat.updatedAt),
         messageCount: messageStatsMap.get(chat.id) || 0,
         status: ['active', 'pending_verification', 'pending_consumption_confirm'].includes(order.status || '') ? 'active' :
                 order.status === 'completed' ? 'completed' :

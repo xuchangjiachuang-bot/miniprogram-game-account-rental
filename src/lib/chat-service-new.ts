@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { accounts, chatMessages, db, groupChatMembers, groupChats, orders, users } from '@/lib/db';
 import { ensurePlatformCustomerServiceMember } from '@/lib/platform-customer-service-user';
 import { resolveStoredFileReference } from '@/lib/storage-service';
+import { formatServerDateTime } from '@/lib/time';
 
 export interface ChatGroupMemberSummary {
   id: string;
@@ -180,7 +181,7 @@ async function loadLastMessages(groupIds: string[]) {
       map.set(message.groupChatId, {
         content: normalizeMessagePreview(message.content, message.messageType),
         sender: message.senderType === 'system' ? '系统' : message.senderType,
-        time: message.createdAt || '',
+        time: formatServerDateTime(message.createdAt || ''),
       });
     }
   }
@@ -413,7 +414,7 @@ export async function getMessage(messageId: string): Promise<ChatMessageSummary 
         ? (await resolveStoredFileReference(message.content)) || message.content
         : message.content,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-    createdAt: message.createdAt || '',
+    createdAt: formatServerDateTime(message.createdAt || ''),
   };
 }
 
@@ -459,7 +460,7 @@ export async function getGroupMessagesForUser(
           ? (await resolveStoredFileReference(message.content)) || message.content
           : message.content,
       messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-      createdAt: message.createdAt || '',
+      createdAt: formatServerDateTime(message.createdAt || ''),
     })),
   );
 }
@@ -526,7 +527,7 @@ export async function sendGroupMessageForUser(params: {
         ? (await resolveStoredFileReference(message.content)) || message.content
         : message.content,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-    createdAt: message.createdAt || now,
+    createdAt: formatServerDateTime(message.createdAt || now),
   };
 }
 

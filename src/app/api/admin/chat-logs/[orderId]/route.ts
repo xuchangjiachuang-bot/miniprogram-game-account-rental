@@ -4,6 +4,7 @@ import { admins, chatMessages, db, groupChats, orders, users } from '@/lib/db';
 import { resolveStoredFileReference } from '@/lib/storage-service';
 import { ensureOrderGroupChat, sendGroupMessageForUser } from '@/lib/chat-service-new';
 import { ensurePlatformCustomerServiceUser } from '@/lib/platform-customer-service-user';
+import { formatServerDateTime } from '@/lib/time';
 
 async function requireAdminToken(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -99,7 +100,7 @@ export async function GET(
               ? (await resolveStoredFileReference(message.content)) || message.content
               : message.content,
           messageType: message.messageType || 'text',
-          timestamp: message.createdAt,
+          timestamp: formatServerDateTime(message.createdAt),
         };
       }),
     );
