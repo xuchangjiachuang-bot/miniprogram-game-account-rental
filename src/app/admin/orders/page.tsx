@@ -74,6 +74,26 @@ interface Order {
 
 const PAGE_SIZE = 20;
 
+function formatRentalDuration(duration?: number | null) {
+  const hours = Number(duration || 0);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return '--';
+  }
+
+  if (hours % 24 === 0) {
+    return `${hours} 小时（${hours / 24} 天）`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remainHours = hours % 24;
+
+  if (days <= 0) {
+    return `${hours} 小时`;
+  }
+
+  return `${hours} 小时（${days} 天 ${remainHours} 小时）`;
+}
+
 function formatMoney(value?: string | number | null) {
   return `¥${Number(value || 0).toFixed(2)}`;
 }
@@ -337,7 +357,7 @@ export default function AdminOrders() {
                       <InfoBlock label="租金" value={formatMoney(order.rentalPrice)} strong />
                       <InfoBlock label="押金" value={formatMoney(order.deposit)} />
                       <InfoBlock label="总额" value={formatMoney(order.totalPrice)} strong valueClassName="text-green-600" />
-                      <InfoBlock label="租期" value={`${order.rentalDuration} 天`} />
+                      <InfoBlock label="租期" value={formatRentalDuration(order.rentalDuration)} />
                     </div>
 
                     <div className="text-sm text-gray-500">
@@ -393,7 +413,7 @@ export default function AdminOrders() {
                   <p><span className="text-gray-500">租金：</span>{formatMoney(selectedOrder.rentalPrice)}</p>
                   <p><span className="text-gray-500">押金：</span>{formatMoney(selectedOrder.deposit)}</p>
                   <p><span className="text-gray-500">总额：</span>{formatMoney(selectedOrder.totalPrice)}</p>
-                  <p><span className="text-gray-500">租期：</span>{selectedOrder.rentalDuration} 天</p>
+                  <p><span className="text-gray-500">租期：</span>{formatRentalDuration(selectedOrder.rentalDuration)}</p>
                 </div>
               </section>
 
