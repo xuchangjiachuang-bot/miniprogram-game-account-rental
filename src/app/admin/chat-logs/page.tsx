@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatServerDateTime } from '@/lib/time';
 
 interface ChatMessage {
   id: string;
@@ -45,21 +46,7 @@ const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function formatDateTime(dateStr: string) {
-  if (!dateStr) return '-';
-
-  try {
-    return new Date(dateStr).toLocaleString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return dateStr;
-  }
+  return formatServerDateTime(dateStr);
 }
 
 function getStatusBadge(status: string) {

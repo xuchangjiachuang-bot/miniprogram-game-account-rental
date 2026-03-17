@@ -413,11 +413,7 @@ export async function resolveStoredFileReference(
     return normalizeBrowserUrl(normalizedReference);
   }
 
-  if (await fileExists(normalizedReference)) {
-    return buildAppFileUrl(normalizedReference);
-  }
-
-  return generateFileUrl(normalizedReference, expireTime);
+  return buildAppFileUrl(normalizedReference);
 }
 
 export { inferContentType };

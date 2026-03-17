@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatServerDateTime } from '@/lib/time';
 import {
   getGroupMessages,
   sendGroupImageMessage,
@@ -27,23 +28,7 @@ const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function formatBeijingTime(value: string) {
-  if (!value) {
-    return '';
-  }
-
-  try {
-    return new Date(value).toLocaleString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return value;
-  }
+  return formatServerDateTime(value);
 }
 
 export function ChatWindow({ group, onClose, onMessageSent }: ChatWindowProps) {
