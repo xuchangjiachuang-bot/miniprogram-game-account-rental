@@ -104,13 +104,15 @@ function MetricCard({
   value,
   tone = 'slate',
   compact = false,
+  className = '',
 }: {
   label: string;
   value: string;
   tone?: 'slate' | 'orange' | 'violet' | 'emerald';
   compact?: boolean;
+  className?: string;
 }) {
-  const className =
+  const toneClassName =
     tone === 'orange'
       ? 'border-orange-200 bg-orange-50 text-orange-700'
       : tone === 'violet'
@@ -120,9 +122,11 @@ function MetricCard({
           : 'border-slate-200 bg-slate-50 text-slate-700';
 
   return (
-    <Card className={`rounded-2xl border px-4 py-3 shadow-none ${className}`}>
+    <Card className={`rounded-2xl border px-4 py-3 shadow-none ${toneClassName} ${className}`}>
       <div className="text-[11px] font-medium tracking-[0.01em]">{label}</div>
-      <div className={`mt-2 font-bold leading-none ${compact ? 'whitespace-nowrap text-[1.05rem] sm:text-[1.45rem]' : 'text-xl sm:text-[1.9rem]'}`}>
+      <div
+        className={`mt-2 font-bold leading-none ${compact ? 'whitespace-nowrap text-[0.95rem] sm:text-[1.15rem] lg:text-[1.3rem] tracking-tight' : 'text-xl sm:text-[1.9rem]'}`}
+      >
         {value}
       </div>
     </Card>
@@ -292,10 +296,15 @@ export function AccountDetailDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
                   <MetricCard label="哈夫币" value={coinsDisplay} tone="orange" />
                   <MetricCard label="比例" value={ratioValue} tone="violet" />
-                  <MetricCard label="租金 / 押金" value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`} compact />
+                  <MetricCard
+                    label="租金 / 押金"
+                    value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`}
+                    compact
+                    className="lg:col-span-2"
+                  />
                   <MetricCard label="总价" value={`¥${getMoney(account.total_price)}`} tone="emerald" />
                   <MetricCard label="租期" value={rentalDisplay} />
                 </div>
