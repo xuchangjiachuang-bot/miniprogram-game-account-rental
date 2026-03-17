@@ -413,6 +413,10 @@ export async function resolveStoredFileReference(
     return normalizeBrowserUrl(normalizedReference);
   }
 
+  if (hasRemoteStorageConfig()) {
+    return generateFileUrl(normalizedReference, expireTime);
+  }
+
   return buildAppFileUrl(normalizedReference);
 }
 
