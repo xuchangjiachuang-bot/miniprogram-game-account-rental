@@ -44,6 +44,18 @@ interface ChatGroup {
   status: 'active' | 'completed' | 'disputed' | 'unknown';
 }
 
+interface SentChatMessageResponse {
+  id: string;
+  senderId?: string;
+  senderType?: 'buyer' | 'seller' | 'admin' | 'system';
+  senderName?: string;
+  content?: string;
+  fileKey?: string;
+  imageUrl?: string;
+  messageType?: 'text' | 'image' | 'system';
+  createdAt?: string;
+}
+
 const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -222,6 +234,48 @@ export default function AdminChatLogs() {
     };
   };
 
+  const applySentMessage = (message: SentChatMessageResponse) => {
+    if (!selectedGroup || !message.id) {
+      return;
+    }
+
+    const normalizedMessage: ChatMessage = {
+      id: message.id,
+      sender: message.senderId || 'admin',
+      senderType: message.senderType || 'admin',
+      senderName: message.senderName || '客服',
+      content: message.messageType === 'image' ? '' : message.content || '',
+      fileKey: message.fileKey,
+      imageUrl: message.imageUrl,
+      messageType: message.messageType || 'text',
+      timestamp: message.createdAt || new Date().toISOString(),
+    };
+
+    setChatDetail((current) => {
+      if (!current || current.orderId !== selectedGroup.orderId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        messages: [...current.messages, normalizedMessage],
+      };
+    });
+
+    setChatGroups((current) =>
+      current.map((group) =>
+        group.orderId === selectedGroup.orderId
+          ? {
+              ...group,
+              lastMessage: normalizedMessage.messageType === 'image' ? '[图片]' : normalizedMessage.content,
+              lastMessageTime: normalizedMessage.timestamp,
+              messageCount: group.messageCount + 1,
+            }
+          : group,
+      ),
+    );
+  };
+
   const sendReply = async () => {
     const content = replyContent.trim();
     const hasPendingImage = Boolean(pendingReplyImageFile);
@@ -247,6 +301,7 @@ export default function AdminChatLogs() {
           throw new Error(imageResult.error || '发送图片失败');
         }
 
+        applySentMessage(imageResult.data || {});
         clearPendingReplyImage();
         setUploadingReplyImage(false);
       }
@@ -263,13 +318,11 @@ export default function AdminChatLogs() {
           throw new Error(result.error || '发送消息失败');
         }
 
+        applySentMessage(result.data || {});
         setReplyContent('');
       }
-
-      await fetchChatDetail(selectedGroup.orderId);
-      await fetchChatLogs();
     } catch (error: any) {
-      console.error('发送客服消息失败:', error);
+      console.error('发送客服消息失败', error);
       alert(error.message || '发送消息失败');
     } finally {
       setSendingReply(false);

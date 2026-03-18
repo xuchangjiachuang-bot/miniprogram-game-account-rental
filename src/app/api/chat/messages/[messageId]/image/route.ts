@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { admins, chatMessages, db, groupChatMembers } from '@/lib/db';
-import { generateFileUrl } from '@/lib/storage-service';
+import { inferContentType, readFile } from '@/lib/storage-service';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
 
@@ -77,15 +77,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const imageUrl = await generateFileUrl(message.content, 3600);
-    if (!imageUrl) {
+    const imageBuffer = await readFile(message.content);
+    if (!imageBuffer) {
       return NextResponse.json({ success: false, error: '图片不存在' }, { status: 404 });
     }
 
-    return NextResponse.redirect(new URL(imageUrl, request.url), {
-      status: 307,
+    return new NextResponse(new Uint8Array(imageBuffer), {
+      status: 200,
       headers: {
-        'Cache-Control': 'private, no-store, max-age=0',
+        'Content-Type': inferContentType(message.content),
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, max-age=300, stale-while-revalidate=300',
       },
     });
   } catch (error: any) {
