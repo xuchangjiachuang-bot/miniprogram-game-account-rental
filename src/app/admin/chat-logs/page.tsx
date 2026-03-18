@@ -59,6 +59,28 @@ interface SentChatMessageResponse {
 const MAX_CHAT_IMAGE_SIZE = 3 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+function getReadableChatErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  if (!message) {
+    return '发送消息失败';
+  }
+
+  if (message.includes('PERSISTENT_STORAGE_NOT_CONFIGURED')) {
+    return '图片存储服务尚未配置完成，请稍后重试。';
+  }
+
+  if (message.includes('WECHAT_CLOUD_ENV_ID_MISSING')) {
+    return '图片存储环境未配置完成，请稍后重试。';
+  }
+
+  if (message.includes('WECHAT_STORAGE')) {
+    return '图片上传到云存储失败，请稍后重试。';
+  }
+
+  return message;
+}
+
 function formatDateTime(dateStr: string) {
   return formatServerDateTime(dateStr);
 }

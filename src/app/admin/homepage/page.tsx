@@ -816,7 +816,7 @@ export default function HomepageConfigPage() {
               </div>
 
               <div>
-                <Label htmlFor="publicSecurityNumber">公网安备号 *</Label>
+                <Label htmlFor="publicSecurityNumber">公网安备号（选填）</Label>
                 <Input
                   id="publicSecurityNumber"
                   value={config?.footerInfo?.publicSecurityNumber || ''}

@@ -1,11 +1,34 @@
 function normalizeStoredKey(value: string): string {
-  return value.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\.\./g, '');
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (trimmed.startsWith('cloud://')) {
+    return trimmed;
+  }
+
+  return trimmed.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\.\./g, '');
 }
 
 function extractManagedStorageKey(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return null;
+  }
+
+  if (trimmed.startsWith('cloud://')) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('/api/storage/file')) {
+    try {
+      const parsed = new URL(trimmed, 'http://localhost');
+      const key = parsed.searchParams.get('key');
+      return key ? normalizeStoredKey(key) : null;
+    } catch {
+      return null;
+    }
   }
 
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -15,17 +38,15 @@ function extractManagedStorageKey(value: string): string | null {
 
   try {
     const parsed = new URL(trimmed);
+
+    if (parsed.pathname.startsWith('/api/storage/file')) {
+      const key = parsed.searchParams.get('key');
+      return key ? normalizeStoredKey(key) : null;
+    }
+
     const normalizedPath = normalizeStoredKey(parsed.pathname);
     if (normalizedPath.startsWith('uploads/')) {
       return normalizedPath;
-    }
-
-    const bucketName = process.env.NEXT_PUBLIC_COZE_BUCKET_NAME?.trim();
-    if (bucketName) {
-      const bucketPrefix = `${bucketName}/uploads/`;
-      if (normalizedPath.startsWith(bucketPrefix)) {
-        return normalizedPath.slice(bucketName.length + 1);
-      }
     }
 
     const uploadsIndex = normalizedPath.indexOf('uploads/');
@@ -64,10 +85,6 @@ export function resolvePublicFileReference(
 
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
-  }
-
-  if (trimmed.startsWith('/api/storage/file')) {
-    return options?.origin ? `${options.origin.replace(/\/+$/, '')}${trimmed}` : trimmed;
   }
 
   if (trimmed.startsWith('/')) {

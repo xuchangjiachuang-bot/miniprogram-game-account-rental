@@ -29,6 +29,7 @@ build/
 .env.local
 .env.production
 .env.railway
+.wxcloud-cli.local.json
 
 # 缓存
 .cache/
