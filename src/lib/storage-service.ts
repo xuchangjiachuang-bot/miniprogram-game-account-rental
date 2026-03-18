@@ -124,6 +124,27 @@ function classifyStoredFileReference(reference: string | null | undefined): {
         return { kind: 'storage-key', original, normalized: normalizedPath };
       }
 
+       const bucketName = process.env.COZE_BUCKET_NAME?.trim();
+       if (bucketName) {
+         const bucketPrefix = `${bucketName}/${LOCAL_UPLOAD_PREFIX}/`;
+         if (normalizedPath.startsWith(bucketPrefix)) {
+           return {
+             kind: 'storage-key',
+             original,
+             normalized: normalizedPath.slice(bucketName.length + 1),
+           };
+         }
+       }
+
+       const uploadsIndex = normalizedPath.indexOf(`${LOCAL_UPLOAD_PREFIX}/`);
+       if (uploadsIndex >= 0) {
+         return {
+           kind: 'storage-key',
+           original,
+           normalized: normalizedPath.slice(uploadsIndex),
+         };
+       }
+
       return { kind: 'external-url', original, normalized: original };
     } catch {
       return { kind: 'external-url', original, normalized: original };

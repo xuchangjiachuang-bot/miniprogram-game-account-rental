@@ -4,12 +4,14 @@ import {
   rejectConsumptionSettlement,
 } from '@/lib/order-consumption-service';
 import { getServerUserId } from '@/lib/server-auth';
+import { ensureDatabaseInitialized } from '@/lib/db';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    await ensureDatabaseInitialized();
     const userId = getServerUserId(request);
     if (!userId) {
       return NextResponse.json({ success: false, error: '请先登录' }, { status: 401 });
