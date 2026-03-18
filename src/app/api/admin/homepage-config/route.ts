@@ -40,15 +40,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const savedConfig = await systemConfigManager.saveHomepageConfig(
-      sanitizeHomepageConfigForAdmin(config),
-    );
+    const sanitizedConfig = sanitizeHomepageConfigForAdmin(config);
+    await systemConfigManager.saveHomepageConfig(sanitizedConfig);
     await broadcastConfigUpdate('all');
 
     return NextResponse.json({
       success: true,
       message: '配置保存成功',
-      data: savedConfig,
+      data: sanitizedConfig,
     });
   } catch (error) {
     console.error('[POST /api/admin/homepage-config] Failed:', error);

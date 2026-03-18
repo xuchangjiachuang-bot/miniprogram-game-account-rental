@@ -1,19 +1,24 @@
-import { eq } from 'drizzle-orm';
-import { getDb } from 'coze-coding-dev-sdk';
-import { systemConfig } from './shared/schema';
+import { sqlClient } from '@/lib/db';
 
-type SystemConfig = typeof systemConfig.$inferSelect;
+type SystemConfig = {
+  id: string;
+  configKey: string;
+  configValue: unknown;
+  description: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
 
 export class SystemConfigManager {
   async getConfigValue<T = any>(configKey: string): Promise<T | null> {
-    const db = await getDb();
-    const [config] = await db
-      .select()
-      .from(systemConfig)
-      .where(eq(systemConfig.configKey, configKey))
-      .limit(1);
+    const [config] = await sqlClient<Array<{ configValue: T | null }>>`
+      select config_value as "configValue"
+      from system_config
+      where config_key = ${configKey}
+      limit 1
+    `;
 
-    return (config?.configValue as T) || null;
+    return config?.configValue ?? null;
   }
 
   async setConfigValue<T = any>(
@@ -21,54 +26,73 @@ export class SystemConfigManager {
     configValue: T,
     description?: string,
   ): Promise<SystemConfig> {
-    const db = await getDb();
-    const [existingConfig] = await db
-      .select()
-      .from(systemConfig)
-      .where(eq(systemConfig.configKey, configKey))
-      .limit(1);
+    const [existingConfig] = await sqlClient<Array<SystemConfig>>`
+      select
+        id,
+        config_key as "configKey",
+        config_value as "configValue",
+        description,
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      from system_config
+      where config_key = ${configKey}
+      limit 1
+    `;
 
     const now = new Date().toISOString();
 
     if (existingConfig) {
-      const [updatedConfig] = await db
-        .update(systemConfig)
-        .set({
-          configValue: configValue as any,
-          description: description || existingConfig.description,
-          updatedAt: now,
-        })
-        .where(eq(systemConfig.configKey, configKey))
-        .returning();
+      const [updatedConfig] = await sqlClient<Array<SystemConfig>>`
+        update system_config
+        set
+          config_value = ${configValue as any}::jsonb,
+          description = ${description || existingConfig.description},
+          updated_at = ${now}
+        where config_key = ${configKey}
+        returning
+          id,
+          config_key as "configKey",
+          config_value as "configValue",
+          description,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+      `;
 
       return updatedConfig;
     }
 
-    const [newConfig] = await db
-      .insert(systemConfig)
-      .values({
-        configKey,
-        configValue: configValue as any,
-        description: description || configKey,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
+    const [newConfig] = await sqlClient<Array<SystemConfig>>`
+      insert into system_config (
+        config_key,
+        config_value,
+        description,
+        created_at,
+        updated_at
+      ) values (
+        ${configKey},
+        ${configValue as any}::jsonb,
+        ${description || configKey},
+        ${now},
+        ${now}
+      )
+      returning
+        id,
+        config_key as "configKey",
+        config_value as "configValue",
+        description,
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+    `;
 
     return newConfig;
   }
 
   async getHomepageConfig(): Promise<any> {
-    try {
-      return await this.getConfigValue('homepage_config');
-    } catch (error) {
-      console.error('获取首页配置失败:', error);
-      return null;
-    }
+    return this.getConfigValue('homepage_config');
   }
 
   async saveHomepageConfig(config: any): Promise<any> {
-    return await this.setConfigValue(
+    return this.setConfigValue(
       'homepage_config',
       config,
       '首页轮播图、LOGO和皮肤选项配置',
@@ -76,14 +100,14 @@ export class SystemConfigManager {
   }
 
   async getPlatformConfig(configKey: string): Promise<any | null> {
-    const db = await getDb();
-    const [config] = await db
-      .select()
-      .from(systemConfig)
-      .where(eq(systemConfig.configKey, configKey))
-      .limit(1);
+    const [config] = await sqlClient<Array<{ configValue: unknown | null }>>`
+      select config_value as "configValue"
+      from system_config
+      where config_key = ${configKey}
+      limit 1
+    `;
 
-    return config?.configValue || null;
+    return config?.configValue ?? null;
   }
 
   async setPlatformConfig(
@@ -91,21 +115,31 @@ export class SystemConfigManager {
     configValue: string,
     description?: string,
   ): Promise<SystemConfig> {
-    return await this.setConfigValue(configKey, configValue, description);
+    return this.setConfigValue(configKey, configValue, description);
   }
 
   async deleteConfig(configKey: string): Promise<boolean> {
-    const db = await getDb();
-    const result = await db
-      .delete(systemConfig)
-      .where(eq(systemConfig.configKey, configKey));
+    const deletedRows = await sqlClient<Array<{ id: string }>>`
+      delete from system_config
+      where config_key = ${configKey}
+      returning id
+    `;
 
-    return (result.rowCount ?? 0) > 0;
+    return deletedRows.length > 0;
   }
 
   async getAllConfigs(): Promise<SystemConfig[]> {
-    const db = await getDb();
-    return db.select().from(systemConfig);
+    return sqlClient<Array<SystemConfig>>`
+      select
+        id,
+        config_key as "configKey",
+        config_value as "configValue",
+        description,
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      from system_config
+      order by created_at asc
+    `;
   }
 }
 

@@ -19,7 +19,7 @@ import { useUser } from '@/contexts/UserContext';
 import { LoginDialog } from '@/components/LoginDialog';
 import { LogoConfig } from '@/lib/config-types';
 import { useRouter } from 'next/navigation';
-import { loadLogoFromCache, saveConfigToCache, loadConfigFromCache } from '@/lib/config-sync';
+import { saveConfigToCache, loadConfigFromCache } from '@/lib/config-sync';
 import { useConfigUpdate } from '@/lib/config-sync-manager';
 import { getToken } from '@/lib/auth-token';
 
@@ -262,13 +262,7 @@ export function Header() {
         if (enabledLogos.length > 0) {
           // 保存到 localStorage（保存完整配置）
           try {
-            const cachedConfig = loadConfigFromCache<any>() || {};
-            const newConfig = {
-              ...cachedConfig,
-              logos: result.data.logos,
-              ...result.data,
-            };
-            saveConfigToCache(newConfig);
+            saveConfigToCache(result.data);
           } catch (e) {
             console.error('保存LOGO到缓存失败:', e);
           }

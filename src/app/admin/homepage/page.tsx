@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { ImagePlus, Edit, Trash2, GripVertical, Save, Upload, Loader2, Eye, Info, Type } from 'lucide-react';
 import { CarouselItem, LogoConfig, HomepageConfig } from '@/lib/config-types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { saveConfigToCache } from '@/lib/config-sync';
 
 export default function HomepageConfigPage() {
   const [config, setConfig] = useState<HomepageConfig | null>(null);
@@ -59,9 +60,10 @@ export default function HomepageConfigPage() {
       const result = await res.json();
       if (result.success) {
         setConfig(result.data);
+        saveConfigToCache(result.data);
       }
     } catch (error) {
-      toast.error('加载配置失败');
+      toast.error('\u52a0\u8f7d\u914d\u7f6e\u5931\u8d25');
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,7 @@ export default function HomepageConfigPage() {
 
   const saveConfig = async () => {
     if (!config) {
-      toast.error('配置未加载，请刷新页面重试');
+      toast.error('\u914d\u7f6e\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u91cd\u8bd5');
       return;
     }
 
@@ -81,47 +83,16 @@ export default function HomepageConfigPage() {
       });
       const result = await res.json();
       if (result.success) {
-        toast.success('配置保存成功');
-
-        // 更新 localStorage 中的 LOGO 配置
-        try {
-          const enabledLogos = config.logos.filter((l: LogoConfig) => l.enabled);
-          localStorage.setItem('homepage_logos', JSON.stringify(enabledLogos));
-
-          // 更新皮肤配置（将 skinOptions 转换为 SkinConfig 格式）
-          if (config.skinOptions && config.skinOptions.length > 0) {
-            const enabledSkins = config.skinOptions
-              .filter((s: any) => s.enabled)
-              .map((s: any) => s.name);
-
-            const skinConfig = {
-              enabled: enabledSkins.length > 0,
-              skins: enabledSkins
-            };
-
-            localStorage.setItem('skin_config', JSON.stringify(skinConfig));
-          } else {
-            // 如果没有皮肤选项，禁用皮肤功能
-            localStorage.setItem('skin_config', JSON.stringify({
-              enabled: false,
-              skins: []
-            }));
-          }
-
-          // 同时保存完整的 homepage_config
-          localStorage.setItem('homepage_config', JSON.stringify(config));
-        } catch (e) {
-          console.error('保存到缓存失败:', e);
-        }
+        toast.success('\u914d\u7f6e\u4fdd\u5b58\u6210\u529f');
+        saveConfigToCache(config);
       } else {
-        toast.error(result.error || '保存失败');
+        toast.error(result.error || '\u4fdd\u5b58\u5931\u8d25');
       }
     } catch (error) {
-      toast.error('保存配置失败');
+      toast.error('\u4fdd\u5b58\u914d\u7f6e\u5931\u8d25');
     }
   };
 
-  // 轮播图操作
   const openCarouselDialog = (item?: CarouselItem) => {
     if (item) {
       setEditingCarousel(item);

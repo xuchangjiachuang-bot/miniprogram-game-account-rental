@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { loadConfigFromCache } from '@/lib/config-sync';
+import { loadConfigFromCache, saveConfigToCache } from '@/lib/config-sync';
 
 interface FooterInfo {
   copyright: string;
@@ -47,6 +47,7 @@ export function Footer() {
       const result = await response.json();
 
       if (result.success && result.data?.footerInfo) {
+        saveConfigToCache(result.data);
         setFooterInfo(result.data.footerInfo);
       }
     } catch (error) {

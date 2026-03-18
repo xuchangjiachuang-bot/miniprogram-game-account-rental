@@ -59,7 +59,7 @@ export const defaultHomepageConfig: HomepageConfig = {
       title: '三角洲行动哈夫币租赁',
       description: '安全可靠，快速交易，享受游戏乐趣',
       imageUrl: '/images/carousel-1.jpg',
-      linkUrl: '/accounts',
+      linkUrl: '/',
       order: 0,
       enabled: true
     },
@@ -68,7 +68,7 @@ export const defaultHomepageConfig: HomepageConfig = {
       title: '海量账号任你选',
       description: '从白银到钻石，满足各种需求',
       imageUrl: '/images/carousel-2.jpg',
-      linkUrl: '/accounts',
+      linkUrl: '/',
       order: 1,
       enabled: true
     }

@@ -6,16 +6,17 @@ import { systemConfigManager } from '@/storage/database/systemConfigManager';
 export async function GET() {
   try {
     const config = await systemConfigManager.getHomepageConfig();
+    const safeConfig = config && typeof config === 'object' ? config : null;
     const mergedConfig = {
       ...defaultHomepageConfig,
-      ...config,
+      ...(safeConfig || {}),
       footerInfo: {
         ...defaultHomepageConfig.footerInfo,
-        ...(config?.footerInfo || {}),
+        ...(safeConfig?.footerInfo || {}),
       },
-      carousels: config?.carousels || defaultHomepageConfig.carousels,
-      logos: config?.logos || defaultHomepageConfig.logos,
-      skinOptions: config?.skinOptions || defaultHomepageConfig.skinOptions,
+      carousels: Array.isArray(safeConfig?.carousels) ? safeConfig.carousels : defaultHomepageConfig.carousels,
+      logos: Array.isArray(safeConfig?.logos) ? safeConfig.logos : defaultHomepageConfig.logos,
+      skinOptions: Array.isArray(safeConfig?.skinOptions) ? safeConfig.skinOptions : defaultHomepageConfig.skinOptions,
     };
 
     return NextResponse.json({
@@ -25,8 +26,8 @@ export async function GET() {
   } catch (error) {
     console.error('[GET /api/homepage-config] Failed:', error);
     return NextResponse.json({
-      success: true,
-      data: normalizeHomepageConfig(defaultHomepageConfig),
-    });
+      success: false,
+      error: 'HOMEPAGE_CONFIG_LOAD_FAILED',
+    }, { status: 500 });
   }
 }

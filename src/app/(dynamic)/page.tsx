@@ -23,6 +23,7 @@ import { getToken } from '@/lib/auth-token';
 import { loadConfigFromCache, saveConfigToCache } from '@/lib/config-sync';
 import { useConfigUpdate } from '@/lib/config-sync-manager';
 import { resolvePublicFileReferences } from '@/lib/storage-public';
+import { normalizeHomepageLinkUrl } from '@/lib/homepage-config-normalizer';
 
 export default function Home() {
   const { user, loading: userLoading, refreshUser } = useUser();
@@ -437,11 +438,15 @@ export default function Home() {
               {/* 轮播图 */}
               <div className="relative overflow-hidden rounded-xl bg-gray-900 aspect-[21/9] md:aspect-[16/9]">
                 {carousels.map((carousel, index) => (
-                  <Link
+                  <div
                     key={carousel.id}
-                    href={carousel.linkUrl || '/accounts'}
                     className={`absolute inset-0 transition-opacity duration-500 ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
                   >
+                    <Link
+                      href={normalizeHomepageLinkUrl(carousel.linkUrl, '/')}
+                      className="absolute inset-0 z-0"
+                      aria-label={carousel.title || '查看轮播图'}
+                    />
                     {carousel.imageUrl && (
                       <div className="absolute inset-0 w-full h-full">
                         <Image
@@ -455,7 +460,7 @@ export default function Home() {
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                    <div className="absolute bottom-0 left-0 right-0 z-10 p-8 text-white">
                       <h2 className="text-3xl md:text-4xl font-bold mb-2">{carousel.title}</h2>
                       {carousel.description && (
                         <p className="text-lg text-gray-200 mb-4">{carousel.description}</p>
@@ -468,7 +473,7 @@ export default function Home() {
                         发布账号
                       </Button>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </div>

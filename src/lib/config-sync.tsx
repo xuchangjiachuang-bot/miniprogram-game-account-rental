@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 // 配置缓存键
 export const CONFIG_CACHE_KEY = 'hafcoin_homepage_config';
 export const CONFIG_VERSION_KEY = 'hafcoin_config_version';
+const LEGACY_CONFIG_KEYS = ['homepage_config', 'homepage_logos', 'skin_config'] as const;
 
 // 配置更新事件类型
 export type ConfigEventType = 'logo' | 'skin' | 'announcement' | 'settings' | 'all';
@@ -51,6 +52,7 @@ export function saveConfigToCache<T>(config: T): void {
   try {
     localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
     localStorage.setItem(CONFIG_VERSION_KEY, Date.now().toString());
+    LEGACY_CONFIG_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch (error) {
     console.error('保存缓存配置失败:', error);
   }
@@ -292,7 +294,10 @@ export function loadSkinsFromCache(): any[] {
   
   try {
     const cached = loadConfigFromCache<any>();
-    if (cached?.skins) {
+    if (Array.isArray(cached?.skinOptions)) {
+      return cached.skinOptions;
+    }
+    if (Array.isArray(cached?.skins)) {
       return cached.skins;
     }
   } catch (error) {
@@ -309,6 +314,9 @@ export function loadLogoFromCache(): any {
   
   try {
     const cached = loadConfigFromCache<any>();
+    if (Array.isArray(cached?.logos) && cached.logos.length > 0) {
+      return cached.logos[0];
+    }
     if (cached?.logo) {
       return cached.logo;
     }
@@ -344,6 +352,7 @@ export function clearConfigCache(): void {
   try {
     localStorage.removeItem(CONFIG_CACHE_KEY);
     localStorage.removeItem(CONFIG_VERSION_KEY);
+    LEGACY_CONFIG_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch (error) {
     console.error('清除配置缓存失败:', error);
   }

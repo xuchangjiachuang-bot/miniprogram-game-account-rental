@@ -43,7 +43,7 @@ const HOMEPAGE_FALLBACK = {
       title: '三角洲行动哈夫币租赁',
       description: '安全可靠，快速交易，畅享游戏乐趣',
       imageUrl: '/images/carousel-1.svg',
-      linkUrl: '/accounts',
+      linkUrl: '/',
       order: 0,
       enabled: true,
     },
@@ -52,7 +52,7 @@ const HOMEPAGE_FALLBACK = {
       title: '海量账号随心选',
       description: '从基础号到高配号，满足不同租号需求',
       imageUrl: '/images/carousel-2.svg',
-      linkUrl: '/accounts',
+      linkUrl: '/',
       order: 1,
       enabled: true,
     },
@@ -83,6 +83,20 @@ const LEGACY_IMAGE_MAP: Record<string, string> = {
   '/images/carousel-1.jpg': '/images/carousel-1.svg',
   '/images/carousel-2.jpg': '/images/carousel-2.svg',
 };
+
+function normalizeLinkUrl(value: string | null | undefined, fallback: string): string {
+  const candidate = String(value || '').trim() || fallback;
+
+  if (!candidate) {
+    return '/';
+  }
+
+  if (candidate === '/accounts' || candidate === '/accounts/') {
+    return '/';
+  }
+
+  return candidate;
+}
 
 function looksLikeMojibake(value: string | null | undefined): boolean {
   if (!value) {
@@ -119,7 +133,7 @@ function normalizeImageUrl(value: string | null | undefined, fallback: string): 
 }
 
 export function normalizeHomepageConfig(rawConfig: HomepageConfig | null | undefined): HomepageConfig {
-  const sourceCarousels = Array.isArray(rawConfig?.carousels) && rawConfig.carousels.length > 0
+  const sourceCarousels = Array.isArray(rawConfig?.carousels)
     ? rawConfig.carousels
     : HOMEPAGE_FALLBACK.carousels;
 
@@ -130,13 +144,13 @@ export function normalizeHomepageConfig(rawConfig: HomepageConfig | null | undef
       title: normalizeText(item?.title, fallback.title),
       description: normalizeText(item?.description, fallback.description),
       imageUrl: normalizeImageUrl(item?.imageUrl, fallback.imageUrl),
-      linkUrl: item?.linkUrl || fallback.linkUrl,
+      linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl),
       order: typeof item?.order === 'number' ? item.order : fallback.order,
       enabled: typeof item?.enabled === 'boolean' ? item.enabled : fallback.enabled,
     };
   });
 
-  const sourceLogos = Array.isArray(rawConfig?.logos) && rawConfig.logos.length > 0
+  const sourceLogos = Array.isArray(rawConfig?.logos)
     ? rawConfig.logos
     : HOMEPAGE_FALLBACK.logos;
 
@@ -161,7 +175,7 @@ export function normalizeHomepageConfig(rawConfig: HomepageConfig | null | undef
         ? normalizeText(item?.text, fallback.text || '')
         : undefined,
       textStyle: item?.textStyle || fallback.textStyle,
-      linkUrl: item?.linkUrl || fallback.linkUrl,
+      linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl || '/'),
       enabled: typeof item?.enabled === 'boolean' ? item.enabled : fallback.enabled,
     };
   });
@@ -221,3 +235,5 @@ export function sanitizeHomepageConfigForAdmin(rawConfig: HomepageConfig | null 
     },
   };
 }
+
+export { normalizeLinkUrl as normalizeHomepageLinkUrl };

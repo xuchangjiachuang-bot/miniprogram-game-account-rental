@@ -13,6 +13,7 @@
     "simulate:wechat:jsapi": "node ./scripts/simulate-wechat-jsapi-browser.mjs",
     "simulate:wechat:jsapi-click": "node ./scripts/simulate-wechat-jsapi-click.mjs",
     "ts-check": "tsc -p tsconfig.json",
+    "wxcloud:envjson": "node ./scripts/export-wxcloud-env-json.mjs",
     "mp:upload": "bash ./scripts/upload-miniprogram.sh",
     "mp:upload:manual": "bash ./scripts/upload-miniprogram.sh \"$1\" \"$2\""
   },
