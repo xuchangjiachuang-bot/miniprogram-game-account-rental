@@ -60,6 +60,7 @@ export async function GET(
     const dispute = await getOrderDispute(order.id);
     const consumptionSettlement = await getLatestConsumptionSettlement(order.id);
     const paymentTimeoutSeconds = await getPaymentTimeoutSeconds();
+    const viewerRole = order.buyerId === userId ? 'buyer' : 'seller';
 
     return NextResponse.json({
       success: true,
@@ -68,6 +69,7 @@ export async function GET(
         dispute,
         consumptionSettlement,
         paymentTimeoutSeconds,
+        viewerRole,
       },
     });
   } catch (error: any) {

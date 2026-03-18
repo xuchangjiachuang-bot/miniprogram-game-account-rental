@@ -678,6 +678,53 @@ export default function UserCenterPage() {
     ].includes(status);
   };
 
+  const getWalletTransactionTypeText = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      order_payment: '支付租金',
+      rental_income: '租金到账',
+      deposit_consumption_deduction: '资源消耗扣款',
+      deposit_refund: '押金退还',
+      deposit_freeze: '押金冻结',
+      deposit_unfreeze: '押金解冻',
+      listing_deposit_freeze: '上架保证金冻结',
+      listing_deposit_refund: '上架保证金退还',
+      order_timeout_refund: '超时退款',
+    };
+
+    return typeMap[type] || getTransactionBadgeText(type);
+  };
+
+  const getWalletTransactionColor = (type: string): string => {
+    if (['withdraw', 'freeze', 'penalty', 'deposit_freeze', 'listing_deposit_freeze', 'order_payment', 'deposit_consumption_deduction'].includes(type)) {
+      return 'text-red-500';
+    }
+
+    return 'text-green-500';
+  };
+
+  const getWalletTransactionAmount = (transaction: any): number => {
+    if (
+      transaction.transaction_type === 'withdraw' ||
+      transaction.transaction_type === 'freeze' ||
+      transaction.transaction_type === 'deposit_freeze' ||
+      transaction.transaction_type === 'listing_deposit_freeze' ||
+      transaction.transaction_type === 'order_payment' ||
+      transaction.transaction_type === 'deposit_consumption_deduction'
+    ) {
+      return -Math.abs(Number(transaction.amount) || 0);
+    }
+
+    if (
+      transaction.transaction_type === 'unfreeze' ||
+      transaction.transaction_type === 'deposit_unfreeze' ||
+      transaction.transaction_type === 'listing_deposit_unfreeze'
+    ) {
+      return Math.abs(Number(transaction.amount) || 0);
+    }
+
+    return Number(transaction.amount) || 0;
+  };
+
   // 充值
   const handleRecharge = async () => {
     if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) {
@@ -1766,7 +1813,7 @@ export default function UserCenterPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline">
-                                  {getTransactionBadgeText(transaction.transaction_type)}
+                                  {getWalletTransactionTypeText(transaction.transaction_type)}
                                 </Badge>
                               </div>
                               {transaction.remark && (
@@ -1776,9 +1823,9 @@ export default function UserCenterPage() {
                                 {new Date(transaction.created_at).toLocaleString('zh-CN')}
                               </p>
                             </div>
-                            <div className={`text-lg font-semibold ${getTransactionTypeColor(transaction.transaction_type)}`}>
-                              {getTransactionDisplayAmount(transaction) >= 0 ? '+' : ''}
-                              {formatBalance(getTransactionDisplayAmount(transaction))}
+                            <div className={`text-lg font-semibold ${getWalletTransactionColor(transaction.transaction_type)}`}>
+                              {getWalletTransactionAmount(transaction) >= 0 ? '+' : ''}
+                              {formatBalance(getWalletTransactionAmount(transaction))}
                             </div>
                           </div>
                         ))

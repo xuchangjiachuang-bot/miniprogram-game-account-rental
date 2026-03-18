@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerToken } from '@/lib/server-auth';
 import { ensureUserBalance } from '@/lib/user-balance-service';
 import { verifyToken } from '@/lib/user-service';

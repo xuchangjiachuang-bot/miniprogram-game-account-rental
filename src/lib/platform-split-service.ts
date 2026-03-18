@@ -1,15 +1,16 @@
-/**
- * 平台自建分账服务
- * 订单完成时自动触发分账，将卖家应得金额计入余额
- */
-
-import { db, orders, userBalances, balanceTransactions, splitRecords, platformSettings, accounts } from './db';
-import { eq, and, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  accounts,
+  balanceTransactions,
+  db,
+  orders,
+  platformSettings,
+  splitRecords,
+  userBalances,
+} from './db';
 import { getEffectiveCommissionRate } from './commission-activity-service';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
 import { getApprovedConsumptionSummary } from './order-consumption-service';
-
-// ==================== 类型定义 ====================
 
 export interface SplitResult {
   success: boolean;
@@ -19,92 +20,90 @@ export interface SplitResult {
   buyerRefund: number;
 }
 
-// ==================== 平台分账核心功能 ====================
+function buildSellerIncomeDescription(params: {
+  orderNo: string;
+  rentalPrice: number;
+  commissionRate: number;
+  platformCommission: number;
+  depositDeductedAmount: number;
+  sellerIncome: number;
+}) {
+  const parts = [
+    `订单 ${params.orderNo} 租金到账`,
+    `租金￥${params.rentalPrice.toFixed(2)}`,
+    `平台服务费 ${params.commissionRate.toFixed(2)}% ￥${params.platformCommission.toFixed(2)}`,
+  ];
 
-/**
- * 执行订单平台分账
- *
- * 说明：平台自建分账系统，不分账到微信，而是记录卖家应得金额到余额
- *
- * @param orderId 订单ID
- * @returns 分账结果
- */
+  if (params.depositDeductedAmount > 0) {
+    parts.push(`资源消耗赔付￥${params.depositDeductedAmount.toFixed(2)}`);
+  }
+
+  parts.push(`实际到账￥${params.sellerIncome.toFixed(2)}`);
+  return parts.join('，');
+}
+
 export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
   try {
-    // 1. 获取订单信息
     const orderList = await db.select().from(orders).where(eq(orders.id, orderId));
+    const order = orderList[0];
 
-    if (!orderList || orderList.length === 0) {
+    if (!order) {
       return {
         success: false,
         message: '订单不存在',
         platformCommission: 0,
         sellerIncome: 0,
-        buyerRefund: 0
+        buyerRefund: 0,
       };
     }
 
-    const order = orderList[0];
-
-    // 检查订单状态是否为已完成
     if (order.status !== 'completed') {
       return {
         success: false,
         message: `订单状态不正确，当前状态：${order.status}`,
         platformCommission: 0,
         sellerIncome: 0,
-        buyerRefund: 0
+        buyerRefund: 0,
       };
     }
 
-    // 检查是否已经分账
     if (order.isSettled) {
       return {
         success: false,
-        message: '订单已经分账',
+        message: '订单已经结算',
         platformCommission: 0,
         sellerIncome: 0,
-        buyerRefund: 0
+        buyerRefund: 0,
       };
     }
 
-    // 2. 获取平台配置
     const settingsList = await db.select().from(platformSettings);
-    const settings = settingsList[0] || {
-      commissionRate: 5
-    };
+    const settings = settingsList[0] || { commissionRate: 5 };
 
     const baseCommissionRate = Number(settings.commissionRate) || 5;
     const { effectiveRate: commissionRate } = await getEffectiveCommissionRate(baseCommissionRate);
 
-    // 3. 计算分账金额
     const rentalPrice = Number(order.rentalPrice) || 0;
     const deposit = Number(order.deposit) || 0;
     const consumptionSummary = await getApprovedConsumptionSummary(orderId);
     const depositDeductedAmount = consumptionSummary.depositDeductedAmount || 0;
-
-    // 平台佣金 = 租金 * 佣金比例
     const platformCommission = rentalPrice * (commissionRate / 100);
-
-    // 卖家收入 = 租金 - 平台佣金 + 资源消耗扣款
     const sellerIncome = rentalPrice - platformCommission + depositDeductedAmount;
-
-    // 买家押金退款
     const buyerRefund = order.paymentMethod === 'wallet'
       ? Math.max(0, deposit - depositDeductedAmount)
       : 0;
 
-    // 4. 开始事务
     await db.transaction(async (tx) => {
-      // 4.1 更新订单分账信息
+      const now = new Date().toISOString();
+
       await tx
         .update(orders)
         .set({
           platformFee: platformCommission.toString(),
           sellerIncome: sellerIncome.toString(),
           isSettled: true,
-          settledAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          settledAt: now,
+          updatedAt: now,
         })
         .where(eq(orders.id, orderId));
 
@@ -112,11 +111,10 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         .update(accounts)
         .set({
           tradeCount: sql`${accounts.tradeCount} + 1`,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
         })
         .where(eq(accounts.id, order.accountId));
 
-      // 4.2 增加卖家可用余额
       const sellerBalances = await tx
         .select()
         .from(userBalances)
@@ -131,23 +129,29 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         await tx
           .update(userBalances)
           .set({
-            availableBalance: newBalance.toString(),
-            totalEarned: newTotalEarned.toString(),
-            updatedAt: new Date().toISOString()
+            availableBalance: newBalance.toFixed(2),
+            totalEarned: newTotalEarned.toFixed(2),
+            updatedAt: now,
           })
           .where(eq(userBalances.userId, order.sellerId));
 
-        // 记录卖家余额变动
         await tx.insert(balanceTransactions).values({
           id: crypto.randomUUID(),
           userId: order.sellerId,
-          orderId: orderId,
+          orderId,
           transactionType: 'rental_income',
-          amount: sellerIncome.toString(),
-          balanceBefore: oldBalance.toString(),
-          balanceAfter: newBalance.toString(),
-          description: `订单${order.orderNo}租金收入，净收入￥${sellerIncome.toFixed(2)}`,
-          createdAt: new Date().toISOString()
+          amount: sellerIncome.toFixed(2),
+          balanceBefore: oldBalance.toFixed(2),
+          balanceAfter: newBalance.toFixed(2),
+          description: buildSellerIncomeDescription({
+            orderNo: order.orderNo,
+            rentalPrice,
+            commissionRate,
+            platformCommission,
+            depositDeductedAmount,
+            sellerIncome,
+          }),
+          createdAt: now,
         });
 
         await safeLogFinanceAuditEvent({
@@ -166,42 +170,57 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         }, tx);
       }
 
-      // 4.3 解冻并退还买家押金
-      const buyerBalances = buyerRefund > 0
+      const shouldHandleBuyerDeposit = order.paymentMethod === 'wallet' && deposit > 0;
+      const buyerBalances = shouldHandleBuyerDeposit
         ? await tx
           .select()
           .from(userBalances)
           .where(eq(userBalances.userId, order.buyerId))
         : [];
 
-      if (buyerRefund > 0 && buyerBalances.length > 0) {
+      if (buyerBalances.length > 0) {
         const oldFrozen = Number(buyerBalances[0].frozenBalance) || 0;
         const oldAvailable = Number(buyerBalances[0].availableBalance) || 0;
-        const releasedFrozen = Math.min(oldFrozen, buyerRefund);
+        const releasedFrozen = Math.min(oldFrozen, deposit);
         const newFrozen = Math.max(0, oldFrozen - releasedFrozen);
         const newAvailable = oldAvailable + buyerRefund;
 
         await tx
           .update(userBalances)
           .set({
-            frozenBalance: newFrozen.toString(),
-            availableBalance: newAvailable.toString(),
-            updatedAt: new Date().toISOString()
+            frozenBalance: newFrozen.toFixed(2),
+            availableBalance: newAvailable.toFixed(2),
+            updatedAt: now,
           })
           .where(eq(userBalances.userId, order.buyerId));
 
-        // 记录买家余额变动
-        await tx.insert(balanceTransactions).values({
-          id: crypto.randomUUID(),
-          userId: order.buyerId,
-          orderId: orderId,
-          transactionType: 'deposit_refund',
-          amount: buyerRefund.toString(),
-          balanceBefore: oldAvailable.toString(),
-          balanceAfter: newAvailable.toString(),
-          description: `订单${order.orderNo}押金退还`,
-          createdAt: new Date().toISOString()
-        });
+        if (buyerRefund > 0) {
+          await tx.insert(balanceTransactions).values({
+            id: crypto.randomUUID(),
+            userId: order.buyerId,
+            orderId,
+            transactionType: 'deposit_refund',
+            amount: buyerRefund.toFixed(2),
+            balanceBefore: oldAvailable.toFixed(2),
+            balanceAfter: newAvailable.toFixed(2),
+            description: `订单 ${order.orderNo} 押金退还`,
+            createdAt: now,
+          });
+        }
+
+        if (depositDeductedAmount > 0) {
+          await tx.insert(balanceTransactions).values({
+            id: crypto.randomUUID(),
+            userId: order.buyerId,
+            orderId,
+            transactionType: 'deposit_consumption_deduction',
+            amount: depositDeductedAmount.toFixed(2),
+            balanceBefore: oldAvailable.toFixed(2),
+            balanceAfter: oldAvailable.toFixed(2),
+            description: `订单 ${order.orderNo} 资源消耗扣除押金￥${depositDeductedAmount.toFixed(2)}`,
+            createdAt: now,
+          });
+        }
 
         await safeLogFinanceAuditEvent({
           eventType: 'order_split_buyer_deposit_refund',
@@ -222,70 +241,68 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
       if (depositDeductedAmount > 0) {
         await tx.insert(splitRecords).values({
           id: crypto.randomUUID(),
-          orderId: orderId,
+          orderId,
           orderNo: order.orderNo,
           receiverType: 'seller',
           receiverId: order.sellerId,
           receiverName: '卖家',
-          splitAmount: depositDeductedAmount.toString(),
+          splitAmount: depositDeductedAmount.toFixed(2),
           splitRatio: '100.00',
           commissionType: 'consumption_deduction',
           status: 'success',
-          splitTime: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          splitTime: now,
+          createdAt: now,
+          updatedAt: now,
         });
       }
 
-      // 4.4 记录分账记录 - 卖家
       await tx.insert(splitRecords).values({
         id: crypto.randomUUID(),
-        orderId: orderId,
+        orderId,
         orderNo: order.orderNo,
         receiverType: 'seller',
         receiverId: order.sellerId,
         receiverName: '卖家',
-        splitAmount: sellerIncome.toString(),
-        splitRatio: ((sellerIncome / rentalPrice) * 100).toString(),
+        splitAmount: sellerIncome.toFixed(2),
+        splitRatio: rentalPrice > 0 ? ((sellerIncome / rentalPrice) * 100).toFixed(2) : '0.00',
         commissionType: 'rental_income',
         status: 'success',
-        splitTime: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        splitTime: now,
+        createdAt: now,
+        updatedAt: now,
       });
 
-      // 4.5 记录分账记录 - 平台佣金
       await tx.insert(splitRecords).values({
         id: crypto.randomUUID(),
-        orderId: orderId,
+        orderId,
         orderNo: order.orderNo,
         receiverType: 'platform',
         receiverId: 'platform',
         receiverName: '平台',
-        splitAmount: platformCommission.toString(),
-        splitRatio: commissionRate.toString(),
+        splitAmount: platformCommission.toFixed(2),
+        splitRatio: commissionRate.toFixed(2),
         commissionType: 'platform_fee',
         status: 'success',
-        splitTime: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        splitTime: now,
+        createdAt: now,
+        updatedAt: now,
       });
 
       if (buyerRefund > 0) {
         await tx.insert(splitRecords).values({
           id: crypto.randomUUID(),
-          orderId: orderId,
+          orderId,
           orderNo: order.orderNo,
           receiverType: 'buyer',
           receiverId: order.buyerId,
           receiverName: '买家',
-          splitAmount: buyerRefund.toString(),
+          splitAmount: buyerRefund.toFixed(2),
           splitRatio: '100.00',
           commissionType: 'deposit_refund',
           status: 'success',
-          splitTime: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          splitTime: now,
+          createdAt: now,
+          updatedAt: now,
         });
       }
 
@@ -307,41 +324,34 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
 
     return {
       success: true,
-      message: '分账成功',
+      message: '结算成功',
       platformCommission,
       sellerIncome,
-      buyerRefund
+      buyerRefund,
     };
   } catch (error: any) {
-    console.error('执行分账失败:', error);
+    console.error('执行结算失败:', error);
     return {
       success: false,
-      message: error.message || '分账失败',
+      message: error.message || '结算失败',
       platformCommission: 0,
       sellerIncome: 0,
-      buyerRefund: 0
+      buyerRefund: 0,
     };
   }
 }
 
-/**
- * 查询订单分账状态
- *
- * @param orderId 订单ID
- * @returns 分账状态
- */
 export async function getSplitStatus(orderId: string) {
   try {
     const orderList = await db.select().from(orders).where(eq(orders.id, orderId));
+    const order = orderList[0];
 
-    if (!orderList || orderList.length === 0) {
+    if (!order) {
       return {
         success: false,
-        message: '订单不存在'
+        message: '订单不存在',
       };
     }
-
-    const order = orderList[0];
 
     const splitRecordsList = await db
       .select()
@@ -354,12 +364,12 @@ export async function getSplitStatus(orderId: string) {
       settledAt: order.settledAt,
       platformFee: order.platformFee,
       sellerIncome: order.sellerIncome,
-      splits: splitRecordsList
+      splits: splitRecordsList,
     };
   } catch (error: any) {
     return {
       success: false,
-      message: error.message || '查询分账状态失败'
+      message: error.message || '查询结算状态失败',
     };
   }
 }

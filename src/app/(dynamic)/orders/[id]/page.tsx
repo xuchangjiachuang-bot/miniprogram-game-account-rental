@@ -43,6 +43,7 @@ type OrderDetail = {
   status: string;
   buyerId: string;
   sellerId: string;
+  viewerRole?: 'buyer' | 'seller';
   accountName?: string;
   accountTitle?: string;
   rentalPrice?: number;
@@ -673,6 +674,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const isConsumptionPending = order.status === 'pending_consumption_confirm';
   const consumptionDraftTotal = getConsumptionDraftTotal(consumptionItems);
+  const canSellerSubmitConsumption =
+    order.viewerRole === 'seller' &&
+    order.status === 'pending_verification' &&
+    !order.consumptionSettlement;
+  const canBuyerRespondConsumption =
+    order.viewerRole === 'buyer' &&
+    isConsumptionPending &&
+    order.consumptionSettlement?.status === 'pending_buyer_confirmation';
   const canCreateDispute =
     ['active', 'pending_verification', 'pending_consumption_confirm', 'disputed'].includes(order.status) &&
     order.dispute?.status !== 'pending';
@@ -738,7 +747,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 ) : null}
 
-                {order.status === 'pending_verification' ? (
+                {canSellerSubmitConsumption ? (
                   <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
                     买家已申请归还账号，当前等待卖家验收。
                     <div className="mt-1 text-yellow-700">
@@ -747,7 +756,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 ) : null}
 
-                {isConsumptionPending ? (
+                {canBuyerRespondConsumption ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     已进入资源消耗结算确认阶段，订单会在买家确认后再执行最终结算。
                   </div>
@@ -937,7 +946,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 )}
 
-                {order.status === 'pending_verification' ? (
+                {canSellerSubmitConsumption ? (
                   <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
                     <div className="text-sm font-medium">卖家发起资源消耗结算</div>
                     {consumptionItems.map((item, index) => (
@@ -985,7 +994,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 ) : null}
 
-                {isConsumptionPending ? (
+                {canBuyerRespondConsumption ? (
                   <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
                     <Textarea
                       value={consumptionBuyerRemark}
