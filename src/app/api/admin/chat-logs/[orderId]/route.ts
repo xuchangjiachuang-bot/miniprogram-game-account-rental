@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import { admins, chatMessages, db, groupChats, orders, users } from '@/lib/db';
 import { ensureOrderGroupChat, sendGroupMessageForUser } from '@/lib/chat-service-new';
 import { ensurePlatformCustomerServiceUser } from '@/lib/platform-customer-service-user';
@@ -68,7 +68,7 @@ export async function GET(
       .select()
       .from(chatMessages)
       .where(eq(chatMessages.groupChatId, groupChat.id))
-      .orderBy(desc(chatMessages.createdAt));
+      .orderBy(asc(chatMessages.createdAt));
 
     const senderIds = Array.from(
       new Set([
