@@ -22,6 +22,7 @@ import { useUser } from '@/contexts/UserContext';
 import { getToken } from '@/lib/auth-token';
 import { loadConfigFromCache, saveConfigToCache } from '@/lib/config-sync';
 import { useConfigUpdate } from '@/lib/config-sync-manager';
+import { resolvePublicFileReferences } from '@/lib/storage-public';
 
 export default function Home() {
   const { user, loading: userLoading, refreshUser } = useUser();
@@ -131,23 +132,8 @@ export default function Home() {
   };
 
   const sanitizeAccountImages = (screenshots: unknown) => {
-    const sourceList = Array.isArray(screenshots)
-      ? screenshots
-      : screenshots
-        ? [screenshots]
-        : [];
-
-    const sanitized = sourceList.filter((value): value is string => {
-      if (typeof value !== 'string' || !value.trim()) {
-        return false;
-      }
-
-      if (value.includes('example.com')) {
-        return false;
-      }
-
-      return true;
-    });
+    const sourceList = Array.isArray(screenshots) ? screenshots : screenshots ? [screenshots] : [];
+    const sanitized = resolvePublicFileReferences(sourceList).filter((value) => !value.includes('example.com'));
 
     return sanitized.length > 0 ? sanitized : ['/placeholder-image.svg'];
   };

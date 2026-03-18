@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, wecomCustomerService } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/admin-auth';
+import { classifyStoredFileReference } from '@/lib/storage-service';
+import { resolvePublicFileReference } from '@/lib/storage-public';
+
+function normalizeStoredFileValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const classified = classifyStoredFileReference(trimmed);
+  return classified.kind === 'storage-key' ? classified.normalized : trimmed;
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -49,8 +65,8 @@ export async function PUT(request: NextRequest) {
       encodingAESKey: encodingAESKey || '',
       kfId: '',
       kfName: '在线客服',
-      kfAvatar: kfAvatar || '',
-      kfQrCode: kfQrCode || '',
+      kfAvatar: normalizeStoredFileValue(kfAvatar),
+      kfQrCode: normalizeStoredFileValue(kfQrCode),
       kfUrl: kfUrl || '',
       autoReply: autoReply ?? true,
       welcomeMessage: welcomeMessage || '您好，欢迎咨询，请问有什么可以帮助您？',
@@ -100,7 +116,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: null });
     }
 
-    return NextResponse.json({ success: true, data: configs[0] });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...configs[0],
+        kfAvatar: resolvePublicFileReference(configs[0].kfAvatar),
+        kfQrCode: resolvePublicFileReference(configs[0].kfQrCode),
+      },
+    });
   } catch (error: any) {
     console.error('Failed to load customer service config:', error);
     return NextResponse.json(

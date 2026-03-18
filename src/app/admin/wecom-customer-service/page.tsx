@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ImageUploader } from '@/components/ImageUploader';
 import {
   MessageCircle,
   Settings,
@@ -19,7 +20,6 @@ import {
   Globe,
   AlertCircle,
   CheckCircle,
-  Upload,
   Smartphone,
   ExternalLink
 } from 'lucide-react';
@@ -330,10 +330,51 @@ export default function AdminWeComCustomerService() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-sm">客服头像</Label>
-                <div className="mt-2 p-6 border-2 border-dashed rounded-lg text-center">
-                  <Upload className="h-10 w-10 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">点击或拖拽上传客服头像</p>
-                  <p className="text-xs text-gray-500 mt-1">支持 JPG、PNG 格式，建议尺寸 200x200</p>
+                <div className="mt-2">
+                  <ImageUploader
+                    type="avatar"
+                    currentUrl={config.kfAvatar}
+                    accept="image/jpeg,image/png,image/webp"
+                    maxSize={2}
+                    onSuccess={(url, key) => {
+                      setConfig((current) => ({
+                        ...current,
+                        kfAvatar: key || url,
+                      }));
+                    }}
+                    onRemove={() => {
+                      setConfig((current) => ({
+                        ...current,
+                        kfAvatar: '',
+                      }));
+                    }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">支持 JPG、PNG、WEBP，建议尺寸 200x200</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm">客服二维码</Label>
+                <div className="mt-2">
+                  <ImageUploader
+                    type="general"
+                    currentUrl={config.kfQrCode}
+                    accept="image/jpeg,image/png,image/webp"
+                    maxSize={3}
+                    onSuccess={(url, key) => {
+                      setConfig((current) => ({
+                        ...current,
+                        kfQrCode: key || url,
+                      }));
+                    }}
+                    onRemove={() => {
+                      setConfig((current) => ({
+                        ...current,
+                        kfQrCode: '',
+                      }));
+                    }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">建议上传清晰二维码图片，用户端会直接展示并支持扫码</p>
                 </div>
               </div>
 

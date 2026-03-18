@@ -9,6 +9,7 @@ import {
   listPublicAccountLinks,
 } from '@/lib/search-content-service';
 import { buildAutoAccountSeo, resolveAccountSeo } from '@/lib/seo-auto';
+import { resolvePublicFileReferences } from '@/lib/storage-public';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -17,11 +18,7 @@ type PageProps = {
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hfb.yugioh.top';
 
 function getAccountImages(screenshots: unknown) {
-  if (!Array.isArray(screenshots)) {
-    return [];
-  }
-
-  return screenshots.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  return resolvePublicFileReferences(screenshots, { origin: siteUrl });
 }
 
 async function getPublicAccount(accountId: string) {

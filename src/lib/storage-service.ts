@@ -29,8 +29,27 @@ const LOCAL_UPLOAD_PREFIX = 'uploads';
 
 let remoteStorage: S3Storage | null | undefined;
 
+type StoredFileReferenceKind =
+  | 'empty'
+  | 'data-url'
+  | 'external-url'
+  | 'browser-path'
+  | 'storage-key';
+
 function hasRemoteStorageConfig(): boolean {
   return Boolean(process.env.COZE_BUCKET_ENDPOINT_URL && process.env.COZE_BUCKET_NAME);
+}
+
+function allowLocalStorageFallback(): boolean {
+  if (process.env.ALLOW_LOCAL_STORAGE_UPLOADS === 'true') {
+    return true;
+  }
+
+  if (process.env.ALLOW_LOCAL_STORAGE_UPLOADS === 'false') {
+    return false;
+  }
+
+  return process.env.NODE_ENV !== 'production';
 }
 
 function getRemoteStorage(): S3Storage | null {
@@ -73,6 +92,70 @@ function generateFileName(originalName: string, folder: string): string {
 function getLocalFilePath(fileKey: string): string {
   const normalized = fileKey.replace(/^\/+/, '').replace(/\.\./g, '');
   return path.join(LOCAL_PUBLIC_ROOT, normalized);
+}
+
+function normalizeStoredFileKey(fileKey: string): string {
+  return fileKey
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/\.\./g, '');
+}
+
+function classifyStoredFileReference(reference: string | null | undefined): {
+  kind: StoredFileReferenceKind;
+  original: string;
+  normalized: string;
+} {
+  const original = (reference || '').trim();
+  if (!original) {
+    return { kind: 'empty', original: '', normalized: '' };
+  }
+
+  if (original.startsWith('data:')) {
+    return { kind: 'data-url', original, normalized: original };
+  }
+
+  if (original.startsWith('http://') || original.startsWith('https://')) {
+    try {
+      const parsed = new URL(original);
+      const normalizedPath = normalizeStoredFileKey(parsed.pathname);
+      if (normalizedPath.startsWith(`${LOCAL_UPLOAD_PREFIX}/`)) {
+        return { kind: 'storage-key', original, normalized: normalizedPath };
+      }
+
+      return { kind: 'external-url', original, normalized: original };
+    } catch {
+      return { kind: 'external-url', original, normalized: original };
+    }
+  }
+
+  if (original.startsWith('/api/storage/file')) {
+    try {
+      const parsed = new URL(original, 'http://localhost');
+      const key = parsed.searchParams.get('key');
+      if (key) {
+        return {
+          kind: 'storage-key',
+          original,
+          normalized: normalizeStoredFileKey(key),
+        };
+      }
+    } catch {
+      return { kind: 'browser-path', original, normalized: original };
+    }
+  }
+
+  const normalized = normalizeStoredFileKey(original);
+  if (normalized.startsWith(`${LOCAL_UPLOAD_PREFIX}/`)) {
+    return { kind: 'storage-key', original, normalized };
+  }
+
+  if (original.startsWith('/')) {
+    return { kind: 'browser-path', original, normalized: original };
+  }
+
+  return { kind: 'storage-key', original, normalized };
 }
 
 function toPublicUrl(fileKey: string): string {
@@ -214,6 +297,13 @@ export async function uploadFile(
     const fileKey = generateFileName(fileName, folder);
     const storage = getRemoteStorage();
     if (!storage) {
+      if (!allowLocalStorageFallback()) {
+        return {
+          success: false,
+          error: 'PERSISTENT_STORAGE_NOT_CONFIGURED',
+        };
+      }
+
       return saveFileLocally(fileContent, fileName, folder);
     }
 
@@ -263,6 +353,13 @@ export async function uploadFileStream(
 
     const storage = getRemoteStorage();
     if (!storage) {
+      if (!allowLocalStorageFallback()) {
+        return {
+          success: false,
+          error: 'PERSISTENT_STORAGE_NOT_CONFIGURED',
+        };
+      }
+
       const buffer = await readStreamToBuffer(stream, maxSize);
       return uploadFile(buffer, fileName, contentType, options);
     }
@@ -327,12 +424,17 @@ export async function uploadFromUrl(
 
 export async function readFile(fileKey: string): Promise<Buffer | null> {
   try {
-    const storage = getRemoteStorage();
-    if (!storage) {
-      return await readLocalFile(getLocalFilePath(fileKey));
+    const normalizedReference = classifyStoredFileReference(fileKey);
+    if (normalizedReference.kind !== 'storage-key') {
+      return null;
     }
 
-    return await storage.readFile({ fileKey });
+    const storage = getRemoteStorage();
+    if (!storage) {
+      return await readLocalFile(getLocalFilePath(normalizedReference.normalized));
+    }
+
+    return await storage.readFile({ fileKey: normalizedReference.normalized });
   } catch (error) {
     console.error('读取文件失败:', error);
     return null;
@@ -341,9 +443,14 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
 
 export async function deleteFile(fileKey: string): Promise<boolean> {
   try {
+    const normalizedReference = classifyStoredFileReference(fileKey);
+    if (normalizedReference.kind !== 'storage-key') {
+      return false;
+    }
+
     const storage = getRemoteStorage();
     if (!storage) {
-      const localPath = getLocalFilePath(fileKey);
+      const localPath = getLocalFilePath(normalizedReference.normalized);
       if (!existsSync(localPath)) {
         return true;
       }
@@ -351,7 +458,7 @@ export async function deleteFile(fileKey: string): Promise<boolean> {
       return true;
     }
 
-    return await storage.deleteFile({ fileKey });
+    return await storage.deleteFile({ fileKey: normalizedReference.normalized });
   } catch (error) {
     console.error('删除文件失败:', error);
     return false;
@@ -360,12 +467,17 @@ export async function deleteFile(fileKey: string): Promise<boolean> {
 
 export async function fileExists(fileKey: string): Promise<boolean> {
   try {
-    const storage = getRemoteStorage();
-    if (!storage) {
-      return existsSync(getLocalFilePath(fileKey));
+    const normalizedReference = classifyStoredFileReference(fileKey);
+    if (normalizedReference.kind !== 'storage-key') {
+      return false;
     }
 
-    return await storage.fileExists({ fileKey });
+    const storage = getRemoteStorage();
+    if (!storage) {
+      return existsSync(getLocalFilePath(normalizedReference.normalized));
+    }
+
+    return await storage.fileExists({ fileKey: normalizedReference.normalized });
   } catch (error) {
     console.error('检查文件存在性失败:', error);
     return false;
@@ -377,13 +489,28 @@ export async function generateFileUrl(
   expireTime: number = 86400
 ): Promise<string | null> {
   try {
+    const normalizedReference = classifyStoredFileReference(fileKey);
+    if (normalizedReference.kind === 'empty') {
+      return null;
+    }
+
+    if (normalizedReference.kind === 'data-url') {
+      return normalizedReference.normalized;
+    }
+
+    if (normalizedReference.kind === 'external-url' || normalizedReference.kind === 'browser-path') {
+      return normalizeBrowserUrl(normalizedReference.normalized);
+    }
+
     const storage = getRemoteStorage();
     if (!storage) {
-      return (await fileExists(fileKey)) ? toPublicUrl(fileKey) : null;
+      return (await fileExists(normalizedReference.normalized))
+        ? toPublicUrl(normalizedReference.normalized)
+        : null;
     }
 
     return await storage.generatePresignedUrl({
-      key: fileKey,
+      key: normalizedReference.normalized,
       expireTime,
     });
   } catch (error) {
@@ -396,31 +523,27 @@ export async function resolveStoredFileReference(
   reference: string | null | undefined,
   expireTime: number = 86400
 ): Promise<string | null> {
-  if (!reference) {
-    return null;
-  }
-
-  const normalizedReference = reference.trim();
-  if (!normalizedReference) {
+  const classifiedReference = classifyStoredFileReference(reference);
+  if (classifiedReference.kind === 'empty') {
     return null;
   }
 
   if (
-    normalizedReference.startsWith('http://') ||
-    normalizedReference.startsWith('https://') ||
-    normalizedReference.startsWith('/')
+    classifiedReference.kind === 'data-url' ||
+    classifiedReference.kind === 'external-url' ||
+    classifiedReference.kind === 'browser-path'
   ) {
-    return normalizeBrowserUrl(normalizedReference);
+    return normalizeBrowserUrl(classifiedReference.normalized);
   }
 
   if (hasRemoteStorageConfig()) {
-    return generateFileUrl(normalizedReference, expireTime);
+    return generateFileUrl(classifiedReference.normalized, expireTime);
   }
 
-  return buildAppFileUrl(normalizedReference);
+  return buildAppFileUrl(classifiedReference.normalized);
 }
 
-export { inferContentType };
+export { classifyStoredFileReference, inferContentType, normalizeStoredFileKey };
 
 export async function listFiles(
   prefix: string,

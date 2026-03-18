@@ -3,6 +3,8 @@ import { and, eq, ne, or } from 'drizzle-orm';
 import { db, users } from './db';
 import { ensureWechatLoginSchema } from './init-wechat-login';
 import { ensureUserBalance } from './user-balance-service';
+import { classifyStoredFileReference } from './storage-service';
+import { resolvePublicFileReference } from './storage-public';
 
 export type UserType = 'buyer' | 'seller' | 'admin';
 
@@ -150,6 +152,20 @@ function normalizeWechatAvatar(avatar: string | undefined) {
   return trimToLength(avatar, WECHAT_AVATAR_MAX_LENGTH);
 }
 
+function normalizeStoredAvatarReference(avatar: string | null | undefined) {
+  const trimmed = trimToLength(avatar, WECHAT_AVATAR_MAX_LENGTH);
+  if (!trimmed) {
+    return null;
+  }
+
+  const classified = classifyStoredFileReference(trimmed);
+  if (classified.kind === 'storage-key') {
+    return classified.normalized.slice(0, WECHAT_AVATAR_MAX_LENGTH);
+  }
+
+  return trimmed;
+}
+
 function isPlaceholderWechatPhone(phone: string | null | undefined) {
   if (!phone) {
     return false;
@@ -171,7 +187,7 @@ function normalizeUser(row: UserRow): User {
     id: row.id,
     username: nickname,
     nickname,
-    avatar: row.avatar || row.wechatAvatar || null,
+    avatar: resolvePublicFileReference(row.avatar || row.wechatAvatar || null),
     email: row.email || null,
     phone: displayPhone,
     userType,
@@ -200,8 +216,8 @@ function normalizeUser(row: UserRow): User {
     wechat_unionid: row.wechatUnionid || null,
     wechatNickname: row.wechatNickname || null,
     wechat_nickname: row.wechatNickname || null,
-    wechatAvatar: row.wechatAvatar || null,
-    wechat_avatar: row.wechatAvatar || null,
+    wechatAvatar: resolvePublicFileReference(row.wechatAvatar || null),
+    wechat_avatar: resolvePublicFileReference(row.wechatAvatar || null),
   };
 }
 
@@ -304,7 +320,7 @@ export async function updateUserProfile(userId: string, params: UpdateUserProfil
   const nextPhoneInput = params.phone === undefined ? currentRow.phone : params.phone;
   const phone = trimToLength(nextPhoneInput, 20);
   const email = trimToLength(params.email ?? currentRow.email, 100);
-  const avatar = trimToLength(params.avatar ?? currentRow.avatar, WECHAT_AVATAR_MAX_LENGTH);
+  const avatar = normalizeStoredAvatarReference(params.avatar ?? currentRow.avatar);
 
   if (!nickname) {
     throw new Error('INVALID_NICKNAME');
@@ -495,7 +511,7 @@ async function createUser(params: {
     .values({
       phone: params.phone,
       nickname,
-      avatar: params.avatar || params.wechatAvatar || null,
+      avatar: normalizeStoredAvatarReference(params.avatar || params.wechatAvatar || null),
       email: params.email || null,
       realName: params.realName || null,
       idCard: params.idCard || null,
@@ -506,7 +522,7 @@ async function createUser(params: {
       wechatOpenPlatformOpenid: params.wechatOpenPlatformOpenid || null,
       wechatUnionid: params.wechatUnionid || null,
       wechatNickname: params.wechatNickname || null,
-      wechatAvatar: params.wechatAvatar || null,
+      wechatAvatar: normalizeStoredAvatarReference(params.wechatAvatar || null),
     })
     .returning();
 
@@ -521,7 +537,7 @@ export async function wechatLogin(params: WechatLoginParams): Promise<LoginResul
 
   const source = params.source === 'open' ? 'open' : 'mp';
   const { nickname, wechatNickname } = normalizeWechatNickname(params.nickname, openid);
-  const avatar = normalizeWechatAvatar(params.avatar);
+  const avatar = normalizeStoredAvatarReference(normalizeWechatAvatar(params.avatar));
   const unionid = params.unionid?.trim() || null;
   const identityPatch = buildIdentityPatch(openid, source);
 

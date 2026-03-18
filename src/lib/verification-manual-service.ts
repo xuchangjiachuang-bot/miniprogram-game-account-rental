@@ -4,6 +4,17 @@
 
 import { db, verificationApplications, users } from '@/lib/db';
 import { eq, and, desc } from 'drizzle-orm';
+import { classifyStoredFileReference } from '@/lib/storage-service';
+
+function normalizeStoredFileValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const classified = classifyStoredFileReference(trimmed);
+  return classified.kind === 'storage-key' ? classified.normalized : trimmed;
+}
 
 // ==================== 类型定义 ====================
 
@@ -53,8 +64,8 @@ export async function createVerificationApplication(
   params: CreateVerificationParams
 ): Promise<{ success: boolean; data?: VerificationApplication; error?: string }> {
   try {
-    const normalizedFrontUrl = params.idCardFrontUrl.trim();
-    const normalizedBackUrl = params.idCardBackUrl.trim();
+    const normalizedFrontUrl = normalizeStoredFileValue(params.idCardFrontUrl);
+    const normalizedBackUrl = normalizeStoredFileValue(params.idCardBackUrl);
 
     // 检查是否已有待审核或已通过的申请
     const existingApplication = await db

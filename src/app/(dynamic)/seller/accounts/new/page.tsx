@@ -18,6 +18,8 @@ import Link from 'next/link';
 import { useUser } from '@/contexts/UserContext';
 import { loadConfigFromCache, saveConfigToCache, loadSkinsFromCache } from '@/lib/config-sync';
 import { useConfigUpdate } from '@/lib/config-sync-manager';
+import { getToken } from '@/lib/auth-token';
+import { resolvePublicFileReferences } from '@/lib/storage-public';
 
 // 省市数据
 const provinceCityData: Record<string, string[]> = {
@@ -84,6 +86,7 @@ const createDefaultFormData = () => ({
   product_type: '\u4e09\u89d2\u6d32\u884c\u52a8\u54c8\u592b\u5e01\u51fa\u79df',
   images: [] as File[],
   imageUrls: [] as string[],
+  imageKeys: [] as string[],
   platform: '',
   province: 'all',
   city: 'all',
@@ -250,6 +253,7 @@ function NewAccountPage() {
     product_type: '三角洲行动哈夫币出租',
     images: [] as File[],
     imageUrls: [] as string[],
+    imageKeys: [] as string[],
     platform: '', // 平台选择：wegame、steam
     province: 'all',
     city: 'all',
@@ -373,9 +377,9 @@ function NewAccountPage() {
         const customAttributes = account.customAttributes || {};
 
         // 填充表单数据
-        setFormData({
-          ...createDefaultFormData(),
-          agreement: formData.agreement,
+          setFormData({
+            ...createDefaultFormData(),
+            agreement: formData.agreement,
           platform: customAttributes.platform || '',
           province: customAttributes.province || 'all',
           city: customAttributes.city || 'all',
@@ -396,10 +400,11 @@ function NewAccountPage() {
           level6_helmet: customAttributes.level6Helmet || '',
           level6_armor: customAttributes.level6Armor || '',
           remark: customAttributes.remark || '',
-          start_hour: customAttributes.startTime || '00',
-          end_hour: customAttributes.endTime || '23',
-          imageUrls: account.screenshots || []
-        });
+            start_hour: customAttributes.startTime || '00',
+            end_hour: customAttributes.endTime || '23',
+            imageUrls: resolvePublicFileReferences(account.screenshots),
+            imageKeys: account.screenshots || []
+          });
       }
     } catch (error) {
       console.error('加载账号数据失败:', error);
@@ -625,40 +630,68 @@ function NewAccountPage() {
   };
 
   // 处理图片上传
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + formData.images.length > 9) {
+    if (files.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    if (files.length + formData.imageUrls.length > 9) {
       alert('最多只能上传9张图片');
       return;
     }
 
-    const newImages = [...formData.images, ...files];
-    const newUrls = formData.imageUrls.slice();
+    try {
+      const token = getToken();
+      const uploadedImages: { key: string; url: string; file: File }[] = [];
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newUrls.push(reader.result as string);
-        if (newUrls.length === newImages.length) {
-          setFormData({
-            ...formData,
-            images: newImages,
-            imageUrls: newUrls
-          });
+      for (const file of files) {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+        uploadFormData.append('type', 'screenshot');
+
+        const response = await fetch('/api/storage/upload', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: uploadFormData,
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.key || !result.url) {
+          throw new Error(result.error || '鍥剧墖涓婁紶澶辫触');
         }
-      };
-      reader.readAsDataURL(file);
-    });
+
+        uploadedImages.push({
+          key: result.key,
+          url: result.url,
+          file,
+        });
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        images: [...prev.images, ...uploadedImages.map((item) => item.file)],
+        imageUrls: [...prev.imageUrls, ...uploadedImages.map((item) => item.url)],
+        imageKeys: [...prev.imageKeys, ...uploadedImages.map((item) => item.key)],
+      }));
+      e.target.value = '';
+    } catch (error) {
+      console.error('鍥剧墖涓婁紶澶辫触:', error);
+      alert(error instanceof Error ? error.message : '鍥剧墖涓婁紶澶辫触');
+    }
   };
 
   // 删除图片
   const handleRemoveImage = (index: number) => {
     const newImages = formData.images.filter((_, i) => i !== index);
     const newUrls = formData.imageUrls.filter((_, i) => i !== index);
+    const newKeys = formData.imageKeys.filter((_, i) => i !== index);
     setFormData({
       ...formData,
       images: newImages,
-      imageUrls: newUrls
+      imageUrls: newUrls,
+      imageKeys: newKeys
     });
   };
 
@@ -791,7 +824,7 @@ function NewAccountPage() {
         accountId: isEditMode ? undefined : `${formData.platform}_${formData.province}_${formData.city}_${Date.now()}`, // 生成唯一账号ID（仅创建模式）
         title: generatedTitle,
         description: formData.remark,
-        screenshots: formData.imageUrls,
+          screenshots: formData.imageKeys,
         coinsM: parseFloat(formData.coins_value),
         safeboxCount: formData.safebox_type === '2x2' ? 4 : formData.safebox_type === '2x3' ? 6 : 9,
         energyValue: parseInt(formData.load_level || '0'),

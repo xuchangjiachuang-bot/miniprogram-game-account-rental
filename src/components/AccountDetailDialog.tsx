@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { resolvePublicFileReference } from '@/lib/storage-public';
 
 interface AccountDetailDialogProps {
   open: boolean;
@@ -80,7 +81,10 @@ function getImageList(account: any) {
 
   for (const source of sources) {
     if (Array.isArray(source)) {
-      const items = source.filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
+      const items = source
+        .filter((item: unknown) => typeof item === 'string' && item.trim().length > 0)
+        .map((item: string) => resolvePublicFileReference(item))
+        .filter((item: string | null): item is string => Boolean(item));
       if (items.length > 0) {
         return items;
       }

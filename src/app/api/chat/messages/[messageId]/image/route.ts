@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { admins, chatMessages, db, groupChatMembers } from '@/lib/db';
-import { inferContentType, readFile } from '@/lib/storage-service';
+import { classifyStoredFileReference, inferContentType, readFile } from '@/lib/storage-service';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
 
@@ -77,15 +77,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const imageReference = classifyStoredFileReference(message.content);
     const imageBuffer = await readFile(message.content);
     if (!imageBuffer) {
-      return NextResponse.json({ success: false, error: '图片不存在' }, { status: 404 });
+      return NextResponse.json({
+        success: false,
+        error: imageReference.kind === 'storage-key'
+          ? '图片文件不存在，可能是历史本地文件已丢失'
+          : '图片文件不存在',
+      }, { status: 404 });
     }
 
     return new NextResponse(new Uint8Array(imageBuffer), {
       status: 200,
       headers: {
-        'Content-Type': inferContentType(message.content),
+        'Content-Type': inferContentType(imageReference.normalized || message.content),
         'Content-Disposition': 'inline',
         'Cache-Control': 'private, max-age=300, stale-while-revalidate=300',
       },

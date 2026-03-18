@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, wecomCustomerService } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { resolvePublicFileReference } from '@/lib/storage-public';
 
 /**
  * 获取企业微信客服配置
@@ -42,14 +43,14 @@ export async function GET() {
     // 返回公开配置（不包含敏感信息）
     return NextResponse.json({
       success: true,
-      data: {
-        isEnabled: config.isEnabled,
-        status: config.status,
-        kfAvatar: config.kfAvatar,
-        kfQrCode: config.kfQrCode,
-        kfUrl: config.kfUrl,
-        welcomeMessage: config.welcomeMessage,
-        offlineMessage: config.offlineMessage,
+        data: {
+          isEnabled: config.isEnabled,
+          status: config.status,
+          kfAvatar: resolvePublicFileReference(config.kfAvatar),
+          kfQrCode: resolvePublicFileReference(config.kfQrCode),
+          kfUrl: config.kfUrl,
+          welcomeMessage: config.welcomeMessage,
+          offlineMessage: config.offlineMessage,
         busyMessage: config.busyMessage,
         autoReply: config.autoReply,
         showOnHomepage: config.showOnHomepage,
