@@ -1,22 +1,17 @@
 import { existsSync } from 'fs';
 import {
   mkdir,
+  mkdtemp,
   readdir,
   readFile as readLocalFile,
+  rm,
   unlink,
   writeFile,
 } from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
-import { Upload } from '@aws-sdk/lib-storage';
+import CloudBase from '@cloudbase/manager-node';
 
 export interface UploadResult {
   success: boolean;
@@ -35,7 +30,7 @@ export interface UploadOptions {
 const LOCAL_PUBLIC_ROOT = path.join(process.cwd(), 'public');
 const LOCAL_UPLOAD_PREFIX = 'uploads';
 
-let remoteStorage: S3Client | null | undefined;
+let cloudBaseStorage: any | null | undefined;
 
 type StoredFileReferenceKind =
   | 'empty'
@@ -55,83 +50,42 @@ function getConfiguredEnvValue(names: string[]): string {
   return '';
 }
 
-function getRemoteEndpointUrl(): string {
+function getCloudBaseEnvId(): string {
   return getConfiguredEnvValue([
-    'COZE_BUCKET_ENDPOINT_URL',
-    'STORAGE_ENDPOINT',
-    'AWS_ENDPOINT_URL',
+    'CLOUDBASE_ENV_ID',
+    'TCB_ENV_ID',
+    'TCB_ENV',
   ]);
 }
 
-function getRemoteBucketName(): string {
+function getCloudBaseSecretId(): string {
   return getConfiguredEnvValue([
-    'COZE_BUCKET_NAME',
-    'STORAGE_BUCKET_NAME',
-    'AWS_BUCKET_NAME',
+    'CLOUDBASE_SECRETID',
+    'TENCENTCLOUD_SECRETID',
+  ]);
+}
+
+function getCloudBaseSecretKey(): string {
+  return getConfiguredEnvValue([
+    'CLOUDBASE_SECRETKEY',
+    'TENCENTCLOUD_SECRETKEY',
+  ]);
+}
+
+function getCloudBaseToken(): string {
+  return getConfiguredEnvValue([
+    'CLOUDBASE_SESSIONTOKEN',
+    'TENCENTCLOUD_SESSIONTOKEN',
+    'TENCENTCLOUD_TOKEN',
   ]);
 }
 
 function hasRemoteStorageConfig(): boolean {
-  return Boolean(getRemoteEndpointUrl() && getRemoteBucketName());
-}
-
-function getRemoteRegion(): string {
-  const configuredRegion = getConfiguredEnvValue([
-    'COZE_BUCKET_REGION',
-    'STORAGE_REGION',
-    'AWS_REGION',
-  ]);
-  if (configuredRegion) {
-    return configuredRegion;
-  }
-
-  const endpoint = getRemoteEndpointUrl();
-  if (endpoint) {
-    try {
-      const { hostname } = new URL(endpoint);
-      const cosMatch = hostname.match(/cos[.-]([a-z0-9-]+)\.myqcloud\.com$/i);
-      if (cosMatch?.[1]) {
-        return cosMatch[1];
-      }
-
-      const tosMatch = hostname.match(/tos[.-]([a-z0-9-]+)\./i);
-      if (tosMatch?.[1]) {
-        return tosMatch[1];
-      }
-    } catch {
-      // ignore invalid endpoint and use the safe fallback below
-    }
-  }
-
-  return 'ap-shanghai';
-}
-
-function getRemoteCredentials() {
-  const accessKeyId = getConfiguredEnvValue([
-    'COZE_BUCKET_ACCESS_KEY_ID',
-    'STORAGE_ACCESS_KEY_ID',
-    'AWS_ACCESS_KEY_ID',
-  ]);
-  const secretAccessKey = getConfiguredEnvValue([
-    'COZE_BUCKET_SECRET_ACCESS_KEY',
-    'STORAGE_SECRET_ACCESS_KEY',
-    'AWS_SECRET_ACCESS_KEY',
-  ]);
-  const sessionToken = getConfiguredEnvValue([
-    'COZE_BUCKET_SESSION_TOKEN',
-    'STORAGE_SESSION_TOKEN',
-    'AWS_SESSION_TOKEN',
-  ]);
-
-  if (!accessKeyId || !secretAccessKey) {
-    return undefined;
-  }
-
-  return {
-    accessKeyId,
-    secretAccessKey,
-    sessionToken: sessionToken || undefined,
-  };
+  return Boolean(
+    getCloudBaseEnvId()
+    && getCloudBaseSecretId()
+    && getCloudBaseSecretKey(),
+  );
 }
 
 function allowLocalStorageFallback(): boolean {
@@ -146,72 +100,22 @@ function allowLocalStorageFallback(): boolean {
   return process.env.NODE_ENV !== 'production';
 }
 
-function getRemoteStorage(): S3Client | null {
+function getRemoteStorage(): any | null {
   if (!hasRemoteStorageConfig()) {
     return null;
   }
 
-  if (!remoteStorage) {
-    const credentials = getRemoteCredentials();
-    remoteStorage = new S3Client({
-      endpoint: getRemoteEndpointUrl(),
-      region: getRemoteRegion(),
-      forcePathStyle: true,
-      credentials,
+  if (!cloudBaseStorage) {
+    const app = CloudBase.init({
+      envId: getCloudBaseEnvId(),
+      secretId: getCloudBaseSecretId(),
+      secretKey: getCloudBaseSecretKey(),
+      token: getCloudBaseToken() || undefined,
     });
+    cloudBaseStorage = app.storage;
   }
 
-  return remoteStorage;
-}
-
-function isRemoteNotFoundError(error: unknown): boolean {
-  const candidate = error as {
-    name?: string;
-    Code?: string;
-    $metadata?: { httpStatusCode?: number };
-  };
-
-  return (
-    candidate?.name === 'NotFound' ||
-    candidate?.name === 'NoSuchKey' ||
-    candidate?.Code === 'NotFound' ||
-    candidate?.Code === 'NoSuchKey' ||
-    candidate?.$metadata?.httpStatusCode === 404
-  );
-}
-
-async function bufferFromRemoteBody(body: unknown): Promise<Buffer> {
-  if (!body) {
-    return Buffer.alloc(0);
-  }
-
-  if (Buffer.isBuffer(body)) {
-    return body;
-  }
-
-  if (body instanceof Uint8Array) {
-    return Buffer.from(body);
-  }
-
-  if (
-    typeof (body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray
-    === 'function'
-  ) {
-    const bytes = await (body as {
-      transformToByteArray: () => Promise<Uint8Array>;
-    }).transformToByteArray();
-    return Buffer.from(bytes);
-  }
-
-  if (typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === 'function') {
-    const chunks: Buffer[] = [];
-    for await (const chunk of body as AsyncIterable<Uint8Array>) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
-  }
-
-  throw new Error('UNSUPPORTED_REMOTE_BODY');
+  return cloudBaseStorage;
 }
 
 function normalizeFolder(folder: string): string {
@@ -266,18 +170,6 @@ function classifyStoredFileReference(reference: string | null | undefined): {
       const normalizedPath = normalizeStoredFileKey(parsed.pathname);
       if (normalizedPath.startsWith(`${LOCAL_UPLOAD_PREFIX}/`)) {
         return { kind: 'storage-key', original, normalized: normalizedPath };
-      }
-
-      const bucketName = getRemoteBucketName();
-      if (bucketName) {
-        const bucketPrefix = `${bucketName}/${LOCAL_UPLOAD_PREFIX}/`;
-        if (normalizedPath.startsWith(bucketPrefix)) {
-          return {
-            kind: 'storage-key',
-            original,
-            normalized: normalizedPath.slice(bucketName.length + 1),
-          };
-        }
       }
 
       const uploadsIndex = normalizedPath.indexOf(`${LOCAL_UPLOAD_PREFIX}/`);
@@ -374,38 +266,39 @@ function buildAppFileUrl(fileKey: string): string {
   return `/api/storage/file?${params.toString()}`;
 }
 
-async function verifyRemoteObjectExists(storage: S3Client, fileKey: string): Promise<void> {
-  await storage.send(new HeadObjectCommand({
-    Bucket: getRemoteBucketName(),
-    Key: fileKey,
-  }));
+async function withTemporaryFile<T>(
+  fileName: string,
+  callback: (localPath: string) => Promise<T>,
+): Promise<T> {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cloudbase-storage-'));
+  const tempPath = path.join(tempDir, fileName);
+
+  try {
+    return await callback(tempPath);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function verifyRemoteObjectExists(storage: any, fileKey: string): Promise<void> {
+  await storage.getFileInfo(fileKey);
 }
 
 async function uploadFileToRemoteStorage(
-  storage: S3Client,
+  storage: any,
   fileKey: string,
-  body: Buffer | NodeJS.ReadableStream,
-  contentType: string,
+  fileContent: Buffer,
+  originalName: string,
 ): Promise<void> {
-  if (Buffer.isBuffer(body)) {
-    await storage.send(new PutObjectCommand({
-      Bucket: getRemoteBucketName(),
-      Key: fileKey,
-      Body: body,
-      ContentType: contentType,
-    }));
-  } else {
-    const uploader = new Upload({
-      client: storage,
-      params: {
-        Bucket: getRemoteBucketName(),
-        Key: fileKey,
-        Body: body as any,
-        ContentType: contentType,
-      },
+  const tempFileName = `${randomUUID()}${path.extname(originalName) || '.bin'}`;
+
+  await withTemporaryFile(tempFileName, async (localPath) => {
+    await writeFile(localPath, fileContent);
+    await storage.uploadFile({
+      localPath,
+      cloudPath: fileKey,
     });
-    await uploader.done();
-  }
+  });
 
   await verifyRemoteObjectExists(storage, fileKey);
 }
@@ -483,6 +376,8 @@ export async function uploadFile(
       folder = 'uploads',
     } = options;
 
+    void contentType;
+
     if (!validateFileSize(fileContent.length, maxSize)) {
       return {
         success: false,
@@ -510,7 +405,7 @@ export async function uploadFile(
     }
 
     const key = generateFileName(fileName, folder);
-    await uploadFileToRemoteStorage(storage, key, fileContent, contentType);
+    await uploadFileToRemoteStorage(storage, key, fileContent, fileName);
 
     return {
       success: true,
@@ -536,7 +431,6 @@ export async function uploadFileStream(
     const {
       maxSize = 10 * 1024 * 1024,
       allowedTypes = [],
-      folder = 'uploads',
     } = options;
 
     if (allowedTypes.length > 0 && !validateFileType(contentType, allowedTypes)) {
@@ -546,27 +440,8 @@ export async function uploadFileStream(
       };
     }
 
-    const storage = getRemoteStorage();
-    if (!storage) {
-      if (!allowLocalStorageFallback()) {
-        return {
-          success: false,
-          error: 'PERSISTENT_STORAGE_NOT_CONFIGURED',
-        };
-      }
-
-      const buffer = await readStreamToBuffer(stream, maxSize);
-      return uploadFile(buffer, fileName, contentType, options);
-    }
-
-    const key = generateFileName(fileName, folder);
-    await uploadFileToRemoteStorage(storage, key, stream, contentType);
-
-    return {
-      success: true,
-      key,
-      url: buildAppFileUrl(key),
-    };
+    const buffer = await readStreamToBuffer(stream, maxSize);
+    return uploadFile(buffer, fileName, contentType, options);
   } catch (error: any) {
     console.error('uploadFileStream failed:', error);
     return {
@@ -622,11 +497,13 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
     }
 
     try {
-      const response = await storage.send(new GetObjectCommand({
-        Bucket: getRemoteBucketName(),
-        Key: normalizedReference.normalized,
-      }));
-      return await bufferFromRemoteBody(response.Body);
+      return await withTemporaryFile(path.basename(normalizedReference.normalized), async (localPath) => {
+        await storage.downloadFile({
+          cloudPath: normalizedReference.normalized,
+          localPath,
+        });
+        return readLocalFile(localPath);
+      });
     } catch (remoteError) {
       const localPath = getLocalFilePath(normalizedReference.normalized);
       if (existsSync(localPath)) {
@@ -659,11 +536,7 @@ export async function deleteFile(fileKey: string): Promise<boolean> {
       return true;
     }
 
-    await storage.send(new DeleteObjectCommand({
-      Bucket: getRemoteBucketName(),
-      Key: normalizedReference.normalized,
-    }));
-
+    await storage.deleteFile([normalizedReference.normalized]);
     return true;
   } catch (error) {
     console.error('deleteFile failed:', error);
@@ -686,13 +559,9 @@ export async function fileExists(fileKey: string): Promise<boolean> {
     try {
       await verifyRemoteObjectExists(storage, normalizedReference.normalized);
       return true;
-    } catch (error) {
-      if (!isRemoteNotFoundError(error)) {
-        throw error;
-      }
+    } catch {
+      return existsSync(getLocalFilePath(normalizedReference.normalized));
     }
-
-    return existsSync(getLocalFilePath(normalizedReference.normalized));
   } catch (error) {
     console.error('fileExists failed:', error);
     return false;
@@ -778,17 +647,16 @@ export async function listFiles(
       };
     }
 
-    const result = await storage.send(new ListObjectsV2Command({
-      Bucket: getRemoteBucketName(),
-      Prefix: normalizeStoredFileKey(prefix),
-      MaxKeys: maxKeys,
-    }));
+    const normalizedPrefix = normalizeStoredFileKey(prefix);
+    const result = await storage.listDirectoryFiles(normalizedPrefix);
+    const keys = (Array.isArray(result) ? result : [])
+      .map((item: any) => String(item?.Key || '').trim())
+      .filter(Boolean)
+      .slice(0, maxKeys);
 
     return {
-      keys: (result.Contents || [])
-        .map((item) => item.Key || '')
-        .filter(Boolean),
-      isTruncated: Boolean(result.IsTruncated),
+      keys,
+      isTruncated: keys.length >= maxKeys,
     };
   } catch (error) {
     console.error('listFiles failed:', error);
