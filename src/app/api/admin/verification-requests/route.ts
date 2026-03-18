@@ -4,6 +4,19 @@ import { eq } from 'drizzle-orm';
 import { getPendingVerificationApplications, reviewVerificationApplication } from '@/lib/verification-manual-service';
 import { resolveStoredFileReference } from '@/lib/storage-service';
 
+function normalizeAuditPhoneDisplay(phone?: string | null) {
+  const trimmed = phone?.trim() || '';
+  if (!trimmed) {
+    return '';
+  }
+
+  if (/^(wx|wechat)_[a-z0-9]+$/i.test(trimmed)) {
+    return '';
+  }
+
+  return /^1[3-9]\d{9}$/.test(trimmed) ? trimmed : '';
+}
+
 /**
  * 获取待审核的实名认证申请列表
  * GET /api/admin/verification-requests
@@ -70,7 +83,7 @@ export async function GET(request: NextRequest) {
           ...app,
           idCardFrontUrl: frontUrl || '',
           idCardBackUrl: backUrl || '',
-          userPhone: appUser?.phone || '',
+          userPhone: normalizeAuditPhoneDisplay(appUser?.phone),
           userName: appUser?.nickname || ''
         };
       })

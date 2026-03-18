@@ -147,7 +147,7 @@ export default function VerificationRequestsPage() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{app.realName}</span>
-                          <Badge variant="outline">{app.userPhone}</Badge>
+                          {app.userPhone ? <Badge variant="outline">{app.userPhone}</Badge> : null}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           身份证号：{app.idCard}
@@ -191,7 +191,7 @@ export default function VerificationRequestsPage() {
                   </div>
                   <div>
                     <Label>手机号</Label>
-                    <div className="mt-1 p-2 bg-muted rounded">{selectedApplication.userPhone}</div>
+                    <div className="mt-1 p-2 bg-muted rounded">{selectedApplication.userPhone || '-'}</div>
                   </div>
                   <div>
                     <Label>真实姓名</Label>

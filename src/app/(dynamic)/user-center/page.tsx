@@ -250,18 +250,6 @@ export default function UserCenterPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const frontPreview = verificationPreview.front;
-    const backPreview = verificationPreview.back;
-
-    return () => {
-      [frontPreview, backPreview].forEach((url) => {
-        if (url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, [verificationPreview.front, verificationPreview.back]);
 
   // 加载用户资料
   useEffect(() => {
@@ -1090,7 +1078,12 @@ export default function UserCenterPage() {
       toast.success('上传成功');
 
       // 更新表单
-      const previewUrl = URL.createObjectURL(file);
+      const previewUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => reject(new Error('图片预览生成失败'));
+        reader.readAsDataURL(file);
+      });
 
       if (side === 'front') {
         setVerificationForm(prev => ({ ...prev, idCardFront: result.url }));
@@ -1155,6 +1148,9 @@ export default function UserCenterPage() {
 
       // 显示成功提示
       toast.success(result.message || '实名认证申请已提交，请等待人工审核');
+      setVerificationStatus('pending');
+      setVerificationReviewComment('');
+      setVerificationDialogOpen(false);
     } catch (error: any) {
       toast.error(error.message || '提交失败，请重试');
     } finally {
@@ -1189,6 +1185,7 @@ export default function UserCenterPage() {
   }
 
   const isVerified = user.isRealNameVerified;
+  const canOpenVerificationDialog = !isVerified && verificationStatus !== 'pending';
 
   return (
     <div className="min-h-screen bg-background">
@@ -1357,9 +1354,14 @@ export default function UserCenterPage() {
                         </div>
                       ) : null}
                       <Button
-                        onClick={() => setVerificationDialogOpen(true)}
+                        onClick={() => {
+                          if (canOpenVerificationDialog) {
+                            setVerificationDialogOpen(true);
+                          }
+                        }}
                         className="w-full"
                         size="lg"
+                        disabled={!canOpenVerificationDialog}
                       >
                         <Shield className="w-4 h-4 mr-2" />
                         开始实名认证
@@ -1985,7 +1987,10 @@ export default function UserCenterPage() {
       </div>
 
       {/* 实名认证对话框 */}
-      <Dialog open={verificationDialogOpen} onOpenChange={setVerificationDialogOpen}>
+      <Dialog
+        open={verificationDialogOpen && canOpenVerificationDialog}
+        onOpenChange={(open) => setVerificationDialogOpen(open && canOpenVerificationDialog)}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>实名认证</DialogTitle>
