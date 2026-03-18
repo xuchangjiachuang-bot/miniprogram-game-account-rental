@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="45%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <radialGradient id="lightA" cx="0" cy="0" r="1" gradientTransform="translate(260 160) rotate(28.739) scale(380 250)">
+      <stop stop-color="#38bdf8" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lightB" cx="0" cy="0" r="1" gradientTransform="translate(1320 720) rotate(-146.221) scale(420 320)">
+      <stop stop-color="#34d399" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" rx="40" fill="url(#bg2)"/>
+  <rect x="92" y="92" width="1416" height="716" rx="30" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)"/>
+  <circle cx="260" cy="160" r="260" fill="url(#lightA)"/>
+  <circle cx="1320" cy="720" r="280" fill="url(#lightB)"/>
+  <g opacity="0.18">
+    <path d="M170 598C352 480 554 432 708 486C848 535 938 640 1124 646C1244 650 1360 615 1468 566" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M170 642C352 524 554 476 708 530C848 579 938 684 1124 690C1244 694 1360 659 1468 610" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.2">
+    <rect x="1110" y="168" width="250" height="172" rx="24" stroke="#fff" stroke-width="8"/>
+    <rect x="1142" y="210" width="186" height="22" rx="11" fill="#fff"/>
+    <rect x="1142" y="252" width="110" height="16" rx="8" fill="#fff"/>
+    <rect x="1142" y="282" width="146" height="16" rx="8" fill="#fff"/>
+  </g>
+  <g opacity="0.16">
+    <rect x="214" y="170" width="250" height="250" rx="26" stroke="#fff" stroke-width="8"/>
+    <path d="M264 334L320 278L360 318L414 264" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="290" cy="246" r="18" fill="#fff"/>
+  </g>
+</svg>

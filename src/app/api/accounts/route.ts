@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
-import { db, accounts } from '@/lib/db';
+import { db, accounts, ensureDatabaseInitialized } from '@/lib/db';
 import { submitForAudit } from '@/lib/account-audit-service';
 import { freezeListingDeposit } from '@/lib/account-deposit-service';
 import { requireAdmin } from '@/lib/admin-auth';
@@ -13,6 +13,8 @@ import { verifyToken } from '@/lib/user-service';
  */
 export async function POST(request: NextRequest) {
   try {
+    await ensureDatabaseInitialized();
+
     const adminAuth = await requireAdmin(request);
     const token = getServerToken(request);
     const user = token ? await verifyToken(token) : null;
@@ -197,6 +199,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await ensureDatabaseInitialized();
+
     const adminAuth = await requireAdmin(request);
     const token = getServerToken(request);
     const user = token ? await verifyToken(token) : null;

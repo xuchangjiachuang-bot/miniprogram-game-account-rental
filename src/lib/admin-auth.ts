@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+ï»¿import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { admins, db } from '@/lib/db';
+import { admins, db, ensureDatabaseInitialized } from '@/lib/db';
 
 export async function requireAdmin(request: NextRequest) {
+  await ensureDatabaseInitialized();
+
   const adminToken = request.cookies.get('admin_token')?.value;
 
   if (!adminToken) {
     return {
       error: NextResponse.json(
-        { success: false, error: 'Î´µÇÂ¼' },
+        { success: false, error: 'æœªç™»å½•' },
         { status: 401 }
       ),
     };
@@ -23,7 +25,7 @@ export async function requireAdmin(request: NextRequest) {
   if (adminList.length === 0) {
     return {
       error: NextResponse.json(
-        { success: false, error: '¹ÜÀíÔ±²»´æÔÚ' },
+        { success: false, error: 'ç®¡ç†å‘˜ä¸å­˜åœ¨' },
         { status: 401 }
       ),
     };
@@ -34,7 +36,7 @@ export async function requireAdmin(request: NextRequest) {
   if (admin.status !== 'active') {
     return {
       error: NextResponse.json(
-        { success: false, error: 'ÕËºÅÒÑ±»½ûÓÃ' },
+        { success: false, error: 'è´¦å·å·²è¢«ç¦ç”¨' },
         { status: 403 }
       ),
     };

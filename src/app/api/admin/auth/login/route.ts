@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db, admins, ensureDatabaseInitialized } from '@/lib/db';
-import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { admins, db, ensureDatabaseInitialized } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,18 +17,23 @@ export async function POST(request: NextRequest) {
           success: false,
           error: '请输入用户名和密码',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const adminList = await db.select().from(admins).where(eq(admins.username, username)).limit(1);
+    const adminList = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.username, username))
+      .limit(1);
+
     if (adminList.length === 0) {
       return NextResponse.json(
         {
           success: false,
           error: '用户名或密码错误',
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -38,7 +44,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: '账号已被禁用',
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -49,7 +55,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: '用户名或密码错误',
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -81,14 +87,15 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error: any) {
-    console.error('[管理员登录] 异常:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '登录失败';
+    console.error('[POST /api/admin/auth/login] Failed:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '登录失败',
+        error: message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
