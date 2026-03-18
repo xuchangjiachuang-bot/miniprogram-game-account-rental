@@ -164,7 +164,7 @@ export const orders = pgTable("orders", {
 	buyerId: uuid("buyer_id").notNull(),
 	sellerId: uuid("seller_id").notNull(),
 	accountId: uuid("account_id").notNull(),
-	status: varchar({ length: 20 }).default('pending_payment'),
+	status: varchar({ length: 40 }).default('pending_payment'),
 	rentalDuration: integer("rental_duration").notNull(),
 	rentalPrice: numeric("rental_price", { precision: 10, scale:  2 }).notNull(),
 	deposit: numeric({ precision: 10, scale:  2 }).notNull(),

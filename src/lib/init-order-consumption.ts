@@ -9,6 +9,11 @@ export async function initOrderConsumptionTables() {
 
   try {
     await db.execute(`
+      ALTER TABLE orders
+      ALTER COLUMN status TYPE VARCHAR(40);
+    `);
+
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS order_consumption_settlements (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
