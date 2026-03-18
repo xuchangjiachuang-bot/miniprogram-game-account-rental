@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeHomepageConfig } from '@/lib/homepage-config-normalizer';
+import { sanitizeHomepageConfigForAdmin } from '@/lib/homepage-config-normalizer';
 import { requireAdmin } from '@/lib/admin-auth';
 import { broadcastConfigUpdate } from '@/lib/sse-broadcaster';
 import { systemConfigManager } from '@/storage/database/systemConfigManager';
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const config = await systemConfigManager.getHomepageConfig();
     return NextResponse.json({
       success: true,
-      data: normalizeHomepageConfig(config),
+      data: sanitizeHomepageConfigForAdmin(config),
     });
   } catch (error) {
     console.error('[GET /api/admin/homepage-config] Failed:', error);
@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const normalizedConfig = normalizeHomepageConfig(config);
-    const savedConfig = await systemConfigManager.saveHomepageConfig(normalizedConfig);
+    const savedConfig = await systemConfigManager.saveHomepageConfig(
+      sanitizeHomepageConfigForAdmin(config),
+    );
     await broadcastConfigUpdate('all');
 
     return NextResponse.json({

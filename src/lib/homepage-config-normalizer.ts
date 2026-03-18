@@ -179,3 +179,45 @@ export function normalizeHomepageConfig(rawConfig: HomepageConfig | null | undef
     },
   };
 }
+
+export function sanitizeHomepageConfigForAdmin(rawConfig: HomepageConfig | null | undefined): HomepageConfig {
+  const carousels = Array.isArray(rawConfig?.carousels)
+    ? rawConfig.carousels.map((item, index) => ({
+      id: String(item?.id || `carousel-${index + 1}`),
+      title: String(item?.title || '').trim(),
+      description: String(item?.description || '').trim(),
+      imageUrl: normalizeImageUrl(item?.imageUrl, ''),
+      linkUrl: String(item?.linkUrl || '').trim(),
+      order: typeof item?.order === 'number' ? item.order : index,
+      enabled: typeof item?.enabled === 'boolean' ? item.enabled : true,
+    }))
+    : [];
+
+  const logos: LogoItem[] = Array.isArray(rawConfig?.logos)
+    ? rawConfig.logos.map((item, index): LogoItem => ({
+      id: String(item?.id || `logo-${index + 1}`),
+      name: String(item?.name || '').trim(),
+      type: item?.type === 'image' ? 'image' : 'text',
+      imageUrl: item?.type === 'image' ? normalizeImageUrl(item?.imageUrl, '') : undefined,
+      text: item?.type === 'image' ? undefined : String(item?.text || '').trim(),
+      textStyle: item?.textStyle || {
+        fontSize: 'xl',
+        fontWeight: 'bold',
+      },
+      linkUrl: String(item?.linkUrl || '').trim(),
+      enabled: typeof item?.enabled === 'boolean' ? item.enabled : true,
+    }))
+    : [];
+
+  return {
+    carousels,
+    logos,
+    skinOptions: Array.isArray(rawConfig?.skinOptions) ? rawConfig.skinOptions : [],
+    footerInfo: {
+      copyright: String(rawConfig?.footerInfo?.copyright || '').trim(),
+      icpNumber: String(rawConfig?.footerInfo?.icpNumber || '').trim(),
+      publicSecurityNumber: String(rawConfig?.footerInfo?.publicSecurityNumber || '').trim(),
+      otherInfo: String(rawConfig?.footerInfo?.otherInfo || '').trim(),
+    },
+  };
+}
