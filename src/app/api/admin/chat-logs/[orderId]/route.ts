@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { admins, chatMessages, db, groupChats, orders, users } from '@/lib/db';
-import { resolveStoredFileReference } from '@/lib/storage-service';
 import { ensureOrderGroupChat, sendGroupMessageForUser } from '@/lib/chat-service-new';
 import { ensurePlatformCustomerServiceUser } from '@/lib/platform-customer-service-user';
-import { formatServerDateTime } from '@/lib/time';
 
 async function requireAdminToken(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -95,12 +93,11 @@ export async function GET(
           senderName:
             message.senderType === 'system' ? '系统' : sender?.nickname || sender?.phone || '未知用户',
           senderType: message.senderType,
-          content:
-            message.messageType === 'image'
-              ? (await resolveStoredFileReference(message.content)) || message.content
-              : message.content,
+          content: message.messageType === 'image' ? '' : message.content,
+          fileKey: message.messageType === 'image' ? message.content : undefined,
+          imageUrl: message.messageType === 'image' ? `/api/chat/messages/${encodeURIComponent(message.id)}/image` : undefined,
           messageType: message.messageType || 'text',
-          timestamp: formatServerDateTime(message.createdAt),
+          timestamp: message.createdAt,
         };
       }),
     );

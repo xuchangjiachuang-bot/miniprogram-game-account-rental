@@ -30,6 +30,8 @@ export interface ChatMessage {
   senderName: string;
   senderAvatar?: string;
   content: string;
+  fileKey?: string;
+  imageUrl?: string;
   messageType: 'text' | 'image' | 'system';
   createdAt: string;
 }

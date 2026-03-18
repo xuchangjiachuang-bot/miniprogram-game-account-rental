@@ -15,6 +15,8 @@ interface ChatMessage {
   senderType: 'buyer' | 'seller' | 'admin' | 'system';
   senderName: string;
   content: string;
+  fileKey?: string;
+  imageUrl?: string;
   messageType?: 'text' | 'image' | 'system';
   timestamp: string;
 }
@@ -597,8 +599,8 @@ export default function AdminChatLogs() {
                             }`}
                           >
                             {message.messageType === 'image' ? (
-                              <a href={message.content} target="_blank" rel="noreferrer">
-                                <img src={message.content} alt="聊天图片" className="max-h-72 max-w-full rounded-lg object-contain" />
+                              <a href={message.imageUrl || '#'} target="_blank" rel="noreferrer">
+                                <img src={message.imageUrl} alt="聊天图片" className="max-h-72 max-w-full rounded-lg object-contain" />
                               </a>
                             ) : (
                               message.content

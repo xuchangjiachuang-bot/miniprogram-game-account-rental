@@ -256,9 +256,9 @@ export function ChatWindow({ group, onClose, onMessageSent }: ChatWindowProps) {
                       }
                     >
                       {message.messageType === 'image' ? (
-                        <a href={message.content} target="_blank" rel="noreferrer">
+                        <a href={message.imageUrl || '#'} target="_blank" rel="noreferrer">
                           <img
-                            src={message.content}
+                            src={message.imageUrl}
                             alt="聊天图片"
                             className="max-h-72 max-w-full rounded-lg object-contain"
                           />

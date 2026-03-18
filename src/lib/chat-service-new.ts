@@ -1,8 +1,6 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { accounts, chatMessages, db, groupChatMembers, groupChats, orders, users } from '@/lib/db';
 import { ensurePlatformCustomerServiceMember } from '@/lib/platform-customer-service-user';
-import { resolveStoredFileReference } from '@/lib/storage-service';
-import { formatServerDateTime } from '@/lib/time';
 
 export interface ChatGroupMemberSummary {
   id: string;
@@ -32,11 +30,17 @@ export interface ChatMessageSummary {
   senderName: string;
   senderAvatar?: string;
   content: string;
+  fileKey?: string;
+  imageUrl?: string;
   messageType: 'text' | 'image' | 'system';
   createdAt: string;
 }
 
 type ChatMemberRole = 'buyer' | 'seller' | 'admin';
+
+function buildChatMessageImageUrl(messageId: string) {
+  return `/api/chat/messages/${encodeURIComponent(messageId)}/image`;
+}
 
 function normalizeMessagePreview(content: string, messageType?: string | null) {
   if (messageType === 'image') {
@@ -181,7 +185,7 @@ async function loadLastMessages(groupIds: string[]) {
       map.set(message.groupChatId, {
         content: normalizeMessagePreview(message.content, message.messageType),
         sender: message.senderType === 'system' ? '系统' : message.senderType,
-        time: formatServerDateTime(message.createdAt || ''),
+        time: message.createdAt || '',
       });
     }
   }
@@ -409,12 +413,11 @@ export async function getMessage(messageId: string): Promise<ChatMessageSummary 
     senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
     senderName: formatUserName(message, message.senderType),
     senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-    content:
-      message.messageType === 'image'
-        ? (await resolveStoredFileReference(message.content)) || message.content
-        : message.content,
+    content: message.messageType === 'image' ? '' : message.content,
+    fileKey: message.messageType === 'image' ? message.content : undefined,
+    imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-    createdAt: formatServerDateTime(message.createdAt || ''),
+    createdAt: message.createdAt || '',
   };
 }
 
@@ -455,12 +458,11 @@ export async function getGroupMessagesForUser(
       senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
       senderName: formatUserName(message, message.senderType),
       senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-      content:
-        message.messageType === 'image'
-          ? (await resolveStoredFileReference(message.content)) || message.content
-          : message.content,
+      content: message.messageType === 'image' ? '' : message.content,
+      fileKey: message.messageType === 'image' ? message.content : undefined,
+      imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
       messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-      createdAt: formatServerDateTime(message.createdAt || ''),
+      createdAt: message.createdAt || '',
     })),
   );
 }
@@ -522,12 +524,11 @@ export async function sendGroupMessageForUser(params: {
     senderType: message.senderType as ChatMessageSummary['senderType'],
     senderName: formatUserName(sender, message.senderType),
     senderAvatar: sender?.avatar || undefined,
-    content:
-      message.messageType === 'image'
-        ? (await resolveStoredFileReference(message.content)) || message.content
-        : message.content,
+    content: message.messageType === 'image' ? '' : message.content,
+    fileKey: message.messageType === 'image' ? message.content : undefined,
+    imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-    createdAt: formatServerDateTime(message.createdAt || now),
+    createdAt: message.createdAt || now,
   };
 }
 

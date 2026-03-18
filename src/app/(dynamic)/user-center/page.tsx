@@ -45,6 +45,9 @@ interface ChatMessage {
   senderName: string;
   senderAvatar?: string;
   content: string;
+  fileKey?: string;
+  imageUrl?: string;
+  messageType?: 'text' | 'image' | 'system';
   timestamp: string;
 }
 
@@ -846,6 +849,9 @@ export default function UserCenterPage() {
           senderName: message.senderName || message.senderType || '系统',
           senderAvatar: message.senderAvatar,
           content: message.content,
+          fileKey: message.fileKey,
+          imageUrl: message.imageUrl,
+          messageType: message.messageType,
           timestamp: message.createdAt || message.timestamp || new Date().toISOString()
         })));
       } else {
@@ -894,6 +900,9 @@ export default function UserCenterPage() {
         senderName: result.data.senderName,
         senderAvatar: result.data.senderAvatar,
         content: result.data.content,
+        fileKey: result.data.fileKey,
+        imageUrl: result.data.imageUrl,
+        messageType: result.data.messageType,
         timestamp: result.data.createdAt,
       }]);
       loadGroupChats();
@@ -1371,13 +1380,20 @@ export default function UserCenterPage() {
                                       : 'bg-gray-100 text-gray-900'
                                   }`}
                                 >
-                                  {message.content}
+                                  {message.messageType === 'image' ? (
+                                    <a href={message.imageUrl || '#'} target="_blank" rel="noreferrer">
+                                      <img
+                                        src={message.imageUrl}
+                                        alt="聊天图片"
+                                        className="max-h-72 max-w-full rounded-lg object-contain"
+                                      />
+                                    </a>
+                                  ) : (
+                                    message.content
+                                  )}
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
+                                  {formatServerDateTime(message.timestamp)}
                                 </div>
                               </div>
                             </div>
