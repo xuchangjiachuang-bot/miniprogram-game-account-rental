@@ -8,7 +8,15 @@ import {
 } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { S3Storage } from 'coze-coding-dev-sdk';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 
 export interface UploadResult {
   success: boolean;
@@ -27,7 +35,7 @@ export interface UploadOptions {
 const LOCAL_PUBLIC_ROOT = path.join(process.cwd(), 'public');
 const LOCAL_UPLOAD_PREFIX = 'uploads';
 
-let remoteStorage: S3Storage | null | undefined;
+let remoteStorage: S3Client | null | undefined;
 
 type StoredFileReferenceKind =
   | 'empty'
@@ -36,8 +44,94 @@ type StoredFileReferenceKind =
   | 'browser-path'
   | 'storage-key';
 
+function getConfiguredEnvValue(names: string[]): string {
+  for (const name of names) {
+    const value = String(process.env[name] || '').trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function getRemoteEndpointUrl(): string {
+  return getConfiguredEnvValue([
+    'COZE_BUCKET_ENDPOINT_URL',
+    'STORAGE_ENDPOINT',
+    'AWS_ENDPOINT_URL',
+  ]);
+}
+
+function getRemoteBucketName(): string {
+  return getConfiguredEnvValue([
+    'COZE_BUCKET_NAME',
+    'STORAGE_BUCKET_NAME',
+    'AWS_BUCKET_NAME',
+  ]);
+}
+
 function hasRemoteStorageConfig(): boolean {
-  return Boolean(process.env.COZE_BUCKET_ENDPOINT_URL && process.env.COZE_BUCKET_NAME);
+  return Boolean(getRemoteEndpointUrl() && getRemoteBucketName());
+}
+
+function getRemoteRegion(): string {
+  const configuredRegion = getConfiguredEnvValue([
+    'COZE_BUCKET_REGION',
+    'STORAGE_REGION',
+    'AWS_REGION',
+  ]);
+  if (configuredRegion) {
+    return configuredRegion;
+  }
+
+  const endpoint = getRemoteEndpointUrl();
+  if (endpoint) {
+    try {
+      const { hostname } = new URL(endpoint);
+      const cosMatch = hostname.match(/cos[.-]([a-z0-9-]+)\.myqcloud\.com$/i);
+      if (cosMatch?.[1]) {
+        return cosMatch[1];
+      }
+
+      const tosMatch = hostname.match(/tos[.-]([a-z0-9-]+)\./i);
+      if (tosMatch?.[1]) {
+        return tosMatch[1];
+      }
+    } catch {
+      // ignore invalid endpoint and use the safe fallback below
+    }
+  }
+
+  return 'ap-shanghai';
+}
+
+function getRemoteCredentials() {
+  const accessKeyId = getConfiguredEnvValue([
+    'COZE_BUCKET_ACCESS_KEY_ID',
+    'STORAGE_ACCESS_KEY_ID',
+    'AWS_ACCESS_KEY_ID',
+  ]);
+  const secretAccessKey = getConfiguredEnvValue([
+    'COZE_BUCKET_SECRET_ACCESS_KEY',
+    'STORAGE_SECRET_ACCESS_KEY',
+    'AWS_SECRET_ACCESS_KEY',
+  ]);
+  const sessionToken = getConfiguredEnvValue([
+    'COZE_BUCKET_SESSION_TOKEN',
+    'STORAGE_SESSION_TOKEN',
+    'AWS_SESSION_TOKEN',
+  ]);
+
+  if (!accessKeyId || !secretAccessKey) {
+    return undefined;
+  }
+
+  return {
+    accessKeyId,
+    secretAccessKey,
+    sessionToken: sessionToken || undefined,
+  };
 }
 
 function allowLocalStorageFallback(): boolean {
@@ -52,22 +146,72 @@ function allowLocalStorageFallback(): boolean {
   return process.env.NODE_ENV !== 'production';
 }
 
-function getRemoteStorage(): S3Storage | null {
+function getRemoteStorage(): S3Client | null {
   if (!hasRemoteStorageConfig()) {
     return null;
   }
 
   if (!remoteStorage) {
-    remoteStorage = new S3Storage({
-      endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-      accessKey: '',
-      secretKey: '',
-      bucketName: process.env.COZE_BUCKET_NAME,
-      region: 'cn-beijing',
+    const credentials = getRemoteCredentials();
+    remoteStorage = new S3Client({
+      endpoint: getRemoteEndpointUrl(),
+      region: getRemoteRegion(),
+      forcePathStyle: true,
+      credentials,
     });
   }
 
   return remoteStorage;
+}
+
+function isRemoteNotFoundError(error: unknown): boolean {
+  const candidate = error as {
+    name?: string;
+    Code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+
+  return (
+    candidate?.name === 'NotFound' ||
+    candidate?.name === 'NoSuchKey' ||
+    candidate?.Code === 'NotFound' ||
+    candidate?.Code === 'NoSuchKey' ||
+    candidate?.$metadata?.httpStatusCode === 404
+  );
+}
+
+async function bufferFromRemoteBody(body: unknown): Promise<Buffer> {
+  if (!body) {
+    return Buffer.alloc(0);
+  }
+
+  if (Buffer.isBuffer(body)) {
+    return body;
+  }
+
+  if (body instanceof Uint8Array) {
+    return Buffer.from(body);
+  }
+
+  if (
+    typeof (body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray
+    === 'function'
+  ) {
+    const bytes = await (body as {
+      transformToByteArray: () => Promise<Uint8Array>;
+    }).transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
+  if (typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === 'function') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  throw new Error('UNSUPPORTED_REMOTE_BODY');
 }
 
 function normalizeFolder(folder: string): string {
@@ -124,26 +268,26 @@ function classifyStoredFileReference(reference: string | null | undefined): {
         return { kind: 'storage-key', original, normalized: normalizedPath };
       }
 
-       const bucketName = process.env.COZE_BUCKET_NAME?.trim();
-       if (bucketName) {
-         const bucketPrefix = `${bucketName}/${LOCAL_UPLOAD_PREFIX}/`;
-         if (normalizedPath.startsWith(bucketPrefix)) {
-           return {
-             kind: 'storage-key',
-             original,
-             normalized: normalizedPath.slice(bucketName.length + 1),
-           };
-         }
-       }
+      const bucketName = getRemoteBucketName();
+      if (bucketName) {
+        const bucketPrefix = `${bucketName}/${LOCAL_UPLOAD_PREFIX}/`;
+        if (normalizedPath.startsWith(bucketPrefix)) {
+          return {
+            kind: 'storage-key',
+            original,
+            normalized: normalizedPath.slice(bucketName.length + 1),
+          };
+        }
+      }
 
-       const uploadsIndex = normalizedPath.indexOf(`${LOCAL_UPLOAD_PREFIX}/`);
-       if (uploadsIndex >= 0) {
-         return {
-           kind: 'storage-key',
-           original,
-           normalized: normalizedPath.slice(uploadsIndex),
-         };
-       }
+      const uploadsIndex = normalizedPath.indexOf(`${LOCAL_UPLOAD_PREFIX}/`);
+      if (uploadsIndex >= 0) {
+        return {
+          kind: 'storage-key',
+          original,
+          normalized: normalizedPath.slice(uploadsIndex),
+        };
+      }
 
       return { kind: 'external-url', original, normalized: original };
     } catch {
@@ -230,10 +374,46 @@ function buildAppFileUrl(fileKey: string): string {
   return `/api/storage/file?${params.toString()}`;
 }
 
+async function verifyRemoteObjectExists(storage: S3Client, fileKey: string): Promise<void> {
+  await storage.send(new HeadObjectCommand({
+    Bucket: getRemoteBucketName(),
+    Key: fileKey,
+  }));
+}
+
+async function uploadFileToRemoteStorage(
+  storage: S3Client,
+  fileKey: string,
+  body: Buffer | NodeJS.ReadableStream,
+  contentType: string,
+): Promise<void> {
+  if (Buffer.isBuffer(body)) {
+    await storage.send(new PutObjectCommand({
+      Bucket: getRemoteBucketName(),
+      Key: fileKey,
+      Body: body,
+      ContentType: contentType,
+    }));
+  } else {
+    const uploader = new Upload({
+      client: storage,
+      params: {
+        Bucket: getRemoteBucketName(),
+        Key: fileKey,
+        Body: body as any,
+        ContentType: contentType,
+      },
+    });
+    await uploader.done();
+  }
+
+  await verifyRemoteObjectExists(storage, fileKey);
+}
+
 async function saveFileLocally(
   fileContent: Buffer,
   fileName: string,
-  folder: string
+  folder: string,
 ): Promise<UploadResult> {
   const key = generateFileName(fileName, folder);
   const absolutePath = getLocalFilePath(key);
@@ -248,7 +428,10 @@ async function saveFileLocally(
   };
 }
 
-async function readStreamToBuffer(stream: AsyncIterable<Uint8Array>, maxSize: number): Promise<Buffer> {
+async function readStreamToBuffer(
+  stream: AsyncIterable<Uint8Array>,
+  maxSize: number,
+): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let totalSize = 0;
 
@@ -256,7 +439,7 @@ async function readStreamToBuffer(stream: AsyncIterable<Uint8Array>, maxSize: nu
     const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalSize += bufferChunk.length;
     if (totalSize > maxSize) {
-      throw new Error(`文件大小超过限制，最大 ${(maxSize / 1024 / 1024).toFixed(2)}MB`);
+      throw new Error(`FILE_TOO_LARGE:${(maxSize / 1024 / 1024).toFixed(2)}MB`);
     }
     chunks.push(bufferChunk);
   }
@@ -291,31 +474,29 @@ export async function uploadFile(
   fileContent: Buffer,
   fileName: string,
   contentType: string,
-  options: UploadOptions = {}
+  options: UploadOptions = {},
 ): Promise<UploadResult> {
   try {
     const {
       maxSize = 5 * 1024 * 1024,
       allowedTypes = [],
       folder = 'uploads',
-      expireTime = 86400,
     } = options;
 
     if (!validateFileSize(fileContent.length, maxSize)) {
       return {
         success: false,
-        error: `文件大小超过限制，最大 ${(maxSize / 1024 / 1024).toFixed(2)}MB`,
+        error: `FILE_TOO_LARGE:${(maxSize / 1024 / 1024).toFixed(2)}MB`,
       };
     }
 
     if (allowedTypes.length > 0 && !validateFileType(contentType, allowedTypes)) {
       return {
         success: false,
-        error: `文件类型不支持，允许的类型：${allowedTypes.join(', ')}`,
+        error: `FILE_TYPE_NOT_ALLOWED:${allowedTypes.join(',')}`,
       };
     }
 
-    const fileKey = generateFileName(fileName, folder);
     const storage = getRemoteStorage();
     if (!storage) {
       if (!allowLocalStorageFallback()) {
@@ -328,11 +509,8 @@ export async function uploadFile(
       return saveFileLocally(fileContent, fileName, folder);
     }
 
-    const key = await storage.uploadFile({
-      fileContent,
-      fileName: fileKey,
-      contentType,
-    });
+    const key = generateFileName(fileName, folder);
+    await uploadFileToRemoteStorage(storage, key, fileContent, contentType);
 
     return {
       success: true,
@@ -340,10 +518,10 @@ export async function uploadFile(
       url: buildAppFileUrl(key),
     };
   } catch (error: any) {
-    console.error('上传文件失败:', error);
+    console.error('uploadFile failed:', error);
     return {
       success: false,
-      error: error.message || '上传文件失败',
+      error: error?.message || 'UPLOAD_FAILED',
     };
   }
 }
@@ -352,18 +530,19 @@ export async function uploadFileStream(
   stream: NodeJS.ReadableStream & AsyncIterable<Uint8Array>,
   fileName: string,
   contentType: string,
-  options: UploadOptions = {}
+  options: UploadOptions = {},
 ): Promise<UploadResult> {
   try {
     const {
       maxSize = 10 * 1024 * 1024,
       allowedTypes = [],
+      folder = 'uploads',
     } = options;
 
     if (allowedTypes.length > 0 && !validateFileType(contentType, allowedTypes)) {
       return {
         success: false,
-        error: `文件类型不支持，允许的类型：${allowedTypes.join(', ')}`,
+        error: `FILE_TYPE_NOT_ALLOWED:${allowedTypes.join(',')}`,
       };
     }
 
@@ -380,16 +559,8 @@ export async function uploadFileStream(
       return uploadFile(buffer, fileName, contentType, options);
     }
 
-    const {
-      folder = 'uploads',
-      expireTime = 86400,
-    } = options;
-
-    const key = await storage.streamUploadFile({
-      stream: stream as any,
-      fileName: generateFileName(fileName, folder),
-      contentType,
-    });
+    const key = generateFileName(fileName, folder);
+    await uploadFileToRemoteStorage(storage, key, stream, contentType);
 
     return {
       success: true,
@@ -397,24 +568,24 @@ export async function uploadFileStream(
       url: buildAppFileUrl(key),
     };
   } catch (error: any) {
-    console.error('流式上传失败:', error);
+    console.error('uploadFileStream failed:', error);
     return {
       success: false,
-      error: error.message || '流式上传失败',
+      error: error?.message || 'STREAM_UPLOAD_FAILED',
     };
   }
 }
 
 export async function uploadFromUrl(
   url: string,
-  options: UploadOptions = {}
+  options: UploadOptions = {},
 ): Promise<UploadResult> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
       return {
         success: false,
-        error: `下载文件失败: ${response.status}`,
+        error: `FETCH_REMOTE_FILE_FAILED:${response.status}`,
       };
     }
 
@@ -423,12 +594,17 @@ export async function uploadFromUrl(
     const pathname = new URL(url).pathname;
     const fileName = path.basename(pathname) || 'remote-file';
 
-    return uploadFile(buffer, fileName, response.headers.get('content-type') || 'application/octet-stream', options);
+    return uploadFile(
+      buffer,
+      fileName,
+      response.headers.get('content-type') || 'application/octet-stream',
+      options,
+    );
   } catch (error: any) {
-    console.error('URL 转存失败:', error);
+    console.error('uploadFromUrl failed:', error);
     return {
       success: false,
-      error: error.message || 'URL 转存失败',
+      error: error?.message || 'UPLOAD_FROM_URL_FAILED',
     };
   }
 }
@@ -446,7 +622,11 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
     }
 
     try {
-      return await storage.readFile({ fileKey: normalizedReference.normalized });
+      const response = await storage.send(new GetObjectCommand({
+        Bucket: getRemoteBucketName(),
+        Key: normalizedReference.normalized,
+      }));
+      return await bufferFromRemoteBody(response.Body);
     } catch (remoteError) {
       const localPath = getLocalFilePath(normalizedReference.normalized);
       if (existsSync(localPath)) {
@@ -456,7 +636,7 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
       throw remoteError;
     }
   } catch (error) {
-    console.error('读取文件失败:', error);
+    console.error('readFile failed:', error);
     return null;
   }
 }
@@ -474,13 +654,19 @@ export async function deleteFile(fileKey: string): Promise<boolean> {
       if (!existsSync(localPath)) {
         return true;
       }
+
       await unlink(localPath);
       return true;
     }
 
-    return await storage.deleteFile({ fileKey: normalizedReference.normalized });
+    await storage.send(new DeleteObjectCommand({
+      Bucket: getRemoteBucketName(),
+      Key: normalizedReference.normalized,
+    }));
+
+    return true;
   } catch (error) {
-    console.error('删除文件失败:', error);
+    console.error('deleteFile failed:', error);
     return false;
   }
 }
@@ -497,21 +683,25 @@ export async function fileExists(fileKey: string): Promise<boolean> {
       return existsSync(getLocalFilePath(normalizedReference.normalized));
     }
 
-    const existsRemotely = await storage.fileExists({ fileKey: normalizedReference.normalized });
-    if (existsRemotely) {
+    try {
+      await verifyRemoteObjectExists(storage, normalizedReference.normalized);
       return true;
+    } catch (error) {
+      if (!isRemoteNotFoundError(error)) {
+        throw error;
+      }
     }
 
     return existsSync(getLocalFilePath(normalizedReference.normalized));
   } catch (error) {
-    console.error('检查文件存在性失败:', error);
+    console.error('fileExists failed:', error);
     return false;
   }
 }
 
 export async function generateFileUrl(
   fileKey: string,
-  expireTime: number = 86400
+  expireTime: number = 86400,
 ): Promise<string | null> {
   try {
     const normalizedReference = classifyStoredFileReference(fileKey);
@@ -523,7 +713,10 @@ export async function generateFileUrl(
       return normalizedReference.normalized;
     }
 
-    if (normalizedReference.kind === 'external-url' || normalizedReference.kind === 'browser-path') {
+    if (
+      normalizedReference.kind === 'external-url'
+      || normalizedReference.kind === 'browser-path'
+    ) {
       return normalizeBrowserUrl(normalizedReference.normalized);
     }
 
@@ -534,16 +727,17 @@ export async function generateFileUrl(
         : null;
     }
 
+    void expireTime;
     return buildAppFileUrl(normalizedReference.normalized);
   } catch (error) {
-    console.error('生成文件 URL 失败:', error);
+    console.error('generateFileUrl failed:', error);
     return null;
   }
 }
 
 export async function resolveStoredFileReference(
   reference: string | null | undefined,
-  expireTime: number = 86400
+  expireTime: number = 86400,
 ): Promise<string | null> {
   const classifiedReference = classifyStoredFileReference(reference);
   if (classifiedReference.kind === 'empty') {
@@ -551,9 +745,9 @@ export async function resolveStoredFileReference(
   }
 
   if (
-    classifiedReference.kind === 'data-url' ||
-    classifiedReference.kind === 'external-url' ||
-    classifiedReference.kind === 'browser-path'
+    classifiedReference.kind === 'data-url'
+    || classifiedReference.kind === 'external-url'
+    || classifiedReference.kind === 'browser-path'
   ) {
     return normalizeBrowserUrl(classifiedReference.normalized);
   }
@@ -569,15 +763,14 @@ export { classifyStoredFileReference, inferContentType, normalizeStoredFileKey }
 
 export async function listFiles(
   prefix: string,
-  maxKeys: number = 100
+  maxKeys: number = 100,
 ): Promise<{ keys: string[]; isTruncated: boolean }> {
   try {
     const storage = getRemoteStorage();
     if (!storage) {
       const normalizedPrefix = prefix.replace(/^\/+/, '').replace(/\\/g, '/');
       const baseDir = getLocalFilePath(normalizedPrefix);
-      const keys = (await walkLocalFiles(baseDir, normalizedPrefix))
-        .slice(0, maxKeys);
+      const keys = (await walkLocalFiles(baseDir, normalizedPrefix)).slice(0, maxKeys);
 
       return {
         keys,
@@ -585,17 +778,20 @@ export async function listFiles(
       };
     }
 
-    const result = await storage.listFiles({
-      prefix,
-      maxKeys,
-    });
+    const result = await storage.send(new ListObjectsV2Command({
+      Bucket: getRemoteBucketName(),
+      Prefix: normalizeStoredFileKey(prefix),
+      MaxKeys: maxKeys,
+    }));
 
     return {
-      keys: result.keys || [],
-      isTruncated: result.isTruncated || false,
+      keys: (result.Contents || [])
+        .map((item) => item.Key || '')
+        .filter(Boolean),
+      isTruncated: Boolean(result.IsTruncated),
     };
   } catch (error) {
-    console.error('列出文件失败:', error);
+    console.error('listFiles failed:', error);
     return { keys: [], isTruncated: false };
   }
 }

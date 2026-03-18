@@ -6,6 +6,7 @@ import {
   orderConsumptionSettlementItems,
   orderConsumptionSettlements,
   orders,
+  sqlClient,
 } from '@/lib/db';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import { createOrderDispute } from '@/lib/dispute-service';
@@ -32,6 +33,36 @@ function toMoney(value: unknown) {
 
 function roundMoney(value: number) {
   return Number(value.toFixed(2));
+}
+
+let ensureOrdersStatusColumnPromise: Promise<void> | null = null;
+
+async function ensureOrdersStatusColumnSupportsConsumption() {
+  if (!ensureOrdersStatusColumnPromise) {
+    ensureOrdersStatusColumnPromise = (async () => {
+      const columnRows = await sqlClient<{ character_maximum_length: number | null }[]>`
+        SELECT character_maximum_length
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'status'
+        LIMIT 1
+      `;
+
+      const currentLength = Number(columnRows[0]?.character_maximum_length || 0);
+      if (currentLength > 0 && currentLength < 40) {
+        await sqlClient`
+          ALTER TABLE orders
+          ALTER COLUMN status TYPE VARCHAR(40)
+        `;
+      }
+    })().catch((error) => {
+      ensureOrdersStatusColumnPromise = null;
+      throw error;
+    });
+  }
+
+  await ensureOrdersStatusColumnPromise;
 }
 
 async function sendSettlementSystemMessage(orderId: string, content: string) {
@@ -128,6 +159,8 @@ export async function submitConsumptionSettlement(params: {
   evidence?: unknown;
   offlineSettledAmount?: number;
 }) {
+  await ensureOrdersStatusColumnSupportsConsumption();
+
   const orderRows = await db.select().from(orders).where(eq(orders.id, params.orderId)).limit(1);
   const order = orderRows[0];
   if (!order) {
@@ -245,6 +278,8 @@ export async function confirmConsumptionSettlement(params: {
   buyerId: string;
   buyerRemark?: string;
 }) {
+  await ensureOrdersStatusColumnSupportsConsumption();
+
   const orderRows = await db.select().from(orders).where(eq(orders.id, params.orderId)).limit(1);
   const order = orderRows[0];
   if (!order) {
@@ -321,6 +356,8 @@ export async function rejectConsumptionSettlement(params: {
   buyerRemark?: string;
   evidence?: unknown;
 }) {
+  await ensureOrdersStatusColumnSupportsConsumption();
+
   const orderRows = await db.select().from(orders).where(eq(orders.id, params.orderId)).limit(1);
   const order = orderRows[0];
   if (!order) {
