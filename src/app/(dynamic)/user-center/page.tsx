@@ -51,6 +51,21 @@ interface ChatMessage {
   timestamp: string;
 }
 
+function normalizeChatMessage(message: any): ChatMessage {
+  return {
+    id: message.id,
+    senderId: message.senderId,
+    senderType: message.senderType,
+    senderName: message.senderName || message.senderType || '系统',
+    senderAvatar: message.senderAvatar,
+    content: message.messageType === 'image' ? '' : message.content,
+    fileKey: message.fileKey,
+    imageUrl: message.imageUrl,
+    messageType: message.messageType,
+    timestamp: message.createdAt || message.timestamp || new Date().toISOString(),
+  };
+}
+
 interface WalletUiSettings {
   withdrawalFee: number;
 }
@@ -893,19 +908,21 @@ export default function UserCenterPage() {
       }
 
       setNewMessage('');
-      setChatMessages((current) => [...current, {
-        id: result.data.id,
-        senderId: result.data.senderId,
-        senderType: result.data.senderType,
-        senderName: result.data.senderName,
-        senderAvatar: result.data.senderAvatar,
-        content: result.data.content,
-        fileKey: result.data.fileKey,
-        imageUrl: result.data.imageUrl,
-        messageType: result.data.messageType,
-        timestamp: result.data.createdAt,
-      }]);
-      loadGroupChats();
+      setChatMessages((current) => [...current, normalizeChatMessage(result.data)]);
+      setGroupChats((current) =>
+        current.map((chat) =>
+          chat.id === selectedChat.id
+            ? {
+                ...chat,
+                lastMessage: {
+                  content: result.data.messageType === 'image' ? '[图片]' : (result.data.content || ''),
+                  sender: result.data.senderType || 'system',
+                  time: result.data.createdAt || new Date().toISOString(),
+                },
+              }
+            : chat,
+        ),
+      );
     } catch (error) {
       console.error('发送消息失败:', error);
       toast.error('发送消息失败');

@@ -62,6 +62,11 @@ export function ChatWindow({ group, onClose, onMessageSent }: ChatWindowProps) {
     }, 0);
   };
 
+  const applySentMessage = (message: ChatMessage) => {
+    setMessages((current) => [...current, message]);
+    scrollToBottom();
+  };
+
   const loadMessages = async (options?: { silent?: boolean }) => {
     try {
       if (!options?.silent) {
@@ -143,20 +148,18 @@ export function ChatWindow({ group, onClose, onMessageSent }: ChatWindowProps) {
       if (pendingImageFile) {
         setUploadingImage(true);
         const imageMessage = await sendGroupImageMessage(group.id, pendingImageFile);
-        setMessages((current) => [...current, imageMessage]);
+        applySentMessage(imageMessage);
         clearPendingImage();
         setUploadingImage(false);
       }
 
       if (content) {
         const textMessage = await sendGroupMessage(group.id, content);
-        setMessages((current) => [...current, textMessage]);
+        applySentMessage(textMessage);
         setNewMessage('');
       }
 
-      await loadMessages({ silent: true });
       onMessageSent?.();
-      scrollToBottom();
     } catch (error: any) {
       console.error('发送群聊消息失败:', error);
       toast.error(error?.message || '发送群聊消息失败');
