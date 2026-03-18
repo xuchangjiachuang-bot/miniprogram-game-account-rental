@@ -313,15 +313,10 @@ export async function uploadFile(
       contentType,
     });
 
-    const url = await storage.generatePresignedUrl({
-      key,
-      expireTime,
-    });
-
     return {
       success: true,
       key,
-      url,
+      url: buildAppFileUrl(key),
     };
   } catch (error: any) {
     console.error('上传文件失败:', error);
@@ -375,15 +370,10 @@ export async function uploadFileStream(
       contentType,
     });
 
-    const url = await storage.generatePresignedUrl({
-      key,
-      expireTime,
-    });
-
     return {
       success: true,
       key,
-      url,
+      url: buildAppFileUrl(key),
     };
   } catch (error: any) {
     console.error('流式上传失败:', error);
@@ -434,7 +424,16 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
       return await readLocalFile(getLocalFilePath(normalizedReference.normalized));
     }
 
-    return await storage.readFile({ fileKey: normalizedReference.normalized });
+    try {
+      return await storage.readFile({ fileKey: normalizedReference.normalized });
+    } catch (remoteError) {
+      const localPath = getLocalFilePath(normalizedReference.normalized);
+      if (existsSync(localPath)) {
+        return await readLocalFile(localPath);
+      }
+
+      throw remoteError;
+    }
   } catch (error) {
     console.error('读取文件失败:', error);
     return null;
@@ -477,7 +476,12 @@ export async function fileExists(fileKey: string): Promise<boolean> {
       return existsSync(getLocalFilePath(normalizedReference.normalized));
     }
 
-    return await storage.fileExists({ fileKey: normalizedReference.normalized });
+    const existsRemotely = await storage.fileExists({ fileKey: normalizedReference.normalized });
+    if (existsRemotely) {
+      return true;
+    }
+
+    return existsSync(getLocalFilePath(normalizedReference.normalized));
   } catch (error) {
     console.error('检查文件存在性失败:', error);
     return false;
@@ -509,10 +513,7 @@ export async function generateFileUrl(
         : null;
     }
 
-    return await storage.generatePresignedUrl({
-      key: normalizedReference.normalized,
-      expireTime,
-    });
+    return buildAppFileUrl(normalizedReference.normalized);
   } catch (error) {
     console.error('生成文件 URL 失败:', error);
     return null;
