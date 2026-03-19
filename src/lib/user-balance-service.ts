@@ -383,7 +383,7 @@ export async function requestWithdrawal(
     const withdrawalNo = `WD${Date.now()}${Math.floor(Math.random() * 1000)
       .toString()
       .padStart(3, '0')}`;
-    const reviewRequired = settings?.requireManualReview !== false;
+    const reviewRequired = settings?.requireWithdrawalManualReview !== false;
     const username =
       String(accountInfo.accountName || accountInfo.nickname || accountInfo.phone || userId).slice(0, 100);
 

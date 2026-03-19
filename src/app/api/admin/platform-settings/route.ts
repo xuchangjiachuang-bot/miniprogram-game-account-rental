@@ -27,6 +27,7 @@ function getDefaultSettings() {
     maxCoinsPerAccount: 1000,
     maxDeposit: 10000,
     requireManualReview: true,
+    requireWithdrawalManualReview: true,
     autoApproveVerified: false,
     listingDepositAmount: 50,
     orderPaymentTimeout: 180,
@@ -100,6 +101,8 @@ export async function PUT(request: NextRequest) {
       maxCoinsPerAccount: body.maxCoinsPerAccount ?? current.maxCoinsPerAccount,
       maxDeposit: body.maxDeposit ?? current.maxDeposit,
       requireManualReview: body.requireManualReview ?? current.requireManualReview,
+      requireWithdrawalManualReview:
+        body.requireWithdrawalManualReview ?? current.requireWithdrawalManualReview ?? true,
       autoApproveVerified: body.autoApproveVerified ?? current.autoApproveVerified,
       listingDepositAmount: body.listingDepositAmount ?? current.listingDepositAmount,
       orderPaymentTimeout: body.orderPaymentTimeout ?? current.orderPaymentTimeout,

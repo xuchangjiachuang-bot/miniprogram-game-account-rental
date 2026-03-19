@@ -524,6 +524,7 @@ export const platformSettings = pgTable("platform_settings", {
 	maxCoinsPerAccount: numeric("max_coins_per_account", { precision: 10, scale:  2 }).default('1000.00').notNull(),
 	maxDeposit: numeric("max_deposit", { precision: 10, scale:  2 }).default('10000.00').notNull(),
 	requireManualReview: boolean("require_manual_review").default(true).notNull(),
+	requireWithdrawalManualReview: boolean("require_withdrawal_manual_review").default(true).notNull(),
 	autoApproveVerified: boolean("auto_approve_verified").default(false).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),

@@ -66,5 +66,16 @@ export async function ensureSchemaCompatibility() {
       ADD COLUMN IF NOT EXISTS password VARCHAR(200);
   `);
 
+  await db.execute(`
+    ALTER TABLE platform_settings
+      ADD COLUMN IF NOT EXISTS require_withdrawal_manual_review BOOLEAN DEFAULT true;
+  `);
+
+  await db.execute(`
+    UPDATE platform_settings
+      SET require_withdrawal_manual_review = true
+    WHERE require_withdrawal_manual_review IS NULL;
+  `);
+
   schemaCompatibilityReady = true;
 }

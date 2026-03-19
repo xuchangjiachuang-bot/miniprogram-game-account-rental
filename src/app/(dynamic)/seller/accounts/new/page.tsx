@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Upload, CheckCircle, AlertCircle, Info, MapPin, Lock, UserCheck, Clock, MessageCircle, X, Calculator, DollarSign, HelpCircle, Gift, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/contexts/UserContext';
@@ -297,6 +298,7 @@ function NewAccountPage() {
   const [startHourPopoverOpen, setStartHourPopoverOpen] = useState(false);
   const [endHourPopoverOpen, setEndHourPopoverOpen] = useState(false);
   const [agreements, setAgreements] = useState<Record<string, { title: string; content: string; enabled: boolean }>>({});
+  const [agreementDialogOpen, setAgreementDialogOpen] = useState(false);
 
   // 检查用户认证状态
   useEffect(() => {
@@ -607,7 +609,9 @@ function NewAccountPage() {
   // 加载协议内容
   const loadAgreements = async () => {
     try {
-      const response = await fetch('/api/admin/agreements');
+      const response = await fetch('/api/admin/agreements', {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         console.error('加载协议失败:', response.status);
         return;
@@ -616,11 +620,13 @@ function NewAccountPage() {
       if (result.success && result.data) {
         const agreementsMap: Record<string, { title: string; content: string; enabled: boolean }> = {};
         result.data.forEach((agreement: any) => {
-          agreementsMap[agreement.key] = {
-            title: agreement.title,
-            content: agreement.content,
-            enabled: agreement.enabled
-          };
+          if (agreement.enabled !== false) {
+            agreementsMap[agreement.key] = {
+              title: agreement.title,
+              content: agreement.content,
+              enabled: agreement.enabled
+            };
+          }
         });
         setAgreements(agreementsMap);
       }
@@ -1789,19 +1795,27 @@ function NewAccountPage() {
                     className="text-sm leading-relaxed cursor-pointer"
                   >
                     我已阅读并同意{' '}
-                    <Link href="#" className="text-purple-600 hover:underline">
+                    <button
+                      type="button"
+                      className="text-purple-600 hover:underline"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setAgreementDialogOpen(true);
+                      }}
+                    >
                       《{agreements['virtual_assets']?.title || '虚拟资产出租出售协议'}》
-                    </Link>
+                    </button>
                     {' '}
-                    <span
+                    <button
+                      type="button"
                       className="text-muted-foreground cursor-pointer hover:text-foreground"
-                      onClick={() => {
-                        const content = agreements['virtual_assets']?.content || '暂无协议内容';
-                        alert(content);
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setAgreementDialogOpen(true);
                       }}
                     >
                       [查看协议全文]
-                    </span>
+                    </button>
                   </label>
                 </div>
               </CardContent>
@@ -1834,6 +1848,21 @@ function NewAccountPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={agreementDialogOpen} onOpenChange={setAgreementDialogOpen}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>
+              {agreements['virtual_assets']?.title || '虚拟资产出租出售协议'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+            <div className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-800">
+              {agreements['virtual_assets']?.content || '暂无协议内容'}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
