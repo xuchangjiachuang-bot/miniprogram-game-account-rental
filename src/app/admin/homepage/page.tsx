@@ -26,6 +26,7 @@ export default function HomepageConfigPage() {
   const [carouselForm, setCarouselForm] = useState<Partial<CarouselItem>>({
     title: '',
     description: '',
+    imageKey: '',
     imageUrl: '',
     linkUrl: '',
     order: 0,
@@ -39,6 +40,7 @@ export default function HomepageConfigPage() {
   const [logoForm, setLogoForm] = useState<Partial<LogoConfig>>({
     name: '',
     type: 'image',
+    imageKey: '',
     imageUrl: '',
     text: '',
     textStyle: {
@@ -84,7 +86,10 @@ export default function HomepageConfigPage() {
       const result = await res.json();
       if (result.success) {
         toast.success('\u914d\u7f6e\u4fdd\u5b58\u6210\u529f');
-        saveConfigToCache(config);
+        if (result.data) {
+          setConfig(result.data);
+          saveConfigToCache(result.data);
+        }
       } else {
         toast.error(result.error || '\u4fdd\u5b58\u5931\u8d25');
       }
@@ -102,6 +107,7 @@ export default function HomepageConfigPage() {
       setCarouselForm({
         title: '',
         description: '',
+        imageKey: '',
         imageUrl: '',
         linkUrl: '',
         order: config?.carousels.length || 0,
@@ -112,7 +118,7 @@ export default function HomepageConfigPage() {
   };
 
   // 图片上传函数
-  const uploadImage = async (file: File): Promise<string> => {
+  const uploadImage = async (file: File): Promise<{ imageUrl: string; fileKey: string }> => {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -126,7 +132,10 @@ export default function HomepageConfigPage() {
       throw new Error(result.error || '上传失败');
     }
 
-    return result.data.imageUrl;
+    return {
+      imageUrl: result.data.imageUrl as string,
+      fileKey: result.data.fileKey as string,
+    };
   };
 
   const saveCarousel = async () => {
@@ -141,6 +150,7 @@ export default function HomepageConfigPage() {
       id: editingCarousel?.id || Date.now().toString(),
       title: carouselForm.title!,
       description: carouselForm.description || '',
+      imageKey: carouselForm.imageKey || undefined,
       imageUrl: carouselForm.imageUrl!,
       linkUrl: carouselForm.linkUrl || '',
       order: carouselForm.order ?? config.carousels.length,
@@ -184,6 +194,7 @@ export default function HomepageConfigPage() {
       setLogoForm({
         name: '',
         type: 'image',
+        imageKey: '',
         imageUrl: '',
         text: '',
         textStyle: {
@@ -219,6 +230,7 @@ export default function HomepageConfigPage() {
       id: editingLogo?.id || Date.now().toString(),
       name: logoForm.name!,
       type: logoForm.type || 'image',
+      imageKey: logoForm.type === 'image' ? (logoForm.imageKey || undefined) : undefined,
       imageUrl: logoForm.imageUrl,
       text: logoForm.text,
       textStyle: logoForm.textStyle,
@@ -336,8 +348,12 @@ export default function HomepageConfigPage() {
                               if (file) {
                                 setUploadingImage(true);
                                 try {
-                                  const imageUrl = await uploadImage(file);
-                                  setCarouselForm({ ...carouselForm, imageUrl });
+                                  const uploaded = await uploadImage(file);
+                                  setCarouselForm({
+                                    ...carouselForm,
+                                    imageKey: uploaded.fileKey,
+                                    imageUrl: uploaded.imageUrl,
+                                  });
                                   toast.success('图片上传成功');
                                 } catch (error) {
                                   toast.error(error instanceof Error ? error.message : '上传失败');
@@ -564,8 +580,12 @@ export default function HomepageConfigPage() {
                                 if (file) {
                                   setUploadingLogo(true);
                                   try {
-                                    const imageUrl = await uploadImage(file);
-                                    setLogoForm({ ...logoForm, imageUrl });
+                                    const uploaded = await uploadImage(file);
+                                    setLogoForm({
+                                      ...logoForm,
+                                      imageKey: uploaded.fileKey,
+                                      imageUrl: uploaded.imageUrl,
+                                    });
                                     toast.success('图片上传成功');
                                   } catch (error) {
                                     toast.error(error instanceof Error ? error.message : '上传失败');

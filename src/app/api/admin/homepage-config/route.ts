@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sanitizeHomepageConfigForAdmin } from '@/lib/homepage-config-normalizer';
+import {
+  sanitizeHomepageConfigForAdmin,
+  sanitizeHomepageConfigForStorage,
+} from '@/lib/homepage-config-normalizer';
 import { requireAdmin } from '@/lib/admin-auth';
 import { broadcastConfigUpdate } from '@/lib/sse-broadcaster';
 import { systemConfigManager } from '@/storage/database/systemConfigManager';
@@ -66,14 +69,14 @@ export async function POST(request: NextRequest) {
         : (existingConfig as any)?.skinOptions,
     };
 
-    const sanitizedConfig = sanitizeHomepageConfigForAdmin(mergedConfig);
-    await systemConfigManager.saveHomepageConfig(sanitizedConfig);
+    const storageConfig = sanitizeHomepageConfigForStorage(mergedConfig);
+    await systemConfigManager.saveHomepageConfig(storageConfig);
     await broadcastConfigUpdate('all');
 
     return NextResponse.json({
       success: true,
       message: '配置保存成功',
-      data: sanitizedConfig,
+      data: sanitizeHomepageConfigForAdmin(storageConfig),
     });
   } catch (error) {
     console.error('[POST /api/admin/homepage-config] Failed:', error);

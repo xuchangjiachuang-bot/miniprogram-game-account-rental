@@ -1,4 +1,5 @@
 import { defaultHomepageConfig, type HomepageConfig, type SkinOption } from '@/lib/config-types';
+import { extractManagedStorageKey, resolvePublicFileReference } from '@/lib/storage-public';
 
 type CarouselItem = HomepageConfig['carousels'][number];
 type LogoItem = HomepageConfig['logos'][number];
@@ -56,6 +57,31 @@ function normalizeImageUrl(value: string | null | undefined, fallback: string): 
   return LEGACY_IMAGE_MAP[trimmed] || trimmed;
 }
 
+function normalizeManagedImageKey(value: string | null | undefined): string | undefined {
+  const managedKey = value ? extractManagedStorageKey(value) : null;
+  return managedKey || undefined;
+}
+
+function buildHomepageImageValue(
+  imageKey: string | undefined,
+  imageUrl: string | null | undefined,
+  fallback: string,
+) {
+  const normalizedKey = normalizeManagedImageKey(imageKey) || normalizeManagedImageKey(imageUrl);
+
+  if (normalizedKey) {
+    return {
+      imageKey: normalizedKey,
+      imageUrl: resolvePublicFileReference(normalizedKey) || fallback,
+    };
+  }
+
+  return {
+    imageKey: undefined,
+    imageUrl: normalizeImageUrl(imageUrl, fallback),
+  };
+}
+
 function cloneDefaultSkinOptions() {
   return defaultHomepageConfig.skinOptions.map((item): SkinOption => ({ ...item }));
 }
@@ -97,12 +123,14 @@ function normalizeCarousels(value: HomepageConfig['carousels'] | undefined): Hom
 
   return source.map((item, index): CarouselItem => {
     const fallback = defaultHomepageConfig.carousels[index] || defaultHomepageConfig.carousels[0];
+    const image = buildHomepageImageValue(item?.imageKey, item?.imageUrl, fallback.imageUrl || '');
 
     return {
       id: String(item?.id || fallback.id),
       title: normalizeText(item?.title, fallback.title),
       description: normalizeText(item?.description, fallback.description),
-      imageUrl: normalizeImageUrl(item?.imageUrl, fallback.imageUrl),
+      imageKey: image.imageKey,
+      imageUrl: image.imageUrl,
       linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl || '/'),
       order: typeof item?.order === 'number' ? item.order : fallback.order,
       enabled: typeof item?.enabled === 'boolean' ? item.enabled : fallback.enabled,
@@ -119,14 +147,14 @@ function normalizeLogos(value: HomepageConfig['logos'] | undefined): HomepageCon
     const fallbackImage = fallback.type === 'image' && fallback.imageUrl
       ? fallback.imageUrl
       : defaultHomepageConfig.carousels[0].imageUrl;
+    const image = buildHomepageImageValue(item?.imageKey, item?.imageUrl, fallbackImage || '');
 
     return {
       id: String(item?.id || fallback.id),
       name: normalizeText(item?.name, fallback.name),
       type,
-      imageUrl: type === 'image'
-        ? normalizeImageUrl(item?.imageUrl, fallbackImage)
-        : undefined,
+      imageKey: type === 'image' ? image.imageKey : undefined,
+      imageUrl: type === 'image' ? image.imageUrl : undefined,
       text: type === 'text'
         ? normalizeText(item?.text, fallback.type === 'text' ? fallback.text || '' : '')
         : undefined,
@@ -170,6 +198,7 @@ export function sanitizeHomepageConfigForAdmin(
       id: String(item.id || `carousel-${index + 1}`),
       title: String(item.title || '').trim(),
       description: String(item.description || '').trim(),
+      imageKey: normalizeManagedImageKey(item.imageKey || item.imageUrl),
       imageUrl: normalizeImageUrl(item.imageUrl, ''),
       linkUrl: String(item.linkUrl || '').trim(),
       order: typeof item.order === 'number' ? item.order : index,
@@ -179,12 +208,64 @@ export function sanitizeHomepageConfigForAdmin(
       id: String(item.id || `logo-${index + 1}`),
       name: String(item.name || '').trim(),
       type: item.type === 'image' ? 'image' : 'text',
+      imageKey: item.type === 'image' ? normalizeManagedImageKey(item.imageKey || item.imageUrl) : undefined,
       imageUrl: item.type === 'image' ? normalizeImageUrl(item.imageUrl, '') : undefined,
       text: item.type === 'image' ? undefined : String(item.text || '').trim(),
       textStyle: item.textStyle || { fontSize: 'xl', fontWeight: 'bold' },
       linkUrl: String(item.linkUrl || '').trim(),
       enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
     })),
+    skinOptions: normalizeSkinOptions(normalized.skinOptions),
+    footerInfo: {
+      copyright: String(normalized.footerInfo.copyright || '').trim(),
+      icpNumber: String(normalized.footerInfo.icpNumber || '').trim(),
+      publicSecurityNumber: String(normalized.footerInfo.publicSecurityNumber || '').trim(),
+      otherInfo: String(normalized.footerInfo.otherInfo || '').trim(),
+    },
+  };
+}
+
+export function sanitizeHomepageConfigForStorage(
+  rawConfig: Partial<HomepageConfig> | null | undefined,
+): Partial<HomepageConfig> {
+  const normalized = normalizeHomepageConfig(rawConfig);
+
+  return {
+    carousels: normalized.carousels.map((item, index) => {
+      const imageKey = normalizeManagedImageKey(item.imageKey || item.imageUrl);
+      const fallback = defaultHomepageConfig.carousels[index] || defaultHomepageConfig.carousels[0];
+
+      return {
+        id: String(item.id || `carousel-${index + 1}`),
+        title: String(item.title || '').trim(),
+        description: String(item.description || '').trim(),
+        imageKey,
+        imageUrl: imageKey ? undefined : normalizeImageUrl(item.imageUrl, fallback.imageUrl || ''),
+        linkUrl: String(item.linkUrl || '').trim(),
+        order: typeof item.order === 'number' ? item.order : index,
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+      };
+    }),
+    logos: normalized.logos.map((item, index) => {
+      const imageKey = item.type === 'image'
+        ? normalizeManagedImageKey(item.imageKey || item.imageUrl)
+        : undefined;
+      const fallback = defaultHomepageConfig.logos[index] || defaultHomepageConfig.logos[0];
+
+      return {
+        id: String(item.id || `logo-${index + 1}`),
+        name: String(item.name || '').trim(),
+        type: item.type === 'image' ? 'image' : 'text',
+        imageKey,
+        imageUrl: item.type === 'image'
+          ? (imageKey ? undefined : normalizeImageUrl(item.imageUrl, fallback.imageUrl || ''))
+          : undefined,
+        text: item.type === 'image' ? undefined : String(item.text || '').trim(),
+        textStyle: item.textStyle || { fontSize: 'xl', fontWeight: 'bold' },
+        linkUrl: String(item.linkUrl || '').trim(),
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+      };
+    }),
     skinOptions: normalizeSkinOptions(normalized.skinOptions),
     footerInfo: {
       copyright: String(normalized.footerInfo.copyright || '').trim(),

@@ -1,11 +1,7 @@
 import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import {
-  mkdir,
-  readdir,
   readFile as readLocalFile,
-  unlink,
-  writeFile,
 } from 'fs/promises';
 import path from 'path';
 import { fetchWechatJson } from './wechat-http';
@@ -57,8 +53,7 @@ export interface StorageDebugRoundTripResult {
   error?: string;
 }
 
-const LOCAL_PUBLIC_ROOT = path.join(process.cwd(), 'public');
-const LOCAL_UPLOAD_PREFIX = 'uploads';
+const STORAGE_OBJECT_PREFIX = 'uploads';
 const WECHAT_API_BASE_URL = 'https://api.weixin.qq.com';
 const WECHAT_OPEN_API_BASE_URL = 'http://api.weixin.qq.com';
 const CLOUDBASE_ACCESS_TOKEN_FILE_PATH = '/.tencentcloudbase/wx/cloudbase_access_token';
@@ -175,18 +170,6 @@ function hasRemoteStorageConfig(): boolean {
   return Boolean(getCloudBaseEnvId());
 }
 
-function allowLocalStorageFallback(): boolean {
-  if (process.env.ALLOW_LOCAL_STORAGE_UPLOADS === 'true') {
-    return true;
-  }
-
-  if (process.env.ALLOW_LOCAL_STORAGE_UPLOADS === 'false') {
-    return false;
-  }
-
-  return process.env.NODE_ENV !== 'production';
-}
-
 function normalizeFolder(folder: string): string {
   const normalized = folder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   return normalized || 'general';
@@ -194,11 +177,11 @@ function normalizeFolder(folder: string): string {
 
 function ensureUploadPrefix(folder: string): string {
   const normalized = normalizeFolder(folder);
-  if (normalized === LOCAL_UPLOAD_PREFIX || normalized.startsWith(`${LOCAL_UPLOAD_PREFIX}/`)) {
+  if (normalized === STORAGE_OBJECT_PREFIX || normalized.startsWith(`${STORAGE_OBJECT_PREFIX}/`)) {
     return normalized;
   }
 
-  return `${LOCAL_UPLOAD_PREFIX}/${normalized}`;
+  return `${STORAGE_OBJECT_PREFIX}/${normalized}`;
 }
 
 function validateFileType(fileType: string, allowedTypes: string[]): boolean {
@@ -219,11 +202,6 @@ function generateFileName(originalName: string, folder: string): string {
   return `${targetFolder}/${Date.now()}_${randomUUID()}${ext.toLowerCase()}`;
 }
 
-function getLocalFilePath(fileKey: string): string {
-  const normalized = fileKey.replace(/^\/+/, '').replace(/\.\./g, '');
-  return path.join(LOCAL_PUBLIC_ROOT, normalized);
-}
-
 function normalizeStoredFileKey(fileKey: string): string {
   const trimmed = fileKey.trim();
   if (!trimmed) {
@@ -234,10 +212,7 @@ function normalizeStoredFileKey(fileKey: string): string {
     return trimmed;
   }
 
-  return trimmed
-    .replace(/\\/g, '/')
-    .replace(/^\/+/, '')
-    .replace(/\.\./g, '');
+  return trimmed.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\.\./g, '');
 }
 
 function classifyStoredFileReference(reference: string | null | undefined): ClassifiedStoredFileReference {
@@ -264,27 +239,13 @@ function classifyStoredFileReference(reference: string | null | undefined): Clas
 
       if (parsed.pathname.startsWith('/api/storage/file')) {
         const key = parsed.searchParams.get('key');
-        if (key) {
+        if (key && isCloudStorageFileId(key)) {
           return {
             kind: 'storage-key',
             original,
             normalized: normalizeStoredFileKey(key),
           };
         }
-      }
-
-      const normalizedPath = normalizeStoredFileKey(parsed.pathname);
-      if (normalizedPath.startsWith(`${LOCAL_UPLOAD_PREFIX}/`)) {
-        return { kind: 'storage-key', original, normalized: normalizedPath };
-      }
-
-      const uploadsIndex = normalizedPath.indexOf(`${LOCAL_UPLOAD_PREFIX}/`);
-      if (uploadsIndex >= 0) {
-        return {
-          kind: 'storage-key',
-          original,
-          normalized: normalizedPath.slice(uploadsIndex),
-        };
       }
 
       return { kind: 'external-url', original, normalized: original };
@@ -297,7 +258,7 @@ function classifyStoredFileReference(reference: string | null | undefined): Clas
     try {
       const parsed = new URL(original, 'http://localhost');
       const key = parsed.searchParams.get('key');
-      if (key) {
+      if (key && isCloudStorageFileId(key)) {
         return {
           kind: 'storage-key',
           original,
@@ -309,22 +270,15 @@ function classifyStoredFileReference(reference: string | null | undefined): Clas
     }
   }
 
-  const normalized = normalizeStoredFileKey(original);
-  if (normalized.startsWith(`${LOCAL_UPLOAD_PREFIX}/`) || isCloudStorageFileId(normalized)) {
-    return { kind: 'storage-key', original, normalized };
-  }
-
   if (original.startsWith('/')) {
     return { kind: 'browser-path', original, normalized: original };
   }
 
-  return { kind: 'storage-key', original, normalized };
-}
-
-function toPublicUrl(fileKey: string): string {
-  const normalized = fileKey.replace(/\\/g, '/').replace(/^\/+/, '');
-  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '');
-  return origin ? `${origin}/${normalized}` : `/${normalized}`;
+  return {
+    kind: 'browser-path',
+    original,
+    normalized: `/${normalizeStoredFileKey(original)}`,
+  };
 }
 
 function normalizeBrowserUrl(reference: string): string {
@@ -662,24 +616,6 @@ async function deleteRemoteFileWithResponse(fileId: string): Promise<WechatBatch
   });
 }
 
-async function saveFileLocally(
-  fileContent: Buffer,
-  fileName: string,
-  folder: string,
-): Promise<UploadResult> {
-  const key = generateFileName(fileName, folder);
-  const absolutePath = getLocalFilePath(key);
-
-  await mkdir(path.dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, fileContent);
-
-  return {
-    success: true,
-    key,
-    url: toPublicUrl(key),
-  };
-}
-
 async function readStreamToBuffer(
   stream: AsyncIterable<Uint8Array>,
   maxSize: number,
@@ -697,29 +633,6 @@ async function readStreamToBuffer(
   }
 
   return Buffer.concat(chunks);
-}
-
-async function walkLocalFiles(directory: string, prefix = ''): Promise<string[]> {
-  if (!existsSync(directory)) {
-    return [];
-  }
-
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files: string[] = [];
-
-  for (const entry of entries) {
-    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-    const fullPath = path.join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...await walkLocalFiles(fullPath, relativePath));
-      continue;
-    }
-
-    files.push(relativePath.replace(/\\/g, '/'));
-  }
-
-  return files;
 }
 
 export async function uploadFile(
@@ -760,14 +673,10 @@ export async function uploadFile(
       };
     }
 
-    if (!allowLocalStorageFallback()) {
-      return {
-        success: false,
-        error: 'PERSISTENT_STORAGE_NOT_CONFIGURED',
-      };
-    }
-
-    return saveFileLocally(fileContent, fileName, folder);
+    return {
+      success: false,
+      error: 'WECHAT_CLOUD_ENV_ID_MISSING',
+    };
   } catch (error: unknown) {
     console.error('uploadFile failed:', error);
     return {
@@ -843,24 +752,15 @@ export async function uploadFromUrl(
 export async function readFile(fileKey: string): Promise<Buffer | null> {
   try {
     const normalizedReference = classifyStoredFileReference(fileKey);
-    if (normalizedReference.kind !== 'storage-key') {
+    if (
+      normalizedReference.kind !== 'storage-key'
+      || !isCloudStorageFileId(normalizedReference.normalized)
+      || !hasRemoteStorageConfig()
+    ) {
       return null;
     }
 
-    if (isCloudStorageFileId(normalizedReference.normalized)) {
-      if (!hasRemoteStorageConfig()) {
-        return null;
-      }
-
-      return await readRemoteFile(normalizedReference.normalized);
-    }
-
-    const localPath = getLocalFilePath(normalizedReference.normalized);
-    if (!existsSync(localPath)) {
-      return null;
-    }
-
-    return await readLocalFile(localPath);
+    return await readRemoteFile(normalizedReference.normalized);
   } catch (error) {
     console.error('readFile failed:', error);
     return null;
@@ -870,25 +770,15 @@ export async function readFile(fileKey: string): Promise<Buffer | null> {
 export async function deleteFile(fileKey: string): Promise<boolean> {
   try {
     const normalizedReference = classifyStoredFileReference(fileKey);
-    if (normalizedReference.kind !== 'storage-key') {
+    if (
+      normalizedReference.kind !== 'storage-key'
+      || !isCloudStorageFileId(normalizedReference.normalized)
+      || !hasRemoteStorageConfig()
+    ) {
       return false;
     }
 
-    if (isCloudStorageFileId(normalizedReference.normalized)) {
-      if (!hasRemoteStorageConfig()) {
-        return false;
-      }
-
-      await deleteRemoteFile(normalizedReference.normalized);
-      return true;
-    }
-
-    const localPath = getLocalFilePath(normalizedReference.normalized);
-    if (!existsSync(localPath)) {
-      return true;
-    }
-
-    await unlink(localPath);
+    await deleteRemoteFile(normalizedReference.normalized);
     return true;
   } catch (error) {
     console.error('deleteFile failed:', error);
@@ -899,24 +789,20 @@ export async function deleteFile(fileKey: string): Promise<boolean> {
 export async function fileExists(fileKey: string): Promise<boolean> {
   try {
     const normalizedReference = classifyStoredFileReference(fileKey);
-    if (normalizedReference.kind !== 'storage-key') {
+    if (
+      normalizedReference.kind !== 'storage-key'
+      || !isCloudStorageFileId(normalizedReference.normalized)
+      || !hasRemoteStorageConfig()
+    ) {
       return false;
     }
 
-    if (isCloudStorageFileId(normalizedReference.normalized)) {
-      if (!hasRemoteStorageConfig()) {
-        return false;
-      }
-
-      try {
-        await getRemoteDownloadUrl(normalizedReference.normalized, 60);
-        return true;
-      } catch {
-        return false;
-      }
+    try {
+      await getRemoteDownloadUrl(normalizedReference.normalized, 60);
+      return true;
+    } catch {
+      return false;
     }
-
-    return existsSync(getLocalFilePath(normalizedReference.normalized));
   } catch (error) {
     console.error('fileExists failed:', error);
     return false;
@@ -953,9 +839,7 @@ export async function generateFileUrl(
       return buildAppFileUrl(normalizedReference.normalized);
     }
 
-    return (await fileExists(normalizedReference.normalized))
-      ? toPublicUrl(normalizedReference.normalized)
-      : null;
+    return null;
   } catch (error) {
     console.error('generateFileUrl failed:', error);
     return null;
@@ -1093,21 +977,9 @@ export async function listFiles(
   maxKeys: number = 100,
 ): Promise<{ keys: string[]; isTruncated: boolean }> {
   try {
-    const normalizedPrefix = normalizeStoredFileKey(prefix);
-
-    if (hasRemoteStorageConfig()) {
-      // Official WeChat CloudRun storage APIs cover upload/download/delete.
-      // Listing is not used in the current runtime path, so we keep legacy local listing only.
-      return { keys: [], isTruncated: false };
-    }
-
-    const baseDir = getLocalFilePath(normalizedPrefix);
-    const keys = (await walkLocalFiles(baseDir, normalizedPrefix)).slice(0, maxKeys);
-
-    return {
-      keys,
-      isTruncated: keys.length >= maxKeys,
-    };
+    void prefix;
+    void maxKeys;
+    return { keys: [], isTruncated: false };
   } catch (error) {
     console.error('listFiles failed:', error);
     return { keys: [], isTruncated: false };

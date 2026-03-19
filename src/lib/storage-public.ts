@@ -32,8 +32,7 @@ function extractManagedStorageKey(value: string): string | null {
   }
 
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-    const normalized = normalizeStoredKey(trimmed);
-    return normalized.startsWith('uploads/') ? normalized : null;
+    return null;
   }
 
   try {
@@ -42,16 +41,6 @@ function extractManagedStorageKey(value: string): string | null {
     if (parsed.pathname.startsWith('/api/storage/file')) {
       const key = parsed.searchParams.get('key');
       return key ? normalizeStoredKey(key) : null;
-    }
-
-    const normalizedPath = normalizeStoredKey(parsed.pathname);
-    if (normalizedPath.startsWith('uploads/')) {
-      return normalizedPath;
-    }
-
-    const uploadsIndex = normalizedPath.indexOf('uploads/');
-    if (uploadsIndex >= 0) {
-      return normalizedPath.slice(uploadsIndex);
     }
   } catch {
     return null;
@@ -109,3 +98,5 @@ export function resolvePublicFileReferences(
     .map((item) => resolvePublicFileReference(item, options))
     .filter((item): item is string => Boolean(item));
 }
+
+export { extractManagedStorageKey };

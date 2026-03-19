@@ -3,7 +3,8 @@ export interface CarouselItem {
   id: string;
   title: string;
   description: string;
-  imageUrl: string;
+  imageKey?: string;
+  imageUrl?: string;
   linkUrl?: string;
   order: number;
   enabled: boolean;
@@ -13,6 +14,7 @@ export interface CarouselItem {
 export interface LogoConfig {
   id: string;
   name: string;
+  imageKey?: string;
   type: 'image' | 'text'; // LOGO类型：图片或文字
   imageUrl?: string; // 图片URL（type为image时使用）
   text?: string; // 文字内容（type为text时使用）
