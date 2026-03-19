@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { db, platformSettings } from '@/lib/db';
 import { getWechatOpenConfig } from '@/lib/wechat-oauth';
 
 /**
  * 测试微信配置完整性
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if ('error' in auth) return auth.error;
+
     // 从数据库读取配置
     const [setting] = await db.select().from(platformSettings).limit(1);
 

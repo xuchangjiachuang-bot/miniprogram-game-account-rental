@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 
 /**
  * 测试微信二维码流程
  * GET /api/test/wechat-qr-flow
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if ('error' in auth) return auth.error;
+
   return new NextResponse(`
 <!DOCTYPE html>
 <html lang="zh-CN">

@@ -1,12 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { ensureDatabaseInitialized } from '@/lib/db';
 
 /**
  * 数据库初始化 API
  * 用于在应用部署后初始化数据库表和默认数据
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if ('error' in auth) return auth.error;
+
     await ensureDatabaseInitialized();
 
     return NextResponse.json({
@@ -29,8 +33,11 @@ export async function POST() {
 /**
  * GET 方法 - 检查数据库状态
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if ('error' in auth) return auth.error;
+
     // 这里可以添加数据库连接检查逻辑
     return NextResponse.json({
       success: true,

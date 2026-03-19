@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getWechatPlatformSettingsCompat, resolveWechatRedirectUri } from '@/lib/wechat-runtime-config';
 
 /**
@@ -7,6 +8,9 @@ import { getWechatPlatformSettingsCompat, resolveWechatRedirectUri } from '@/lib
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if ('error' in auth) return auth.error;
+
     const setting = await getWechatPlatformSettingsCompat();
 
     const config = {

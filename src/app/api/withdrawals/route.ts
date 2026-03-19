@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     const accountInfo = {
       openid: wechatOpenid,
-      accountName: user.realName || user.username || user.phone || '',
+      accountName: '',
       phone: user.phone || '',
       nickname: user.username || '',
     };

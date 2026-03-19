@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { generateWechatAuthUrl, generateWechatQrLoginUrl } from '@/lib/wechat-oauth';
 
 /**
@@ -7,6 +8,9 @@ import { generateWechatAuthUrl, generateWechatQrLoginUrl } from '@/lib/wechat-oa
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request);
+    if ('error' in auth) return auth.error;
+
     // 测试公众号授权URL（微信浏览器使用）
     const authUrl = await generateWechatAuthUrl('test');
 
