@@ -1,83 +1,7 @@
-type CarouselItem = {
-  id?: string;
-  title?: string;
-  description?: string;
-  imageUrl?: string;
-  linkUrl?: string;
-  order?: number;
-  enabled?: boolean;
-};
+import { defaultHomepageConfig, type HomepageConfig, type SkinOption } from '@/lib/config-types';
 
-type LogoItem = {
-  id?: string;
-  name?: string;
-  type?: 'image' | 'text';
-  imageUrl?: string;
-  text?: string;
-  textStyle?: {
-    fontSize?: string;
-    fontWeight?: string;
-  };
-  linkUrl?: string;
-  enabled?: boolean;
-};
-
-type FooterInfo = {
-  copyright?: string;
-  icpNumber?: string;
-  publicSecurityNumber?: string;
-  otherInfo?: string;
-};
-
-type HomepageConfig = {
-  carousels?: CarouselItem[];
-  logos?: LogoItem[];
-  skinOptions?: unknown[];
-  footerInfo?: FooterInfo;
-};
-
-const HOMEPAGE_FALLBACK = {
-  carousels: [
-    {
-      id: '1',
-      title: '三角洲行动哈夫币租赁',
-      description: '安全可靠，快速交易，畅享游戏乐趣',
-      imageUrl: '/images/carousel-1.svg',
-      linkUrl: '/',
-      order: 0,
-      enabled: true,
-    },
-    {
-      id: '2',
-      title: '海量账号随心选',
-      description: '从基础号到高配号，满足不同租号需求',
-      imageUrl: '/images/carousel-2.svg',
-      linkUrl: '/',
-      order: 1,
-      enabled: true,
-    },
-  ],
-  logos: [
-    {
-      id: '1',
-      name: '主 LOGO',
-      type: 'text' as const,
-      text: '哈夫币租赁平台',
-      textStyle: {
-        fontSize: 'xl',
-        fontWeight: 'bold',
-      },
-      linkUrl: '/',
-      enabled: true,
-    },
-  ],
-  footerInfo: {
-    copyright: '© 2026 哈夫币租赁平台. 保留所有权利.',
-    icpNumber: '',
-    publicSecurityNumber: '',
-    otherInfo: '',
-  },
-};
+type CarouselItem = HomepageConfig['carousels'][number];
+type LogoItem = HomepageConfig['logos'][number];
 
 const LEGACY_IMAGE_MAP: Record<string, string> = {
   '/images/carousel-1.jpg': '/images/carousel-1.svg',
@@ -108,10 +32,10 @@ function looksLikeMojibake(value: string | null | undefined): boolean {
     return false;
   }
 
-  return trimmed.includes('锟')
-    || trimmed.includes('�')
-    || /[ÃÂÐÑäåæçèéêëìíîïðñòóôõöøùúûü]/.test(trimmed)
-    || /[ä¸åæçéèêï¼]/.test(trimmed);
+  return trimmed.includes('閿?')
+    || trimmed.includes('锟?')
+    || /[脙脗脨脩盲氓忙莽猫茅锚毛矛铆卯茂冒帽貌贸么玫枚酶霉煤没眉]/.test(trimmed)
+    || /[盲赂氓忙莽茅猫锚茂录]/.test(trimmed);
 }
 
 function normalizeText(value: string | null | undefined, fallback: string): string {
@@ -132,106 +56,141 @@ function normalizeImageUrl(value: string | null | undefined, fallback: string): 
   return LEGACY_IMAGE_MAP[trimmed] || trimmed;
 }
 
-export function normalizeHomepageConfig(rawConfig: HomepageConfig | null | undefined): HomepageConfig {
-  const sourceCarousels = Array.isArray(rawConfig?.carousels)
-    ? rawConfig.carousels
-    : HOMEPAGE_FALLBACK.carousels;
+function cloneDefaultSkinOptions() {
+  return defaultHomepageConfig.skinOptions.map((item): SkinOption => ({ ...item }));
+}
 
-  const carousels = sourceCarousels.map((item, index) => {
-    const fallback = HOMEPAGE_FALLBACK.carousels[index] || HOMEPAGE_FALLBACK.carousels[0];
+function normalizeSkinOptions(value: unknown): SkinOption[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return cloneDefaultSkinOptions();
+  }
+
+  return value
+    .map((item, index): SkinOption | null => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const record = item as Partial<SkinOption>;
+      const fallback = defaultHomepageConfig.skinOptions[index] || defaultHomepageConfig.skinOptions[0];
+      const name = String(record.name || '').trim();
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        id: String(record.id || fallback?.id || `skin-${index + 1}`),
+        name,
+        code: String(record.code || '').trim() || fallback?.code,
+        iconUrl: String(record.iconUrl || '').trim(),
+        category: String(record.category || '').trim(),
+        enabled: typeof record.enabled === 'boolean' ? record.enabled : true,
+        createdAt: String(record.createdAt || '').trim() || fallback?.createdAt || new Date().toISOString(),
+      };
+    })
+    .filter((item): item is SkinOption => Boolean(item));
+}
+
+function normalizeCarousels(value: HomepageConfig['carousels'] | undefined): HomepageConfig['carousels'] {
+  const source = Array.isArray(value) ? value : defaultHomepageConfig.carousels;
+
+  return source.map((item, index): CarouselItem => {
+    const fallback = defaultHomepageConfig.carousels[index] || defaultHomepageConfig.carousels[0];
+
     return {
       id: String(item?.id || fallback.id),
       title: normalizeText(item?.title, fallback.title),
       description: normalizeText(item?.description, fallback.description),
       imageUrl: normalizeImageUrl(item?.imageUrl, fallback.imageUrl),
-      linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl),
+      linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl || '/'),
       order: typeof item?.order === 'number' ? item.order : fallback.order,
       enabled: typeof item?.enabled === 'boolean' ? item.enabled : fallback.enabled,
     };
   });
+}
 
-  const sourceLogos = Array.isArray(rawConfig?.logos)
-    ? rawConfig.logos
-    : HOMEPAGE_FALLBACK.logos;
+function normalizeLogos(value: HomepageConfig['logos'] | undefined): HomepageConfig['logos'] {
+  const source = Array.isArray(value) ? value : defaultHomepageConfig.logos;
 
-  const logos = sourceLogos.map((item, index) => {
-    const fallback = HOMEPAGE_FALLBACK.logos[index] || HOMEPAGE_FALLBACK.logos[0];
+  return source.map((item, index): LogoItem => {
+    const fallback = defaultHomepageConfig.logos[index] || defaultHomepageConfig.logos[0];
     const type: 'image' | 'text' = item?.type === 'image' ? 'image' : 'text';
-    const fallbackImage = 'imageUrl' in fallback && typeof fallback.imageUrl === 'string'
+    const fallbackImage = fallback.type === 'image' && fallback.imageUrl
       ? fallback.imageUrl
-      : HOMEPAGE_FALLBACK.carousels[0].imageUrl;
-    const imageUrl = typeof (item as { imageUrl?: unknown } | undefined)?.imageUrl === 'string'
-      ? (item as { imageUrl?: string }).imageUrl
-      : undefined;
+      : defaultHomepageConfig.carousels[0].imageUrl;
 
     return {
       id: String(item?.id || fallback.id),
       name: normalizeText(item?.name, fallback.name),
       type,
       imageUrl: type === 'image'
-        ? normalizeImageUrl(imageUrl, fallbackImage)
+        ? normalizeImageUrl(item?.imageUrl, fallbackImage)
         : undefined,
       text: type === 'text'
-        ? normalizeText(item?.text, fallback.text || '')
+        ? normalizeText(item?.text, fallback.type === 'text' ? fallback.text || '' : '')
         : undefined,
       textStyle: item?.textStyle || fallback.textStyle,
       linkUrl: normalizeLinkUrl(item?.linkUrl, fallback.linkUrl || '/'),
       enabled: typeof item?.enabled === 'boolean' ? item.enabled : fallback.enabled,
     };
   });
+}
 
+export function normalizeHomepageConfig(rawConfig: Partial<HomepageConfig> | null | undefined): HomepageConfig {
   return {
-    ...rawConfig,
-    carousels,
-    logos,
-    skinOptions: Array.isArray(rawConfig?.skinOptions) ? rawConfig.skinOptions : [],
+    ...defaultHomepageConfig,
+    ...(rawConfig || {}),
+    carousels: normalizeCarousels(rawConfig?.carousels),
+    logos: normalizeLogos(rawConfig?.logos),
+    skinOptions: normalizeSkinOptions(rawConfig?.skinOptions),
     footerInfo: {
-      copyright: normalizeText(rawConfig?.footerInfo?.copyright, HOMEPAGE_FALLBACK.footerInfo.copyright),
-      icpNumber: rawConfig?.footerInfo?.icpNumber || HOMEPAGE_FALLBACK.footerInfo.icpNumber,
-      publicSecurityNumber: rawConfig?.footerInfo?.publicSecurityNumber || HOMEPAGE_FALLBACK.footerInfo.publicSecurityNumber,
-      otherInfo: rawConfig?.footerInfo?.otherInfo || HOMEPAGE_FALLBACK.footerInfo.otherInfo,
+      copyright: normalizeText(
+        rawConfig?.footerInfo?.copyright,
+        defaultHomepageConfig.footerInfo.copyright,
+      ),
+      icpNumber: String(rawConfig?.footerInfo?.icpNumber || defaultHomepageConfig.footerInfo.icpNumber || '').trim(),
+      publicSecurityNumber: String(
+        rawConfig?.footerInfo?.publicSecurityNumber
+        || defaultHomepageConfig.footerInfo.publicSecurityNumber
+        || '',
+      ).trim(),
+      otherInfo: String(rawConfig?.footerInfo?.otherInfo || defaultHomepageConfig.footerInfo.otherInfo || '').trim(),
     },
   };
 }
 
-export function sanitizeHomepageConfigForAdmin(rawConfig: HomepageConfig | null | undefined): HomepageConfig {
-  const carousels = Array.isArray(rawConfig?.carousels)
-    ? rawConfig.carousels.map((item, index) => ({
-      id: String(item?.id || `carousel-${index + 1}`),
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      imageUrl: normalizeImageUrl(item?.imageUrl, ''),
-      linkUrl: String(item?.linkUrl || '').trim(),
-      order: typeof item?.order === 'number' ? item.order : index,
-      enabled: typeof item?.enabled === 'boolean' ? item.enabled : true,
-    }))
-    : [];
-
-  const logos: LogoItem[] = Array.isArray(rawConfig?.logos)
-    ? rawConfig.logos.map((item, index): LogoItem => ({
-      id: String(item?.id || `logo-${index + 1}`),
-      name: String(item?.name || '').trim(),
-      type: item?.type === 'image' ? 'image' : 'text',
-      imageUrl: item?.type === 'image' ? normalizeImageUrl(item?.imageUrl, '') : undefined,
-      text: item?.type === 'image' ? undefined : String(item?.text || '').trim(),
-      textStyle: item?.textStyle || {
-        fontSize: 'xl',
-        fontWeight: 'bold',
-      },
-      linkUrl: String(item?.linkUrl || '').trim(),
-      enabled: typeof item?.enabled === 'boolean' ? item.enabled : true,
-    }))
-    : [];
+export function sanitizeHomepageConfigForAdmin(
+  rawConfig: Partial<HomepageConfig> | null | undefined,
+): HomepageConfig {
+  const normalized = normalizeHomepageConfig(rawConfig);
 
   return {
-    carousels,
-    logos,
-    skinOptions: Array.isArray(rawConfig?.skinOptions) ? rawConfig.skinOptions : [],
+    carousels: normalized.carousels.map((item, index) => ({
+      id: String(item.id || `carousel-${index + 1}`),
+      title: String(item.title || '').trim(),
+      description: String(item.description || '').trim(),
+      imageUrl: normalizeImageUrl(item.imageUrl, ''),
+      linkUrl: String(item.linkUrl || '').trim(),
+      order: typeof item.order === 'number' ? item.order : index,
+      enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    })),
+    logos: normalized.logos.map((item, index) => ({
+      id: String(item.id || `logo-${index + 1}`),
+      name: String(item.name || '').trim(),
+      type: item.type === 'image' ? 'image' : 'text',
+      imageUrl: item.type === 'image' ? normalizeImageUrl(item.imageUrl, '') : undefined,
+      text: item.type === 'image' ? undefined : String(item.text || '').trim(),
+      textStyle: item.textStyle || { fontSize: 'xl', fontWeight: 'bold' },
+      linkUrl: String(item.linkUrl || '').trim(),
+      enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    })),
+    skinOptions: normalizeSkinOptions(normalized.skinOptions),
     footerInfo: {
-      copyright: String(rawConfig?.footerInfo?.copyright || '').trim(),
-      icpNumber: String(rawConfig?.footerInfo?.icpNumber || '').trim(),
-      publicSecurityNumber: String(rawConfig?.footerInfo?.publicSecurityNumber || '').trim(),
-      otherInfo: String(rawConfig?.footerInfo?.otherInfo || '').trim(),
+      copyright: String(normalized.footerInfo.copyright || '').trim(),
+      icpNumber: String(normalized.footerInfo.icpNumber || '').trim(),
+      publicSecurityNumber: String(normalized.footerInfo.publicSecurityNumber || '').trim(),
+      otherInfo: String(normalized.footerInfo.otherInfo || '').trim(),
     },
   };
 }

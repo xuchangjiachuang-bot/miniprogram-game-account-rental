@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  Copy,
   CreditCard,
-  ExternalLink,
   FileText,
   Loader2,
   RefreshCw,
@@ -246,20 +244,6 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const copyText = async (value: string, label: string) => {
-    if (!value) {
-      toast.error(`${label} 为空，无法复制`);
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success(`${label} 已复制`);
-    } catch {
-      toast.error(`复制${label}失败`);
-    }
-  };
-
   const updateConsumptionCatalogItem = (
     index: number,
     field: 'name' | 'price' | 'unitLabel' | 'enabled',
@@ -358,7 +342,7 @@ export default function AdminSettingsPage() {
         value: '',
       },
     ],
-    [paymentStatus]
+    [paymentStatus],
   );
 
   if (loading) {
@@ -391,8 +375,30 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-        <Card><CardHeader className="pb-2"><CardDescription>业务规则</CardDescription><CardTitle className="text-base">佣金与订单</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground"><div>基础佣金：{settings.commissionRate}%</div><div>订单押金：由卖家上架时手动填写</div><div>上架保证金：¥{settings.listingDepositAmount}</div><div>支付超时：{settings.orderPaymentTimeout} 秒</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>微信支付运行时</CardDescription><CardTitle className="text-base">Railway 环境变量</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm"><span className="text-muted-foreground">{paymentStatus?.configured ? '基础项已就绪' : '存在缺项'}</span><Badge variant={paymentStatus?.configured ? 'default' : 'outline'}>{paymentStatus?.configured ? '运行中' : '待补齐'}</Badge></CardContent></Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>业务规则</CardDescription>
+            <CardTitle className="text-base">佣金与订单</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <div>基础佣金：{settings.commissionRate}%</div>
+            <div>订单押金：由卖家上架时手动填写</div>
+            <div>上架保证金：¥{settings.listingDepositAmount}</div>
+            <div>支付超时：{settings.orderPaymentTimeout} 秒</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>微信支付运行时</CardDescription>
+            <CardTitle className="text-base">Railway 环境变量</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{paymentStatus?.configured ? '基础项已就绪' : '存在缺项'}</span>
+            <Badge variant={paymentStatus?.configured ? 'default' : 'outline'}>
+              {paymentStatus?.configured ? '运行中' : '待补齐'}
+            </Badge>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="business" className="space-y-4">
@@ -405,18 +411,75 @@ export default function AdminSettingsPage() {
         <TabsContent value="business" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Settings2 className="h-5 w-5" />业务规则</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                业务规则
+              </CardTitle>
               <CardDescription>这里只保留当前真实生效的业务参数。微信登录和微信服务器配置已从这里移除。</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="space-y-2"><Label>佣金比例 (%)</Label><Input type="number" value={settings.commissionRate} onChange={(e) => setSettings((prev) => ({ ...prev, commissionRate: toNumber(e.target.value, prev.commissionRate) }))} /></div>
-              <div className="space-y-2"><Label>提现手续费 (%)</Label><Input type="number" value={settings.withdrawalFee} onChange={(e) => setSettings((prev) => ({ ...prev, withdrawalFee: toNumber(e.target.value, prev.withdrawalFee) }))} /></div>
-              <div className="space-y-2"><Label>最低租金 (元)</Label><Input type="number" value={settings.minRentalPrice} onChange={(e) => setSettings((prev) => ({ ...prev, minRentalPrice: toNumber(e.target.value, prev.minRentalPrice) }))} /></div>
-              <div className="space-y-2"><Label>上架保证金 (元)</Label><Input type="number" value={settings.listingDepositAmount} onChange={(e) => setSettings((prev) => ({ ...prev, listingDepositAmount: toNumber(e.target.value, prev.listingDepositAmount) }))} /></div>
-              <div className="space-y-2"><Label>订单支付超时 (秒)</Label><Input type="number" value={settings.orderPaymentTimeout} onChange={(e) => setSettings((prev) => ({ ...prev, orderPaymentTimeout: toNumber(e.target.value, prev.orderPaymentTimeout) }))} /></div>
-              <div className="rounded-xl border border-dashed bg-muted/30 p-4 md:col-span-2 xl:col-span-3"><div className="font-medium">订单押金改为卖家手动填写</div><div className="mt-1 text-sm text-muted-foreground">这里不再配置“押金比例”。买家下单时使用的是卖家上架账号时填写的押金金额。</div></div>
-              <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-4"><div><div className="font-medium">新上架人工审核</div><div className="text-sm text-muted-foreground">关闭后会减少人工审核量。</div></div><Switch checked={settings.requireManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireManualReview: checked }))} /></div></div>
-              <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-4"><div><div className="font-medium">实名用户自动审核</div><div className="text-sm text-muted-foreground">适合流程稳定后开启。</div></div><Switch checked={settings.autoApproveVerified} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, autoApproveVerified: checked }))} /></div></div>
+              <div className="space-y-2">
+                <Label>佣金比例 (%)</Label>
+                <Input
+                  type="number"
+                  value={settings.commissionRate}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, commissionRate: toNumber(e.target.value, prev.commissionRate) }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>提现手续费 (%)</Label>
+                <Input
+                  type="number"
+                  value={settings.withdrawalFee}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, withdrawalFee: toNumber(e.target.value, prev.withdrawalFee) }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>最低租金 (元)</Label>
+                <Input
+                  type="number"
+                  value={settings.minRentalPrice}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, minRentalPrice: toNumber(e.target.value, prev.minRentalPrice) }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>上架保证金 (元)</Label>
+                <Input
+                  type="number"
+                  value={settings.listingDepositAmount}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, listingDepositAmount: toNumber(e.target.value, prev.listingDepositAmount) }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>订单支付超时 (秒)</Label>
+                <Input
+                  type="number"
+                  value={settings.orderPaymentTimeout}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, orderPaymentTimeout: toNumber(e.target.value, prev.orderPaymentTimeout) }))}
+                />
+              </div>
+              <div className="rounded-xl border border-dashed bg-muted/30 p-4 md:col-span-2 xl:col-span-3">
+                <div className="font-medium">订单押金改为卖家手动填写</div>
+                <div className="mt-1 text-sm text-muted-foreground">这里不再配置“押金比例”。买家下单时使用的是卖家上架账号时填写的押金金额。</div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-medium">新上架人工审核</div>
+                    <div className="text-sm text-muted-foreground">关闭后会减少人工审核量。</div>
+                  </div>
+                  <Switch checked={settings.requireManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireManualReview: checked }))} />
+                </div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-medium">实名用户自动审核</div>
+                    <div className="text-sm text-muted-foreground">适合流程稳定后开启。</div>
+                  </div>
+                  <Switch checked={settings.autoApproveVerified} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, autoApproveVerified: checked }))} />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -457,10 +520,7 @@ export default function AdminSettingsPage() {
                   </div>
                   <div className="flex items-end">
                     <div className="flex items-center gap-3 rounded-lg border px-3 py-2">
-                      <Switch
-                        checked={item.enabled}
-                        onCheckedChange={(checked) => updateConsumptionCatalogItem(index, 'enabled', checked)}
-                      />
+                      <Switch checked={item.enabled} onCheckedChange={(checked) => updateConsumptionCatalogItem(index, 'enabled', checked)} />
                       <span className="text-sm text-muted-foreground">启用</span>
                     </div>
                   </div>
@@ -480,14 +540,6 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>微信登录调试入口已移除</AlertTitle>
-            <AlertDescription>
-              后台中与微信登录相关的检测、调试和服务器配置入口已经移除，避免继续和当前真实业务配置混用。支付运行状态仍保留在本页，只用于检查 Railway 环境变量是否生效。
-            </AlertDescription>
-          </Alert>
         </TabsContent>
 
         <TabsContent value="payment" className="space-y-6">
@@ -503,12 +555,21 @@ export default function AdminSettingsPage() {
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" />微信支付状态</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    微信支付状态
+                  </CardTitle>
                   <CardDescription>这里展示线上服务当前真正读到的支付配置。</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={loadPaymentStatus} disabled={refreshingPayment}>{refreshingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}刷新</Button>
-                  <Button onClick={testPayment} disabled={testingPayment}>{testingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}校验配置</Button>
+                  <Button variant="outline" onClick={loadPaymentStatus} disabled={refreshingPayment}>
+                    {refreshingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    刷新
+                  </Button>
+                  <Button onClick={testPayment} disabled={testingPayment}>
+                    {testingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                    校验配置
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -543,9 +604,6 @@ export default function AdminSettingsPage() {
                     {item.value ? <div className="mt-2 break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">{item.value}</div> : null}
                   </div>
                 ))}
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <a href="https://railway.com" target="_blank" rel="noreferrer"><Button variant="outline"><ExternalLink className="mr-2 h-4 w-4" />打开 Railway</Button></a>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -554,21 +612,44 @@ export default function AdminSettingsPage() {
         <TabsContent value="agreements" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />协议内容</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                协议内容
+              </CardTitle>
               <CardDescription>协议文案也统一放进配置中心，避免分散在旧页面里。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {agreements.map((agreement, index) => (
                 <div key={agreement.key || index} className="space-y-4 rounded-xl border p-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2"><Label>协议标识</Label><Input value={agreement.key} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], key: e.target.value }; setAgreements(next); }} /></div>
-                    <div className="space-y-2"><Label>协议标题</Label><Input value={agreement.title} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], title: e.target.value }; setAgreements(next); }} /></div>
+                    <div className="space-y-2">
+                      <Label>协议标识</Label>
+                      <Input value={agreement.key} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], key: e.target.value }; setAgreements(next); }} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>协议标题</Label>
+                      <Input value={agreement.title} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], title: e.target.value }; setAgreements(next); }} />
+                    </div>
                   </div>
-                  <div className="space-y-2"><Label>协议内容</Label><Textarea value={agreement.content} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], content: e.target.value }; setAgreements(next); }} className="min-h-[220px]" /></div>
-                  <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3"><div><div className="font-medium">是否启用</div><div className="text-sm text-muted-foreground">关闭后前台将不再展示这条协议。</div></div><Switch checked={agreement.enabled} onCheckedChange={(checked) => { const next = [...agreements]; next[index] = { ...next[index], enabled: checked }; setAgreements(next); }} /></div>
+                  <div className="space-y-2">
+                    <Label>协议内容</Label>
+                    <Textarea value={agreement.content} onChange={(e) => { const next = [...agreements]; next[index] = { ...next[index], content: e.target.value }; setAgreements(next); }} className="min-h-[220px]" />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+                    <div>
+                      <div className="font-medium">是否启用</div>
+                      <div className="text-sm text-muted-foreground">关闭后前台将不再展示这条协议。</div>
+                    </div>
+                    <Switch checked={agreement.enabled} onCheckedChange={(checked) => { const next = [...agreements]; next[index] = { ...next[index], enabled: checked }; setAgreements(next); }} />
+                  </div>
                 </div>
               ))}
-              <div className="flex justify-end"><Button onClick={saveAgreements} disabled={savingAgreements}>{savingAgreements ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}保存协议</Button></div>
+              <div className="flex justify-end">
+                <Button onClick={saveAgreements} disabled={savingAgreements}>
+                  {savingAgreements ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  保存协议
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
