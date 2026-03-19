@@ -13,7 +13,7 @@ interface FooterInfo {
 
 // 默认 Footer 信息
 const DEFAULT_FOOTER_INFO: FooterInfo = {
-  copyright: '© 2026 哈夫币租赁平台. 保留所有权利.',
+  copyright: '© 2026 YuGiOh. 保留所有权利.',
   icpNumber: '',
   publicSecurityNumber: '',
   otherInfo: ''
