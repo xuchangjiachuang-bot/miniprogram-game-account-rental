@@ -128,6 +128,9 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      cos-nodejs-sdk-v5:
+        specifier: ^2.15.4
+        version: 2.15.4
       coze-coding-dev-sdk:
         specifier: ^0.7.15
         version: 0.7.15(openai@6.17.0(ws@8.18.3)(zod@4.3.6))(ws@8.18.3)
@@ -4717,6 +4720,10 @@ packages:
 
   cos-nodejs-sdk-v5@2.14.6:
     resolution: {integrity: sha512-b5PIJ0fqzIPCC1tq0GOBlJU0wlo4F0HQgTAqvdk73jYlxrNiMd1RTU9GsLwwX2fGOA2J+TOlcy76FebjlO0Smg==}
+    engines: {node: '>= 6'}
+
+  cos-nodejs-sdk-v5@2.15.4:
+    resolution: {integrity: sha512-TP/iYTvKKKhRK89on9SRfSMGEw/9SFAAU8EC1kdT5Fmpx7dAwaCNM2+R2H1TSYoQt+03rwOs8QEfNkX8GOHjHQ==}
     engines: {node: '>= 6'}
 
   cosmiconfig@6.0.0:
@@ -10924,7 +10931,7 @@ snapshots:
     dependencies:
       '@cloudbase/database': 0.6.2
       archiver: 3.1.1
-      cos-nodejs-sdk-v5: 2.14.6
+      cos-nodejs-sdk-v5: 2.15.4
       del: 5.1.0
       fs-extra: 11.3.3
       https-proxy-agent: 5.0.1
@@ -14790,6 +14797,13 @@ snapshots:
       fast-xml-parser: 4.5.4
 
   cos-nodejs-sdk-v5@2.14.6:
+    dependencies:
+      conf: 9.0.2
+      fast-xml-parser: 4.2.5
+      mime-types: 2.1.35
+      request: 2.88.2
+
+  cos-nodejs-sdk-v5@2.15.4:
     dependencies:
       conf: 9.0.2
       fast-xml-parser: 4.2.5

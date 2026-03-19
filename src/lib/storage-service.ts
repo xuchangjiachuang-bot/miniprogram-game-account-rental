@@ -1,10 +1,6 @@
 import { randomUUID } from 'crypto';
-import { existsSync } from 'fs';
-import {
-  readFile as readLocalFile,
-} from 'fs/promises';
 import path from 'path';
-import { fetchWechatJson } from './wechat-http';
+import COS from 'cos-nodejs-sdk-v5';
 
 export interface UploadResult {
   success: boolean;
@@ -26,21 +22,19 @@ export interface StorageDebugRoundTripResult {
   fileKey?: string;
   fileId?: string;
   auth?: {
-    url?: string;
-    hasAuthorization: boolean;
-    hasToken: boolean;
-    fileId?: string;
-    cosFileId?: string;
+    hasTempCredentials: boolean;
+    expiresAt?: number;
+    bucket?: string;
+    region?: string;
+    metaFileId?: string;
   };
   upload?: {
     ok: boolean;
     status?: number;
-    responseText?: string;
     metaFileIdUsed?: string;
   };
   download?: {
     ok: boolean;
-    response?: WechatBatchDownloadResponse;
     url?: string;
     readbackMatches?: boolean;
     bytes?: number;
@@ -48,19 +42,19 @@ export interface StorageDebugRoundTripResult {
   delete?: {
     attempted: boolean;
     ok: boolean;
-    response?: WechatBatchDeleteResponse;
+    response?: unknown;
   };
   error?: string;
 }
 
 const STORAGE_OBJECT_PREFIX = 'uploads';
-const WECHAT_API_BASE_URL = 'https://api.weixin.qq.com';
-const CLOUDBASE_ACCESS_TOKEN_FILE_PATH = '/.tencentcloudbase/wx/cloudbase_access_token';
+const WECHAT_OPEN_API_BASE_URL = 'http://api.weixin.qq.com';
 const DEFAULT_PRODUCTION_CLOUDBASE_ENV_ID = 'hfb-0gv08jmpa261d9fc';
+const DEFAULT_STORAGE_REGION = 'ap-shanghai';
 
-let cachedWechatAccessToken:
+let cachedCosAuth:
   | {
-      value: string;
+      value: WechatCosAuthResponse;
       expiresAt: number;
     }
   | null = null;
@@ -78,43 +72,27 @@ interface ClassifiedStoredFileReference {
   normalized: string;
 }
 
-interface WechatUploadAuthResponse {
+interface WechatCosAuthResponse {
   errcode?: number;
   errmsg?: string;
-  url?: string;
-  token?: string;
-  authorization?: string;
-  file_id?: string;
-  cos_file_id?: string;
+  TmpSecretId?: string;
+  TmpSecretKey?: string;
+  Token?: string;
+  ExpiredTime?: number;
 }
 
-interface WechatBatchDownloadResponse {
+interface WechatMetaEncodeResponse {
   errcode?: number;
   errmsg?: string;
-  file_list?: Array<{
-    fileid?: string;
-    download_url?: string;
-    status?: number;
-    errcode?: number;
-    errmsg?: string;
-  }>;
+  respdata?: {
+    x_cos_meta_field_strs?: string[];
+  };
 }
 
-interface WechatBatchDeleteResponse {
-  errcode?: number;
-  errmsg?: string;
-  file_list?: Array<{
-    fileid?: string;
-    status?: number;
-    errcode?: number;
-    errmsg?: string;
-  }>;
-  delete_list?: Array<{
-    fileid?: string;
-    status?: number;
-    errcode?: number;
-    errmsg?: string;
-  }>;
+interface ParsedCloudFileId {
+  envId: string;
+  bucket: string;
+  key: string;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -157,16 +135,54 @@ function getCloudBaseEnvId(): string {
   return isKnownProductionRuntime ? DEFAULT_PRODUCTION_CLOUDBASE_ENV_ID : '';
 }
 
-function getWechatMpAppId(): string {
-  return getConfiguredEnvValue(['WECHAT_MP_APPID']);
+function getStorageBucket(): string {
+  return getConfiguredEnvValue([
+    'WECHAT_COS_BUCKET',
+    'WECHAT_STORAGE_BUCKET',
+    'CLOUDBASE_STORAGE_BUCKET',
+    'STORAGE_BUCKET_NAME',
+    'COZE_BUCKET_NAME',
+  ]);
 }
 
-function getWechatMpSecret(): string {
-  return getConfiguredEnvValue(['WECHAT_MP_SECRET']);
+function getStorageRegion(): string {
+  return getConfiguredEnvValue([
+    'WECHAT_COS_REGION',
+    'WECHAT_STORAGE_REGION',
+    'CLOUDBASE_STORAGE_REGION',
+    'STORAGE_REGION',
+  ]) || DEFAULT_STORAGE_REGION;
 }
 
 function hasRemoteStorageConfig(): boolean {
-  return Boolean(getCloudBaseEnvId());
+  return Boolean(getCloudBaseEnvId() && getStorageBucket() && getStorageRegion());
+}
+
+function getRequiredEnvId(): string {
+  const envId = getCloudBaseEnvId();
+  if (!envId) {
+    throw new Error('WECHAT_CLOUD_ENV_ID_MISSING');
+  }
+
+  return envId;
+}
+
+function getRequiredBucket(): string {
+  const bucket = getStorageBucket();
+  if (!bucket) {
+    throw new Error('WECHAT_COS_BUCKET_MISSING');
+  }
+
+  return bucket;
+}
+
+function getRequiredRegion(): string {
+  const region = getStorageRegion();
+  if (!region) {
+    throw new Error('WECHAT_COS_REGION_MISSING');
+  }
+
+  return region;
 }
 
 function normalizeFolder(folder: string): string {
@@ -327,49 +343,39 @@ function buildAppFileUrl(fileKey: string): string {
   return `/api/storage/file?${params.toString()}`;
 }
 
-function extractResponseErrorMessage(data: unknown, rawText: string): string {
-  if (data && typeof data === 'object') {
-    const candidate = data as { errcode?: number; errmsg?: string; message?: string };
-    if (candidate.errmsg) {
-      return candidate.errmsg;
-    }
-
-    if (candidate.message) {
-      return candidate.message;
-    }
-
-    if (typeof candidate.errcode === 'number') {
-      return `ERRCODE_${candidate.errcode}`;
-    }
-  }
-
-  return rawText.slice(0, 200) || 'UNKNOWN_RESPONSE';
+function buildCloudFileId(envId: string, bucket: string, key: string): string {
+  return `cloud://${envId}.${bucket}/${key.replace(/^\/+/, '')}`;
 }
 
-// Cloud Run server-side storage requests use the official WeChat storage API endpoints directly.
-async function postWechatStorageJson<T>(endpoint: string, payload: Record<string, unknown>): Promise<T> {
-  const cloudbaseAccessToken = await getRuntimeCloudbaseAccessToken();
-  if (cloudbaseAccessToken) {
-    return postJsonRequest<T>(
-      `${WECHAT_API_BASE_URL}${endpoint}?cloudbase_access_token=${encodeURIComponent(cloudbaseAccessToken)}`,
-      payload,
-    );
+function parseCloudFileId(fileId: string): ParsedCloudFileId {
+  const normalized = normalizeStoredFileKey(fileId);
+  const match = normalized.match(/^cloud:\/\/([^/]+?)\.([^/]+?)\/(.+)$/);
+  if (!match) {
+    throw new Error('WECHAT_STORAGE_FILE_ID_INVALID');
   }
 
-  const accessToken = await getWechatStorageAccessToken();
-  return postJsonRequest<T>(
-    `${WECHAT_API_BASE_URL}${endpoint}?access_token=${encodeURIComponent(accessToken)}`,
-    payload,
-  );
+  return {
+    envId: match[1],
+    bucket: match[2],
+    key: match[3].replace(/^\/+/, ''),
+  };
 }
 
-async function postJsonRequest<T>(url: string, payload: Record<string, unknown>): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
+async function requestWechatOpenApiJson<T>(
+  endpoint: string,
+  init?: {
+    method?: 'GET' | 'POST';
+    body?: Record<string, unknown>;
+  },
+): Promise<T> {
+  const response = await fetch(`${WECHAT_OPEN_API_BASE_URL}${endpoint}`, {
+    method: init?.method || 'GET',
+    headers: init?.body
+      ? {
+          'Content-Type': 'application/json',
+        }
+      : undefined,
+    body: init?.body ? JSON.stringify(init.body) : undefined,
     cache: 'no-store',
   });
 
@@ -385,202 +391,132 @@ async function postJsonRequest<T>(url: string, payload: Record<string, unknown>)
   }
 
   if (!response.ok) {
-    throw new Error(`WECHAT_STORAGE_HTTP_${response.status}:${extractResponseErrorMessage(data, rawText)}`);
+    throw new Error(`WECHAT_STORAGE_HTTP_${response.status}:${rawText.slice(0, 200)}`);
   }
 
   if (data && typeof data === 'object') {
     const candidate = data as { errcode?: number; errmsg?: string };
     if (typeof candidate.errcode === 'number' && candidate.errcode !== 0) {
-      throw new Error(`WECHAT_STORAGE_API_${candidate.errcode}:${candidate.errmsg || 'UNKNOWN'}`);
+      throw new Error(`WECHAT_STORAGE_OPEN_API_${candidate.errcode}:${candidate.errmsg || 'UNKNOWN'}`);
     }
   }
 
   return data as T;
 }
 
-async function getWechatStorageAccessToken(): Promise<string> {
-  if (cachedWechatAccessToken && cachedWechatAccessToken.expiresAt > Date.now() + 60_000) {
-    return cachedWechatAccessToken.value;
+async function getCosTemporaryAuth(): Promise<WechatCosAuthResponse> {
+  if (cachedCosAuth && cachedCosAuth.expiresAt > Date.now() + 60_000) {
+    return cachedCosAuth.value;
   }
 
-  const appId = getWechatMpAppId();
-  const secret = getWechatMpSecret();
+  const auth = await requestWechatOpenApiJson<WechatCosAuthResponse>('/_/cos/getauth');
 
-  if (!appId || !secret) {
-    throw new Error('WECHAT_MP_CREDENTIALS_MISSING');
+  if (!auth.TmpSecretId || !auth.TmpSecretKey || !auth.Token || !auth.ExpiredTime) {
+    throw new Error('WECHAT_STORAGE_COS_AUTH_INVALID');
   }
 
-  const url = `${WECHAT_API_BASE_URL}/cgi-bin/token?grant_type=client_credential&appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}`;
-  const response = await fetchWechatJson<{
-    access_token?: string;
-    expires_in?: number;
-    errcode?: number;
-    errmsg?: string;
-  }>(url, { cache: 'no-store' });
-
-  const data = response.data;
-  if (!response.ok || !data.access_token) {
-    throw new Error(
-      `WECHAT_ACCESS_TOKEN_FAILED:${data.errmsg || data.errcode || response.status}`,
-    );
-  }
-
-  cachedWechatAccessToken = {
-    value: data.access_token,
-    expiresAt: Date.now() + Math.max(300, Number(data.expires_in || 7200) - 300) * 1000,
+  cachedCosAuth = {
+    value: auth,
+    expiresAt: Number(auth.ExpiredTime) * 1000,
   };
 
-  return cachedWechatAccessToken.value;
+  return auth;
 }
 
-async function getRuntimeCloudbaseAccessToken(): Promise<string> {
-  if (!existsSync(CLOUDBASE_ACCESS_TOKEN_FILE_PATH)) {
-    return '';
-  }
+async function getCosClient(): Promise<COS> {
+  const auth = await getCosTemporaryAuth();
 
-  try {
-    return (await readLocalFile(CLOUDBASE_ACCESS_TOKEN_FILE_PATH, 'utf8')).trim();
-  } catch (error) {
-    console.warn('[storage-service] Failed to read cloudbase access token file:', error);
-    return '';
-  }
+  return new COS({
+    SecretId: auth.TmpSecretId,
+    SecretKey: auth.TmpSecretKey,
+    SecurityToken: auth.Token,
+    Protocol: 'https:',
+  });
 }
 
-function getRequiredEnvId(): string {
-  const envId = getCloudBaseEnvId();
-  if (!envId) {
-    throw new Error('WECHAT_CLOUD_ENV_ID_MISSING');
-  }
-
-  return envId;
-}
-
-async function requestUploadAuthorization(fileKey: string): Promise<Required<Pick<WechatUploadAuthResponse, 'url' | 'authorization' | 'file_id'>> & Pick<WechatUploadAuthResponse, 'token' | 'cos_file_id'>> {
-  const envId = getRequiredEnvId();
-  const response = await postWechatStorageJson<WechatUploadAuthResponse>('/tcb/uploadfile', {
-    env: envId,
-    path: fileKey,
+async function requestMetaFileId(bucket: string, key: string): Promise<string> {
+  const response = await requestWechatOpenApiJson<WechatMetaEncodeResponse>('/_/cos/metaid/encode', {
+    method: 'POST',
+    body: {
+      openid: '',
+      bucket,
+      paths: [`/${key.replace(/^\/+/, '')}`],
+    },
   });
 
-  if (!response.url || !response.authorization || !response.file_id) {
-    throw new Error('WECHAT_STORAGE_UPLOAD_AUTH_INVALID');
+  const metaFileId = response.respdata?.x_cos_meta_field_strs?.[0];
+  if (!metaFileId) {
+    throw new Error('WECHAT_STORAGE_META_FILE_ID_MISSING');
   }
 
-  return {
-    url: response.url,
-    authorization: response.authorization,
-    file_id: response.file_id,
-    token: response.token,
-    cos_file_id: response.cos_file_id,
-  };
+  return metaFileId;
 }
 
 async function uploadFileToRemoteStorage(
   fileKey: string,
   fileContent: Buffer,
   contentType: string,
-  originalName: string,
 ): Promise<{
   fileId: string;
-  uploadStatus: number;
-  uploadResponseText: string;
-  metaFileIdUsed: string;
-  auth: Required<Pick<WechatUploadAuthResponse, 'url' | 'authorization' | 'file_id'>> & Pick<WechatUploadAuthResponse, 'token' | 'cos_file_id'>;
+  statusCode?: number;
+  metaFileId: string;
 }> {
-  const auth = await requestUploadAuthorization(fileKey);
-  const metaFileId = auth.cos_file_id || auth.file_id;
-  const formData = new FormData();
-  formData.append('key', fileKey);
-  formData.append('Signature', auth.authorization);
+  const envId = getRequiredEnvId();
+  const bucket = getRequiredBucket();
+  const region = getRequiredRegion();
+  const cos = await getCosClient();
+  const metaFileId = await requestMetaFileId(bucket, fileKey);
 
-  if (auth.token) {
-    formData.append('x-cos-security-token', auth.token);
-  }
-
-  formData.append('x-cos-meta-fileid', metaFileId);
-  formData.append(
-    'file',
-    new Blob([new Uint8Array(fileContent)], { type: contentType || inferContentType(fileKey) }),
-    originalName || path.basename(fileKey) || 'file.bin',
-  );
-
-  const response = await fetch(auth.url, {
-    method: 'POST',
-    body: formData,
-    cache: 'no-store',
+  const response = await cos.putObject({
+    Bucket: bucket,
+    Region: region,
+    Key: fileKey,
+    StorageClass: 'STANDARD',
+    Body: fileContent,
+    ContentLength: fileContent.length,
+    ContentType: contentType || inferContentType(fileKey),
+    Headers: {
+      'x-cos-meta-fileid': metaFileId,
+    },
   });
 
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`WECHAT_STORAGE_UPLOAD_FAILED:${response.status}:${responseText.slice(0, 200)}`);
+  if (Number(response.statusCode || 0) !== 200) {
+    throw new Error(`WECHAT_STORAGE_UPLOAD_FAILED:${response.statusCode || 'UNKNOWN'}`);
   }
 
   return {
-    fileId: auth.file_id,
-    uploadStatus: response.status,
-    uploadResponseText: responseText,
-    metaFileIdUsed: metaFileId,
-    auth,
+    fileId: buildCloudFileId(envId, bucket, fileKey),
+    statusCode: response.statusCode,
+    metaFileId,
   };
 }
 
-async function getRemoteDownloadUrl(fileId: string, expireTime: number): Promise<string> {
-  const envId = getRequiredEnvId();
-  const response = await postWechatStorageJson<WechatBatchDownloadResponse>('/tcb/batchdownloadfile', {
-    env: envId,
-    file_list: [
-      {
-        fileid: fileId,
-        max_age: expireTime,
-      },
-    ],
-  });
-
-  const result = response.file_list?.[0];
-  if (!result) {
-    throw new Error('WECHAT_STORAGE_DOWNLOAD_URL_MISSING');
-  }
-
-  const status = Number(result.status ?? result.errcode ?? 0);
-  if (status !== 0 || !result.download_url) {
-    throw new Error(`WECHAT_STORAGE_DOWNLOAD_URL_FAILED:${result.errmsg || status}`);
-  }
-
-  return result.download_url;
-}
-
 async function readRemoteFile(fileId: string): Promise<Buffer> {
-  const downloadUrl = await getRemoteDownloadUrl(fileId, 600);
-  const response = await fetch(downloadUrl, { cache: 'no-store' });
-
-  if (!response.ok) {
-    throw new Error(`WECHAT_STORAGE_DOWNLOAD_FAILED:${response.status}`);
-  }
-
-  return Buffer.from(await response.arrayBuffer());
-}
-
-async function deleteRemoteFile(fileId: string): Promise<void> {
-  const response = await deleteRemoteFileWithResponse(fileId);
-
-  const result = response.file_list?.[0] || response.delete_list?.[0];
-  if (!result) {
-    return;
-  }
-
-  const status = Number(result.status ?? result.errcode ?? 0);
-  if (status !== 0) {
-    throw new Error(`WECHAT_STORAGE_DELETE_FAILED:${result.errmsg || status}`);
-  }
-}
-
-async function deleteRemoteFileWithResponse(fileId: string): Promise<WechatBatchDeleteResponse> {
-  const envId = getRequiredEnvId();
-  return postWechatStorageJson<WechatBatchDeleteResponse>('/tcb/batchdeletefile', {
-    env: envId,
-    fileid_list: [fileId],
+  const parsed = parseCloudFileId(fileId);
+  const cos = await getCosClient();
+  const response = await cos.getObject({
+    Bucket: parsed.bucket,
+    Region: getRequiredRegion(),
+    Key: parsed.key,
   });
+
+  return Buffer.isBuffer(response.Body) ? response.Body : Buffer.from(response.Body);
+}
+
+async function deleteRemoteFile(fileId: string): Promise<{ statusCode?: number }> {
+  const parsed = parseCloudFileId(fileId);
+  const cos = await getCosClient();
+  const response = await cos.deleteObject({
+    Bucket: parsed.bucket,
+    Region: getRequiredRegion(),
+    Key: parsed.key,
+  });
+
+  if (Number(response.statusCode || 0) !== 204 && Number(response.statusCode || 0) !== 200) {
+    throw new Error(`WECHAT_STORAGE_DELETE_FAILED:${response.statusCode || 'UNKNOWN'}`);
+  }
+
+  return { statusCode: response.statusCode };
 }
 
 async function readStreamToBuffer(
@@ -629,20 +565,20 @@ export async function uploadFile(
       };
     }
 
-    if (hasRemoteStorageConfig()) {
-      const fileKey = generateFileName(fileName, folder);
-      const uploadResult = await uploadFileToRemoteStorage(fileKey, fileContent, contentType, fileName);
-
+    if (!hasRemoteStorageConfig()) {
       return {
-        success: true,
-        key: uploadResult.fileId,
-        url: buildAppFileUrl(uploadResult.fileId),
+        success: false,
+        error: 'WECHAT_STORAGE_COS_CONFIG_MISSING',
       };
     }
 
+    const fileKey = generateFileName(fileName, folder);
+    const uploadResult = await uploadFileToRemoteStorage(fileKey, fileContent, contentType);
+
     return {
-      success: false,
-      error: 'WECHAT_CLOUD_ENV_ID_MISSING',
+      success: true,
+      key: uploadResult.fileId,
+      url: buildAppFileUrl(uploadResult.fileId),
     };
   } catch (error: unknown) {
     console.error('uploadFile failed:', error);
@@ -764,8 +700,15 @@ export async function fileExists(fileKey: string): Promise<boolean> {
       return false;
     }
 
+    const parsed = parseCloudFileId(normalizedReference.normalized);
+    const cos = await getCosClient();
+
     try {
-      await getRemoteDownloadUrl(normalizedReference.normalized, 60);
+      await cos.headObject({
+        Bucket: parsed.bucket,
+        Region: getRequiredRegion(),
+        Key: parsed.key,
+      });
       return true;
     } catch {
       return false;
@@ -797,16 +740,12 @@ export async function generateFileUrl(
       return normalizeBrowserUrl(normalizedReference.normalized);
     }
 
-    if (isCloudStorageFileId(normalizedReference.normalized)) {
-      if (!hasRemoteStorageConfig()) {
-        return null;
-      }
-
-      void expireTime;
-      return buildAppFileUrl(normalizedReference.normalized);
+    if (!isCloudStorageFileId(normalizedReference.normalized) || !hasRemoteStorageConfig()) {
+      return null;
     }
 
-    return null;
+    void expireTime;
+    return buildAppFileUrl(normalizedReference.normalized);
   } catch (error) {
     console.error('generateFileUrl failed:', error);
     return null;
@@ -851,53 +790,47 @@ export async function debugRemoteStorageRoundTrip(
   const fileKey = generateFileName(fileName, folder);
 
   try {
-    const upload = await uploadFileToRemoteStorage(fileKey, fileContent, contentType, fileName);
-    const downloadResponse = await postWechatStorageJson<WechatBatchDownloadResponse>('/tcb/batchdownloadfile', {
-      env: getRequiredEnvId(),
-      file_list: [
-        {
-          fileid: upload.fileId,
-          max_age: options.expireTime || 600,
-        },
-      ],
+    const envId = getRequiredEnvId();
+    const bucket = getRequiredBucket();
+    const region = getRequiredRegion();
+    const auth = await getCosTemporaryAuth();
+    const metaFileId = await requestMetaFileId(bucket, fileKey);
+    const upload = await uploadFileToRemoteStorage(fileKey, fileContent, contentType);
+    const cos = await getCosClient();
+    const fileId = buildCloudFileId(envId, bucket, fileKey);
+    const parsed = parseCloudFileId(fileId);
+    const downloadUrl = cos.getObjectUrl({
+      Bucket: parsed.bucket,
+      Region: region,
+      Key: parsed.key,
+      Sign: true,
+      Expires: options.expireTime || 600,
     });
-
-    const downloadItem = downloadResponse.file_list?.[0];
-    const downloadOk = Boolean(downloadItem?.download_url) && Number(downloadItem?.status ?? 0) === 0;
-    let readbackMatches = false;
-    let bytes = 0;
-
-    if (downloadOk && downloadItem?.download_url) {
-      const response = await fetch(downloadItem.download_url, { cache: 'no-store' });
-      const buffer = Buffer.from(await response.arrayBuffer());
-      bytes = buffer.length;
-      readbackMatches = response.ok && Buffer.compare(buffer, fileContent) === 0;
-    }
+    const buffer = await readRemoteFile(fileId);
+    const readbackMatches = Buffer.compare(buffer, fileContent) === 0;
 
     return {
-      success: downloadOk && readbackMatches,
+      success: readbackMatches,
       storageEnabled: true,
       fileKey,
-      fileId: upload.fileId,
+      fileId,
       auth: {
-        url: upload.auth.url,
-        hasAuthorization: Boolean(upload.auth.authorization),
-        hasToken: Boolean(upload.auth.token),
-        fileId: upload.auth.file_id,
-        cosFileId: upload.auth.cos_file_id,
+        hasTempCredentials: true,
+        expiresAt: auth.ExpiredTime,
+        bucket,
+        region,
+        metaFileId,
       },
       upload: {
-        ok: upload.uploadStatus >= 200 && upload.uploadStatus < 300,
-        status: upload.uploadStatus,
-        responseText: upload.uploadResponseText,
-        metaFileIdUsed: upload.metaFileIdUsed,
+        ok: Number(upload.statusCode || 0) === 200,
+        status: upload.statusCode,
+        metaFileIdUsed: upload.metaFileId,
       },
       download: {
-        ok: downloadOk,
-        response: downloadResponse,
-        url: downloadItem?.download_url,
+        ok: true,
+        url: downloadUrl,
         readbackMatches,
-        bytes,
+        bytes: buffer.length,
       },
       delete: {
         attempted: false,
@@ -916,13 +849,11 @@ export async function debugRemoteStorageRoundTrip(
 
 export async function cleanupRemoteStorageFile(fileId: string): Promise<StorageDebugRoundTripResult['delete']> {
   try {
-    const response = await deleteRemoteFileWithResponse(fileId);
-    const result = response.file_list?.[0] || response.delete_list?.[0];
-    const status = Number(result?.status ?? result?.errcode ?? 0);
+    const response = await deleteRemoteFile(fileId);
 
     return {
       attempted: true,
-      ok: status === 0,
+      ok: Number(response.statusCode || 0) === 204 || Number(response.statusCode || 0) === 200,
       response,
     };
   } catch (error) {
@@ -944,9 +875,28 @@ export async function listFiles(
   maxKeys: number = 100,
 ): Promise<{ keys: string[]; isTruncated: boolean }> {
   try {
-    void prefix;
-    void maxKeys;
-    return { keys: [], isTruncated: false };
+    if (!hasRemoteStorageConfig()) {
+      return { keys: [], isTruncated: false };
+    }
+
+    const cos = await getCosClient();
+    const result = await cos.getBucket({
+      Bucket: getRequiredBucket(),
+      Region: getRequiredRegion(),
+      Prefix: normalizeStoredFileKey(prefix),
+      'MaxKeys': maxKeys,
+    });
+
+    const contents = Array.isArray(result.Contents) ? result.Contents : [];
+    const keys = contents
+      .map((item) => String(item.Key || '').trim())
+      .filter(Boolean)
+      .slice(0, maxKeys);
+
+    return {
+      keys,
+      isTruncated: String(result.IsTruncated || '').toLowerCase() === 'true',
+    };
   } catch (error) {
     console.error('listFiles failed:', error);
     return { keys: [], isTruncated: false };
