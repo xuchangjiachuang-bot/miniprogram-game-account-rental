@@ -19,6 +19,11 @@ export interface WechatPayV3Config {
   transferSceneInfoContent: string;
 }
 
+interface TransferSceneReportInfo {
+  info_type: string;
+  info_content: string;
+}
+
 export interface WechatPlatformCertificate {
   serialNo: string;
   certificatePem: string;
@@ -754,6 +759,28 @@ async function getWechatPayEncryptMaterial() {
   };
 }
 
+function buildTransferSceneReportInfos(config: WechatPayV3Config): TransferSceneReportInfo[] {
+  if (config.transferSceneId === '1005') {
+    return [
+      {
+        info_type: '岗位类型',
+        info_content: '其他类型',
+      },
+      {
+        info_type: '报酬说明',
+        info_content: '平台订单佣金结算',
+      },
+    ];
+  }
+
+  return [
+    {
+      info_type: config.transferSceneInfoType,
+      info_content: config.transferSceneInfoContent,
+    },
+  ];
+}
+
 export async function createTransferBill(params: CreateTransferBillParams) {
   const config = await getWechatPayV3Config();
   if (!config.transferSceneId) {
@@ -769,12 +796,7 @@ export async function createTransferBill(params: CreateTransferBillParams) {
     transfer_amount: params.transferAmountFen,
     transfer_remark: params.transferRemark,
     notify_url: params.notifyUrl || config.notifyUrl,
-    transfer_scene_report_infos: [
-      {
-        info_type: config.transferSceneInfoType,
-        info_content: config.transferSceneInfoContent,
-      },
-    ],
+    transfer_scene_report_infos: buildTransferSceneReportInfos(config),
   };
 
   if (params.userName) {
