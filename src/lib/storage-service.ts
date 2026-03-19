@@ -55,7 +55,6 @@ export interface StorageDebugRoundTripResult {
 
 const STORAGE_OBJECT_PREFIX = 'uploads';
 const WECHAT_API_BASE_URL = 'https://api.weixin.qq.com';
-const WECHAT_OPEN_API_BASE_URL = 'http://api.weixin.qq.com';
 const CLOUDBASE_ACCESS_TOKEN_FILE_PATH = '/.tencentcloudbase/wx/cloudbase_access_token';
 const DEFAULT_PRODUCTION_CLOUDBASE_ENV_ID = 'hfb-0gv08jmpa261d9fc';
 
@@ -347,53 +346,21 @@ function extractResponseErrorMessage(data: unknown, rawText: string): string {
   return rawText.slice(0, 200) || 'UNKNOWN_RESPONSE';
 }
 
+// Cloud Run server-side storage requests use the official WeChat storage API endpoints directly.
 async function postWechatStorageJson<T>(endpoint: string, payload: Record<string, unknown>): Promise<T> {
-  const openApiErrors: string[] = [];
-
-  if (process.env.WECHAT_STORAGE_DISABLE_OPENAPI !== 'true') {
-    try {
-      return await postJsonRequest<T>(`${WECHAT_OPEN_API_BASE_URL}${endpoint}`, payload);
-    } catch (error: unknown) {
-      openApiErrors.push(getErrorMessage(error));
-    }
-  }
-
   const cloudbaseAccessToken = await getRuntimeCloudbaseAccessToken();
   if (cloudbaseAccessToken) {
-    try {
-      return await postJsonRequest<T>(
-        `${WECHAT_API_BASE_URL}${endpoint}?cloudbase_access_token=${encodeURIComponent(cloudbaseAccessToken)}`,
-        payload,
-      );
-    } catch (error: unknown) {
-      openApiErrors.push(`cloudbase_token=${getErrorMessage(error)}`);
-    }
-  }
-
-  let accessToken = '';
-  try {
-    accessToken = await getWechatStorageAccessToken();
-  } catch (error: unknown) {
-    if (openApiErrors.length > 0) {
-      throw new Error(`${getErrorMessage(error)}; openapi=${openApiErrors.join(' | ')}`);
-    }
-
-    throw error;
-  }
-
-  try {
-    return await postJsonRequest<T>(
-      `${WECHAT_API_BASE_URL}${endpoint}?access_token=${encodeURIComponent(accessToken)}`,
+    return postJsonRequest<T>(
+      `${WECHAT_API_BASE_URL}${endpoint}?cloudbase_access_token=${encodeURIComponent(cloudbaseAccessToken)}`,
       payload,
     );
-  } catch (error: unknown) {
-    const fallbackMessage = getErrorMessage(error);
-    if (openApiErrors.length > 0) {
-      throw new Error(`${fallbackMessage}; openapi=${openApiErrors.join(' | ')}`);
-    }
-
-    throw error;
   }
+
+  const accessToken = await getWechatStorageAccessToken();
+  return postJsonRequest<T>(
+    `${WECHAT_API_BASE_URL}${endpoint}?access_token=${encodeURIComponent(accessToken)}`,
+    payload,
+  );
 }
 
 async function postJsonRequest<T>(url: string, payload: Record<string, unknown>): Promise<T> {
