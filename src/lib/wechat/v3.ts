@@ -24,6 +24,21 @@ export interface WechatPlatformCertificate {
   certificatePem: string;
 }
 
+export interface WechatPayPrivateKeyDiagnostics {
+  parseable: boolean;
+  keyLength: number;
+  serialNoLength: number;
+  publicKeyLength: number;
+  publicKeyIdLength: number;
+  apiV3KeyLength: number;
+  beginLabel: string | null;
+  endLabel: string | null;
+  looksEncrypted: boolean;
+  hasBeginMarker: boolean;
+  hasEndMarker: boolean;
+  parseError: string | null;
+}
+
 export interface CreateJsapiTransactionParams {
   appid?: string;
   description: string;
@@ -317,6 +332,55 @@ function getPrivateKeyObject(privateKey: string) {
   throw lastError;
 }
 
+function extractPemLabel(value: string, marker: 'BEGIN' | 'END') {
+  const match = value.match(new RegExp(`-----${marker} ([A-Z ]+)-----`));
+  return match?.[1] || null;
+}
+
+export async function getWechatPayPrivateKeyDiagnostics(): Promise<WechatPayPrivateKeyDiagnostics> {
+  const config = await getWechatPayV3Config();
+  const privateKey = config.privateKey || '';
+  const beginLabel = extractPemLabel(privateKey, 'BEGIN');
+  const endLabel = extractPemLabel(privateKey, 'END');
+  const looksEncrypted =
+    beginLabel === 'ENCRYPTED PRIVATE KEY' ||
+    privateKey.includes('Proc-Type: 4,ENCRYPTED') ||
+    privateKey.includes('DEK-Info:');
+
+  try {
+    getPrivateKeyObject(privateKey);
+    return {
+      parseable: true,
+      keyLength: privateKey.length,
+      serialNoLength: config.serialNo.length,
+      publicKeyLength: config.publicKey.length,
+      publicKeyIdLength: config.publicKeyId.length,
+      apiV3KeyLength: config.apiV3Key.length,
+      beginLabel,
+      endLabel,
+      looksEncrypted,
+      hasBeginMarker: privateKey.includes('BEGIN'),
+      hasEndMarker: privateKey.includes('END'),
+      parseError: null,
+    };
+  } catch (error) {
+    return {
+      parseable: false,
+      keyLength: privateKey.length,
+      serialNoLength: config.serialNo.length,
+      publicKeyLength: config.publicKey.length,
+      publicKeyIdLength: config.publicKeyId.length,
+      apiV3KeyLength: config.apiV3Key.length,
+      beginLabel,
+      endLabel,
+      looksEncrypted,
+      hasBeginMarker: privateKey.includes('BEGIN'),
+      hasEndMarker: privateKey.includes('END'),
+      parseError: error instanceof Error ? error.message : 'UNKNOWN_PRIVATE_KEY_PARSE_ERROR',
+    };
+  }
+}
+
 function getPublicKeyObject(publicKey: string) {
   const candidates = buildPublicKeyCandidates(publicKey);
   let lastError: unknown;
@@ -338,7 +402,9 @@ function getPublicKeyObject(publicKey: string) {
     hasEndMarker: publicKey.includes('END'),
     candidateCount: candidates.length,
   });
-  throw lastError;
+  throw new Error(
+    `WECHAT_PAY_PUBLIC_KEY_PARSE_FAILED:${lastError instanceof Error ? lastError.message : 'UNKNOWN_PUBLIC_KEY_ERROR'}`
+  );
 }
 
 function buildAuthorizationHeader(

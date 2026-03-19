@@ -4,6 +4,8 @@ import { createTransferBill } from '@/lib/wechat/v3';
 import { balanceTransactions, db, userBalances, users, withdrawals } from './db';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
 
+const WITHDRAWAL_NAME_REQUIRED_THRESHOLD_FEN = 200000;
+
 function isValidWithdrawalRecord(withdrawal: any) {
   return Number(withdrawal?.amount || 0) > 0 && Number(withdrawal?.actualAmount || 0) > 0;
 }
@@ -157,7 +159,12 @@ async function approveWithdrawalByWechatTransfer(params: {
     openid: accountInfo.openid,
     transferAmountFen: Math.round(actualAmount * 100),
     transferRemark: `Withdrawal ${withdrawal.withdrawalNo}`,
-    userName: accountInfo.accountName || undefined,
+    // 微信官方转账接口仅在特定金额门槛及规则下要求收款人姓名。
+    // 小额提现不强制携带 user_name，避免无谓地走公钥加密链路。
+    userName:
+      Math.round(actualAmount * 100) >= WITHDRAWAL_NAME_REQUIRED_THRESHOLD_FEN
+        ? accountInfo.accountName || undefined
+        : undefined,
     userRecvPerception: 'Balance withdrawal',
   });
 
