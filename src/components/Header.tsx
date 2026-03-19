@@ -28,7 +28,7 @@ const DEFAULT_LOGO: LogoConfig = {
   id: 'default',
   name: '默认Logo',
   type: 'text',
-  text: '哈夫币租赁平台',
+  text: 'YuGiOh',
   textStyle: {
     fontSize: 'xl',
     fontWeight: 'bold'

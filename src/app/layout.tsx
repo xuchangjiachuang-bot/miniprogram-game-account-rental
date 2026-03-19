@@ -6,8 +6,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: '哈夫币租赁平台',
-    template: '%s | 哈夫币租赁平台',
+    default: 'YuGiOh',
+    template: '%s | YuGiOh',
   },
   description:
     '专业的三角洲行动虚拟货币租赁服务平台，提供安全、便捷的账号租赁体验。',
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
     '虚拟货币',
     '游戏租赁',
   ],
-  authors: [{ name: '哈夫币租赁平台' }],
+  authors: [{ name: 'YuGiOh' }],
   generator: 'Next.js',
   openGraph: {
-    title: '哈夫币租赁平台 | 专业的游戏虚拟货币租赁服务',
+    title: 'YuGiOh | 专业的游戏虚拟货币租赁服务',
     description:
       '专业的三角洲行动虚拟货币租赁服务平台，提供安全、便捷的账号租赁体验。',
     type: 'website',

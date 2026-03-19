@@ -80,7 +80,7 @@ export const defaultHomepageConfig: HomepageConfig = {
       id: '1',
       name: '主LOGO',
       type: 'text',
-      text: '哈夫币租赁平台',
+      text: 'YuGiOh',
       textStyle: {
         fontSize: 'xl',
         fontWeight: 'bold'
@@ -335,7 +335,7 @@ export const defaultHomepageConfig: HomepageConfig = {
     }
   ],
   footerInfo: {
-    copyright: '© 2026 哈夫币租赁平台. 保留所有权利.',
+    copyright: '© 2026 YuGiOh. 保留所有权利.',
     icpNumber: '',
     publicSecurityNumber: '',
     otherInfo: ''
