@@ -467,7 +467,7 @@ export default function Home() {
                       )}
                       <Button
                         onClick={handlePublishAccount}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium"
+                        className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700"
                       >
                         <PlusCircle className="w-4 h-4 mr-2" />
                         发布账号
@@ -495,7 +495,7 @@ export default function Home() {
               <div className="mt-6">
                 <Button
                   onClick={handlePublishAccount}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium"
+                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700"
                 >
                   <PlusCircle className="w-5 h-5 mr-2" />
                   发布账号

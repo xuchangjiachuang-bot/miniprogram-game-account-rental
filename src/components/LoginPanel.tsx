@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ExternalLink, Loader2, QrCode, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, QrCode, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@/contexts/UserContext';
 import {
@@ -318,19 +318,10 @@ export function LoginPanel({ mode, onClose, onSuccess }: LoginPanelProps) {
                   size="sm"
                   onClick={() => void loadWechatQrConfig()}
                   disabled={loading}
-                  className="flex items-center gap-2"
+                  className="flex cursor-pointer items-center gap-2"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   刷新二维码
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(wechatConfig.loginUrl, '_blank', 'noopener,noreferrer')}
-                  className="flex items-center gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  打开官方登录页
                 </Button>
               </div>
             </div>

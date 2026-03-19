@@ -16,6 +16,7 @@ import { User, FileText, Wallet, Shield, Upload, CheckCircle, Camera, Loader2, A
 import { useUser } from '@/contexts/UserContext';
 import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
+import { LoginDialog } from '@/components/LoginDialog';
 import { getToken } from '@/lib/auth-token';
 import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
 import { formatServerDateTime } from '@/lib/time';
@@ -98,6 +99,7 @@ interface WithdrawalRecord {
 
 export default function UserCenterPage() {
   const { user, loading, refreshUser } = useUser();
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -1175,11 +1177,20 @@ export default function UserCenterPage() {
             <CardDescription>您需要登录后才能访问个人中心</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => window.location.href = '/'} className="w-full">
-              去登录
+            <Button onClick={() => setShowLoginDialog(true)} className="w-full cursor-pointer">
+              微信登录
             </Button>
           </CardContent>
         </Card>
+        <LoginDialog
+          trigger={null}
+          open={showLoginDialog}
+          onOpenChange={setShowLoginDialog}
+          onSuccess={() => {
+            setShowLoginDialog(false);
+            refreshUser(true);
+          }}
+        />
       </div>
     );
   }

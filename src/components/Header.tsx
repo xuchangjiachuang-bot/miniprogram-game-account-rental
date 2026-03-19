@@ -352,7 +352,7 @@ export function Header() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="relative h-10 w-10 rounded-full hover:bg-gray-100 transition-colors"
+                      className="relative h-10 w-10 cursor-pointer rounded-full transition-colors hover:bg-gray-100"
                       onClick={handleNotificationClick}
                     >
                       <Bell className="h-5 w-5 text-gray-600" />
@@ -434,7 +434,7 @@ export function Header() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="relative h-10 w-10 rounded-full group hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 transition-all duration-200"
+                      className="group relative h-10 w-10 cursor-pointer rounded-full transition-all duration-200 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2"
                     >
                       <Avatar className="h-10 w-10 transition-transform duration-200 group-hover:scale-105">
                         <AvatarImage src={user.avatar ?? undefined} alt={user.username} />
