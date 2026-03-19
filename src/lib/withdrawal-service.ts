@@ -165,7 +165,6 @@ async function approveWithdrawalByWechatTransfer(params: {
       Math.round(actualAmount * 100) >= WITHDRAWAL_NAME_REQUIRED_THRESHOLD_FEN
         ? accountInfo.accountName || undefined
         : undefined,
-    userRecvPerception: 'Balance withdrawal',
   });
 
   const now = new Date().toISOString();
