@@ -32,6 +32,42 @@ function toNumber(value: unknown) {
   return Number(value) || 0;
 }
 
+async function resolveOrderTransactionId(order: typeof orders.$inferSelect) {
+  if (order.transactionId) {
+    return order.transactionId;
+  }
+
+  const paymentRows = await db
+    .select({
+      transactionId: paymentRecords.transactionId,
+    })
+    .from(paymentRecords)
+    .where(
+      and(
+        eq(paymentRecords.orderId, order.id),
+        eq(paymentRecords.type, 'payment'),
+        eq(paymentRecords.method, 'wechat'),
+        eq(paymentRecords.status, 'success'),
+      ),
+    )
+    .limit(1);
+
+  const transactionId = paymentRows[0]?.transactionId || '';
+  if (!transactionId) {
+    return '';
+  }
+
+  await db
+    .update(orders)
+    .set({
+      transactionId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(orders.id, order.id));
+
+  return transactionId;
+}
+
 async function sendDisputeSystemMessage(orderId: string, content: string) {
   const groupRows = await db.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
   const group = groupRows[0];
@@ -191,7 +227,8 @@ async function requestFullRefund(orderId: string, reason: string) {
     throw new Error('订单已分账，不能直接发起全额退款');
   }
 
-  if (!order.transactionId) {
+  const transactionId = await resolveOrderTransactionId(order);
+  if (!transactionId) {
     throw new Error('订单缺少微信支付流水号，无法发起原路退款');
   }
 
@@ -213,7 +250,7 @@ async function requestFullRefund(orderId: string, reason: string) {
   const refundAmount = toNumber(order.totalPrice);
   const outRefundNo = `RF${order.id.replace(/-/g, '').slice(0, 16)}${generateNonceStr(8)}`;
   const refundResult = await refund({
-    transactionId: order.transactionId || undefined,
+    transactionId: transactionId || undefined,
     outTradeNo: order.id,
     outRefundNo,
     totalFee: yuanToFen(refundAmount),
@@ -257,7 +294,7 @@ async function requestFullRefund(orderId: string, reason: string) {
         orderNo: order.orderNo,
         outRefundNo,
         reason,
-        transactionId: order.transactionId,
+        transactionId,
       },
     }, tx);
   });

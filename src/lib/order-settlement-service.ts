@@ -16,6 +16,42 @@ export interface SettlementResult {
   buyerRefund: number;
 }
 
+async function resolveOrderTransactionId(order: typeof orders.$inferSelect) {
+  if (order.transactionId) {
+    return order.transactionId;
+  }
+
+  const paymentRows = await db
+    .select({
+      transactionId: paymentRecords.transactionId,
+    })
+    .from(paymentRecords)
+    .where(
+      and(
+        eq(paymentRecords.orderId, order.id),
+        eq(paymentRecords.type, 'payment'),
+        eq(paymentRecords.method, 'wechat'),
+        eq(paymentRecords.status, 'success'),
+      ),
+    )
+    .limit(1);
+
+  const transactionId = paymentRows[0]?.transactionId || '';
+  if (!transactionId) {
+    return '';
+  }
+
+  await db
+    .update(orders)
+    .set({
+      transactionId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(orders.id, order.id));
+
+  return transactionId;
+}
+
 async function requestWechatDepositRefund(order: typeof orders.$inferSelect) {
   const depositAmount = Number(order.deposit) || 0;
   const consumptionSummary = await getApprovedConsumptionSummary(order.id);
@@ -25,13 +61,14 @@ async function requestWechatDepositRefund(order: typeof orders.$inferSelect) {
     return { success: true, message: 'NO_DEPOSIT', pendingRefund: false };
   }
 
-  if (!order.transactionId) {
+  const transactionId = await resolveOrderTransactionId(order);
+  if (!transactionId) {
     throw new Error('ORDER_TRANSACTION_ID_MISSING');
   }
 
   const outRefundNo = `DR${order.id.replace(/-/g, '').slice(0, 16)}${generateNonceStr(8)}`;
   const refundResult = await refund({
-    transactionId: order.transactionId || undefined,
+    transactionId: transactionId || undefined,
     outTradeNo: order.id,
     outRefundNo,
     totalFee: yuanToFen(Number(order.totalPrice) || 0),
@@ -64,7 +101,7 @@ async function requestWechatDepositRefund(order: typeof orders.$inferSelect) {
     details: {
       orderNo: order.orderNo,
       outRefundNo,
-      transactionId: order.transactionId,
+      transactionId,
       depositDeductedAmount: consumptionSummary.depositDeductedAmount || 0,
     },
   });
