@@ -1556,8 +1556,11 @@ function NewAccountPage() {
                         {/* 可提现收入 - 突出显示 */}
                         <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-emerald-100 rounded-lg border-2 border-green-300">
                           <div className="flex-1">
-                            <div className="text-sm font-semibold text-green-800 mb-1">您的收入</div>
-                            <div className="text-2xl font-bold text-green-700">¥{pricing.sellerIncome.toFixed(2)}</div>
+                            <div className="text-sm font-semibold text-green-800 mb-1">预计到账</div>
+                            <div className="text-2xl font-bold text-green-700">¥{pricing.finalIncome.toFixed(2)}</div>
+                            <div className="mt-1 text-xs text-green-700">
+                              已扣除平台抽佣 ¥{pricing.commission.toFixed(2)} 和提现费 ¥{pricing.withdrawalFee.toFixed(2)}
+                            </div>
                           </div>
                           <div className="text-right text-xs text-green-700">
                             <div>平台抽佣 {pricing.commissionRate}%</div>
