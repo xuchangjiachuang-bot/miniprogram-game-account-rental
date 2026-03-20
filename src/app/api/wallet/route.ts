@@ -28,12 +28,18 @@ export async function GET(request: NextRequest) {
     }
 
     const balance = await ensureUserBalance(user.id);
+    const withdrawableBalance = Math.max(
+      Number(balance.availableBalance) - Number(balance.nonWithdrawableBalance),
+      0,
+    );
 
     return NextResponse.json({
       success: true,
       data: {
         user_id: user.id,
         available_balance: balance.availableBalance,
+        withdrawable_balance: withdrawableBalance,
+        non_withdrawable_balance: balance.nonWithdrawableBalance,
         frozen_balance: balance.frozenBalance,
         total_balance: balance.availableBalance + balance.frozenBalance,
         total_withdrawn: balance.totalWithdrawn,

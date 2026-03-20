@@ -71,6 +71,18 @@ interface WalletUiSettings {
   withdrawalFee: number;
 }
 
+interface WalletSummary {
+  available_balance: number;
+  withdrawable_balance?: number;
+  non_withdrawable_balance?: number;
+  frozen_balance: number;
+  total_balance: number;
+  total_withdrawn?: number;
+  total_recharged?: number;
+  total_income?: number;
+  total_refund?: number;
+}
+
 function resolveWechatWithdrawOpenid(user: any) {
   if (!user) {
     return null;
@@ -172,7 +184,7 @@ export default function UserCenterPage() {
   const [pendingChatTarget, setPendingChatTarget] = useState<{ groupId?: string; orderId?: string } | null>(null);
 
   // 钱包状态
-  const [balance, setBalance] = useState<any>(null);
+  const [balance, setBalance] = useState<WalletSummary | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [rechargeAmount, setRechargeAmount] = useState('');
@@ -751,7 +763,7 @@ export default function UserCenterPage() {
       toast.error('请输入提现账户');
       return;
     }
-    if (balance && parseFloat(withdrawAmount) > balance.available_balance) {
+    if (balance && parseFloat(withdrawAmount) > Number(balance.withdrawable_balance ?? balance.available_balance ?? 0)) {
       toast.error('提现金额超过可用余额');
       return;
     }
@@ -801,7 +813,7 @@ export default function UserCenterPage() {
       return;
     }
 
-    if (balance && parseFloat(withdrawAmount) > Number(balance.available_balance || 0)) {
+    if (balance && parseFloat(withdrawAmount) > Number(balance.withdrawable_balance ?? balance.available_balance ?? 0)) {
       toast.error('提现金额超过可用余额');
       return;
     }
@@ -1766,9 +1778,14 @@ export default function UserCenterPage() {
                           </CardHeader>
                           <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4 lg:px-6 lg:pb-6">
                             <div className="text-lg font-bold text-gray-900 sm:text-xl lg:text-3xl">
-                              {formatBalance(balance.available_balance)}
+                              {formatBalance(Number(balance.withdrawable_balance ?? balance.available_balance ?? 0))}
                             </div>
                             <p className="mt-1 text-xs text-gray-500">可提现金额</p>
+                            {Number(balance.non_withdrawable_balance || 0) > 0 ? (
+                              <p className="mt-1 text-xs text-amber-600">
+                                含测试充值不可提现金额 {formatBalance(Number(balance.non_withdrawable_balance || 0))}
+                              </p>
+                            ) : null}
                           </CardContent>
                         </Card>
 
