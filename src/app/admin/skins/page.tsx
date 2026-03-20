@@ -14,11 +14,22 @@ import { SkinOption, HomepageConfig } from '@/lib/config-types';
 const SKIN_CATEGORY_OPTIONS = ['刀皮', '干员皮肤', '武器皮肤'] as const;
 const normalizeSkinCategory = (value?: string) => {
   if (!value) return '';
-  if (value === '刀皮' || value === '武器皮肤' || value === '干员皮肤') return value;
-  if (value.includes('刀')) return '刀皮';
-  if (value.includes('武器') || value.includes('枪')) return '武器皮肤';
-  if (value.includes('干员') || value.includes('角色')) return '干员皮肤';
-  return value;
+  const normalized = value.trim();
+  if (SKIN_CATEGORY_OPTIONS.includes(normalized as typeof SKIN_CATEGORY_OPTIONS[number])) {
+    return normalized;
+  }
+  if (normalized.includes('刀')) return '刀皮';
+  if (normalized.includes('武器') || normalized.includes('枪')) return '武器皮肤';
+  if (
+    normalized.includes('红皮')
+    || normalized.includes('金皮')
+    || normalized.includes('干员')
+    || normalized.includes('角色')
+    || normalized.includes('人物')
+  ) {
+    return '干员皮肤';
+  }
+  return normalized;
 };
 
 export default function SkinOptionsPage() {
@@ -217,7 +228,10 @@ export default function SkinOptionsPage() {
   })) || [];
 
   // 获取所有分类
-  const categories = ['all', ...SKIN_CATEGORY_OPTIONS];
+  const categories = ['all', ...Array.from(new Set([
+    ...SKIN_CATEGORY_OPTIONS,
+    ...filteredSkins.map((skin) => skin.category).filter(Boolean),
+  ]))];
   const groupedFilteredSkins = categories
     .filter((category) => category !== 'all')
     .map((category) => ({

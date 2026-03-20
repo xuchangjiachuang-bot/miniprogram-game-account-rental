@@ -91,11 +91,22 @@ interface SkinConfig {
 const SKIN_CATEGORY_ORDER = ['刀皮', '干员皮肤', '武器皮肤'] as const;
 const normalizeSkinCategory = (value?: string) => {
   if (!value) return '未分类';
-  if (value === '刀皮' || value === '干员皮肤' || value === '武器皮肤') return value;
-  if (value.includes('刀')) return '刀皮';
-  if (value.includes('武器') || value.includes('枪')) return '武器皮肤';
-  if (value.includes('干员') || value.includes('角色')) return '干员皮肤';
-  return value;
+  const normalized = value.trim();
+  if (SKIN_CATEGORY_ORDER.includes(normalized as typeof SKIN_CATEGORY_ORDER[number])) {
+    return normalized;
+  }
+  if (normalized.includes('刀')) return '刀皮';
+  if (normalized.includes('武器') || normalized.includes('枪')) return '武器皮肤';
+  if (
+    normalized.includes('红皮')
+    || normalized.includes('金皮')
+    || normalized.includes('干员')
+    || normalized.includes('角色')
+    || normalized.includes('人物')
+  ) {
+    return '干员皮肤';
+  }
+  return normalized;
 };
 
 const createDefaultFormData = () => ({
@@ -538,6 +549,7 @@ function NewAccountPage() {
 
       // 1. 优先从缓存加载配置（秒级）
       const cachedConfig = loadConfigFromCache<any>();
+      let latestSkinOptions = cachedConfig?.skinOptions;
       if (cachedConfig?.platformSettings) {
         setPlatformSettings(cachedConfig.platformSettings);
       }
@@ -552,9 +564,10 @@ function NewAccountPage() {
       loadAgreements();
 
       // 2. 异步从服务器加载最新配置
-      const [settingsRes, activitiesRes] = await Promise.all([
+      const [settingsRes, activitiesRes, homepageConfigRes] = await Promise.all([
         fetch('/api/admin/platform-settings'),
-        fetch('/api/admin/commission-activities?active=true')
+        fetch('/api/admin/commission-activities?active=true'),
+        fetch('/api/homepage-config', { cache: 'no-store' })
       ]);
 
       // 加载平台设置
@@ -581,8 +594,22 @@ function NewAccountPage() {
 
       // 保存到缓存
       try {
+        if (homepageConfigRes.ok) {
+          const result = await homepageConfigRes.json();
+          if (result.success && result.data?.skinOptions) {
+            latestSkinOptions = result.data.skinOptions;
+            const nextConfig = {
+              ...cachedConfig,
+              skinOptions: latestSkinOptions,
+            };
+            saveConfigToCache(nextConfig);
+            loadSkinConfig(nextConfig);
+          }
+        }
+
         const newConfig = {
           ...cachedConfig,
+          skinOptions: latestSkinOptions,
           platformSettings,
           activeActivity,
         };
@@ -600,10 +627,10 @@ function NewAccountPage() {
     }
   };
 
-  const loadSkinConfig = () => {
+  const loadSkinConfig = (sourceConfig?: any) => {
     // 优先从缓存加载皮肤配置
     try {
-      const cachedConfig = loadConfigFromCache<any>();
+      const cachedConfig = sourceConfig || loadConfigFromCache<any>();
       if (cachedConfig?.skinOptions) {
         const enabledSkins = cachedConfig.skinOptions
           .filter((s: any) => s.enabled)
