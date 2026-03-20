@@ -71,10 +71,15 @@ export default function SkinOptionsPage() {
 
   const loadConfig = async () => {
     try {
-      const res = await fetch('/api/admin/homepage-config');
+      const res = await fetch('/api/admin/homepage-config', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       const result = await res.json();
       if (result.success) {
         setConfig(result.data);
+      } else {
+        toast.error(result.error || '加载配置失败');
       }
     } catch (error) {
       toast.error('加载配置失败');
@@ -84,19 +89,30 @@ export default function SkinOptionsPage() {
   };
 
   const saveConfig = async () => {
+    if (!config) {
+      toast.error('配置未加载，无法保存');
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/homepage-config', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
-      const result = await res.json();
+
+      const result = await res.json().catch(() => null);
       if (result.success) {
         toast.success('配置保存成功');
+        if (result.data) {
+          setConfig(result.data);
+        }
       } else {
-        toast.error(result.error || '保存失败');
+        toast.error(result?.error || `保存失败 (${res.status})`);
       }
     } catch (error) {
+      console.error('[admin/skins] save config failed:', error);
       toast.error('保存配置失败');
     }
   };
