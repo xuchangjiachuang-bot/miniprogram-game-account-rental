@@ -1,12 +1,24 @@
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { checkWechatPayConfig } from '@/lib/wechat/config';
-import { refund } from '@/lib/wechat/refund';
-import { generateNonceStr, yuanToFen } from '@/lib/wechat/utils';
-import { chatMessages, db, disputes, groupChats, orderConsumptionSettlements, orders, paymentRecords, users } from './db';
+import { restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
+import {
+  balanceTransactions,
+  chatMessages,
+  db,
+  disputes,
+  groupChats,
+  orderConsumptionSettlements,
+  orders,
+  paymentRecords,
+  userBalances,
+  users,
+} from './db';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
 import { getLatestConsumptionSettlement } from './order-consumption-service';
 import { settleCompletedOrder } from './order-settlement-service';
+import { checkWechatPayConfig } from '@/lib/wechat/config';
+import { refund } from '@/lib/wechat/refund';
+import { generateNonceStr, yuanToFen } from '@/lib/wechat/utils';
 
 export type DisputeDecision = 'refund_buyer_full' | 'resume_order' | 'complete_order';
 
@@ -30,42 +42,6 @@ export interface DisputeView {
 
 function toNumber(value: unknown) {
   return Number(value) || 0;
-}
-
-async function resolveOrderTransactionId(order: typeof orders.$inferSelect) {
-  if (order.transactionId) {
-    return order.transactionId;
-  }
-
-  const paymentRows = await db
-    .select({
-      transactionId: paymentRecords.transactionId,
-    })
-    .from(paymentRecords)
-    .where(
-      and(
-        eq(paymentRecords.orderId, order.id),
-        eq(paymentRecords.type, 'payment'),
-        eq(paymentRecords.method, 'wechat'),
-        eq(paymentRecords.status, 'success'),
-      ),
-    )
-    .limit(1);
-
-  const transactionId = paymentRows[0]?.transactionId || '';
-  if (!transactionId) {
-    return '';
-  }
-
-  await db
-    .update(orders)
-    .set({
-      transactionId,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(orders.id, order.id));
-
-  return transactionId;
 }
 
 async function sendDisputeSystemMessage(orderId: string, content: string) {
@@ -174,6 +150,7 @@ export async function createOrderDispute(params: {
   const respondentId = order.buyerId === params.initiatorId ? order.sellerId : order.buyerId;
   const now = new Date().toISOString();
   const disputeId = randomUUID();
+  const trimmedReason = params.reason.trim();
 
   await db.transaction(async (tx) => {
     await tx.insert(disputes).values({
@@ -183,7 +160,7 @@ export async function createOrderDispute(params: {
       respondentId,
       status: 'pending',
       disputeType: params.disputeType || 'after_sale',
-      reason: params.reason.trim(),
+      reason: trimmedReason,
       evidence: params.evidence ?? null,
       resolution: null,
       compensation: '0',
@@ -196,7 +173,7 @@ export async function createOrderDispute(params: {
       .set({
         status: 'disputed',
         disputeId,
-        disputeReason: params.reason.trim(),
+        disputeReason: trimmedReason,
         disputeEvidence: params.evidence ?? null,
         updatedAt: now,
       })
@@ -205,52 +182,138 @@ export async function createOrderDispute(params: {
 
   await sendDisputeSystemMessage(
     order.id,
-    `订单已发起纠纷，原因：${params.reason.trim()}。平台将介入处理，请买卖双方在群内补充说明。`,
+    `订单已发起纠纷，原因：${trimmedReason}。平台将介入处理，请买卖双方在群内补充说明。`,
   );
 
   return getOrderDispute(params.orderId);
 }
 
-async function requestFullRefund(orderId: string, reason: string) {
-  const orderRows = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
-  const order = orderRows[0];
+async function requestWalletFullRefund(order: typeof orders.$inferSelect, reason: string) {
+  const refundAmount = toNumber(order.totalPrice);
+  const depositAmount = toNumber(order.deposit);
+  const now = new Date().toISOString();
 
-  if (!order) {
-    throw new Error('订单不存在');
-  }
+  await db.transaction(async (tx) => {
+    const balanceRows = await tx
+      .select()
+      .from(userBalances)
+      .where(eq(userBalances.userId, order.buyerId))
+      .limit(1);
 
-  if (order.isSettled) {
-    throw new Error('订单已分账，不能直接发起全额退款');
-  }
+    const balance = balanceRows[0];
+    if (!balance) {
+      throw new Error('BUYER_BALANCE_NOT_FOUND');
+    }
 
-  const transactionId = await resolveOrderTransactionId(order);
+    const availableBefore = toNumber(balance.availableBalance);
+    const frozenBefore = toNumber(balance.frozenBalance);
+    const releasedFrozen = Math.min(frozenBefore, depositAmount);
+    const availableCredit = Math.max(refundAmount - releasedFrozen, 0);
+    const availableAfter = availableBefore + availableCredit;
+    const frozenAfter = Math.max(frozenBefore - releasedFrozen, 0);
+
+    await tx
+      .update(userBalances)
+      .set({
+        availableBalance: availableAfter.toFixed(2),
+        frozenBalance: frozenAfter.toFixed(2),
+        updatedAt: now,
+      })
+      .where(eq(userBalances.userId, order.buyerId));
+
+    if (availableCredit > 0) {
+      await tx.insert(balanceTransactions).values({
+        id: randomUUID(),
+        userId: order.buyerId,
+        orderId: order.id,
+        transactionType: 'refund',
+        amount: availableCredit.toFixed(2),
+        balanceBefore: availableBefore.toFixed(2),
+        balanceAfter: availableAfter.toFixed(2),
+        description: `订单 ${order.orderNo} 争议全额退款返还租金`,
+        createdAt: now,
+      });
+    }
+
+    if (releasedFrozen > 0) {
+      await tx.insert(balanceTransactions).values({
+        id: randomUUID(),
+        userId: order.buyerId,
+        orderId: order.id,
+        transactionType: 'unfreeze',
+        amount: releasedFrozen.toFixed(2),
+        balanceBefore: availableAfter.toFixed(2),
+        balanceAfter: availableAfter.toFixed(2),
+        description: `订单 ${order.orderNo} 争议全额退款解冻押金`,
+        createdAt: now,
+      });
+    }
+
+    await tx.insert(paymentRecords).values({
+      id: randomUUID(),
+      orderId: order.id,
+      orderNo: order.orderNo,
+      userId: order.buyerId,
+      amount: refundAmount.toFixed(2),
+      type: 'refund',
+      method: 'wallet',
+      transactionId: '',
+      thirdPartyOrderId: order.id,
+      status: 'success',
+      failureReason: reason,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await tx
+      .update(orders)
+      .set({
+        status: 'refunded',
+        updatedAt: now,
+      })
+      .where(eq(orders.id, order.id));
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_refund_wallet_completed',
+      status: 'success',
+      userId: order.buyerId,
+      orderId: order.id,
+      amount: refundAmount,
+      balanceBefore: availableBefore,
+      balanceAfter: availableAfter,
+      details: {
+        orderNo: order.orderNo,
+        reason,
+        releasedFrozen,
+        availableCredit,
+      },
+    }, tx);
+  });
+
+  await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
+
+  return {
+    refundId: `WALLET-${order.id}`,
+    refundAmount,
+    walletRefund: true,
+  };
+}
+
+async function requestWechatFullRefund(order: typeof orders.$inferSelect, reason: string) {
+  const transactionId = order.transactionId || '';
   if (!transactionId) {
-    throw new Error('订单缺少微信支付流水号，无法发起原路退款');
+    throw new Error('ORDER_PAYMENT_TRANSACTION_MISSING');
   }
 
   const configCheck = await checkWechatPayConfig();
   if (!configCheck.valid) {
-    throw new Error(`微信支付配置不完整：${configCheck.missing.join(', ')}`);
-  }
-
-  const existingRefund = await db
-    .select({ id: paymentRecords.id })
-    .from(paymentRecords)
-    .where(and(eq(paymentRecords.orderId, order.id), eq(paymentRecords.type, 'refund')))
-    .limit(1);
-
-  if (existingRefund.length > 0) {
-    throw new Error('该订单已存在退款记录');
+    throw new Error(`WECHAT_PAY_CONFIG_INVALID:${configCheck.missing.join(',')}`);
   }
 
   const refundAmount = toNumber(order.totalPrice);
   const outRefundNo = `RF${order.id.replace(/-/g, '').slice(0, 16)}${generateNonceStr(8)}`;
   const refundResult = await refund({
-    transactionId: transactionId || undefined,
+    transactionId,
     outTradeNo: order.id,
     outRefundNo,
     totalFee: yuanToFen(refundAmount),
@@ -302,7 +365,41 @@ async function requestFullRefund(orderId: string, reason: string) {
   return {
     refundId: outRefundNo,
     refundAmount,
+    walletRefund: false,
   };
+}
+
+async function requestFullRefund(orderId: string, reason: string) {
+  const orderRows = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  const order = orderRows[0];
+  if (!order) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  if (order.isSettled) {
+    throw new Error('ORDER_ALREADY_SETTLED');
+  }
+
+  const existingRefund = await db
+    .select({ id: paymentRecords.id })
+    .from(paymentRecords)
+    .where(and(eq(paymentRecords.orderId, order.id), eq(paymentRecords.type, 'refund')))
+    .limit(1);
+
+  if (existingRefund.length > 0) {
+    throw new Error('ORDER_REFUND_ALREADY_EXISTS');
+  }
+
+  if (order.paymentMethod === 'wallet') {
+    return requestWalletFullRefund(order, reason);
+  }
+
+  return requestWechatFullRefund(order, reason);
 }
 
 export async function resolveOrderDispute(params: {
@@ -331,17 +428,21 @@ export async function resolveOrderDispute(params: {
     .from(orders)
     .where(eq(orders.id, params.orderId))
     .limit(1);
-  const order = orderRows[0];
 
+  const order = orderRows[0];
   if (!order) {
     throw new Error('订单不存在');
   }
 
   const now = new Date().toISOString();
-  const resolutionRemark = `管理员 ${params.adminName}：${params.remark.trim() || '已处理纠纷'}`;
+  const trimmedRemark = params.remark.trim();
+  const resolutionRemark = `管理员 ${params.adminName}：${trimmedRemark || '已处理纠纷'}`;
 
   if (params.decision === 'refund_buyer_full') {
-    const refundResult = await requestFullRefund(params.orderId, params.remark.trim() || '平台判定全额退款');
+    const refundResult = await requestFullRefund(
+      params.orderId,
+      trimmedRemark || '平台判定全额退款',
+    );
 
     await db
       .update(disputes)
@@ -355,17 +456,17 @@ export async function resolveOrderDispute(params: {
 
     await sendDisputeSystemMessage(
       order.id,
-      `平台已裁决：全额退款给买家。${params.remark.trim() || '请留意退款处理进度。'}`,
+      `平台已裁定：全额退款给买家。${trimmedRemark || '请在订单页查看最终处理结果。'}`,
     );
 
     return {
       success: true,
-      message: '已发起全额退款，等待微信回调完成',
+      message: refundResult.walletRefund ? '已完成钱包全额退款' : '已发起全额退款，等待微信回调完成',
       data: {
         decision: params.decision,
         refundId: refundResult.refundId,
         refundAmount: refundResult.refundAmount,
-        orderStatus: 'refunding',
+        orderStatus: refundResult.walletRefund ? 'refunded' : 'refunding',
       },
     };
   }
@@ -390,12 +491,12 @@ export async function resolveOrderDispute(params: {
           status: resumeStatus,
           updatedAt: now,
         })
-      .where(eq(orders.id, order.id));
+        .where(eq(orders.id, order.id));
     });
 
     await sendDisputeSystemMessage(
       order.id,
-      `平台已裁决：驳回本次纠纷，订单恢复为${resumeStatus === 'pending_verification' ? '待验收' : '进行中'}。${params.remark.trim() || ''}`.trim(),
+      `平台已裁定：驳回本次纠纷，订单恢复为${resumeStatus === 'pending_verification' ? '待验收' : '进行中'}。${trimmedRemark}`.trim(),
     );
 
     return {
@@ -420,7 +521,7 @@ export async function resolveOrderDispute(params: {
       .set({
         status: 'completed',
         verificationResult: 'passed',
-        verificationRemark: params.remark.trim() || '平台裁定按正常完成订单处理',
+        verificationRemark: trimmedRemark || '平台裁定按正常完成订单处理',
         updatedAt: now,
       })
       .where(eq(orders.id, order.id));
@@ -433,7 +534,7 @@ export async function resolveOrderDispute(params: {
         .update(orderConsumptionSettlements)
         .set({
           status: 'confirmed',
-          buyerRemark: params.remark.trim() || '平台裁定按资源消耗结算执行',
+          buyerRemark: trimmedRemark || '平台裁定按资源消耗结算执行',
           resolvedAt: now,
           updatedAt: now,
         })
@@ -457,7 +558,7 @@ export async function resolveOrderDispute(params: {
 
     await sendDisputeSystemMessage(
       order.id,
-      `平台已裁决：驳回本次纠纷并完成订单结算。${params.remark.trim() || '请在订单页查看最终处理结果。'}`,
+      `平台已裁定：驳回本次纠纷并完成订单结算。${trimmedRemark || '请在订单页查看最终处理结果。'}`,
     );
 
     return {
