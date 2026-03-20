@@ -34,6 +34,27 @@ function getRankText(rank?: string) {
   return rankMap[rank || ''] || rank || '-';
 }
 
+function normalizeAccountTitle(value: string) {
+  if (!value) {
+    return value;
+  }
+
+  const replacements: Record<string, string> = {
+    blackeagle: '黑鹰',
+    bronze: '青铜',
+    silver: '白银',
+    gold: '黄金',
+    platinum: '铂金',
+    diamond: '钻石',
+    peak: '巅峰',
+    none: '无段位',
+  };
+
+  return Object.entries(replacements).reduce((title, [from, to]) => {
+    return title.replace(new RegExp(`\\b${from}\\b`, 'gi'), to);
+  }, value);
+}
+
 function getRentalDescription(duration?: number) {
   if (!duration) {
     return '-';
@@ -180,7 +201,7 @@ export function AccountDetailDialog({
     return null;
   }
 
-  const accountTitle = account.title || account.account_name || '账号详情';
+  const accountTitle = normalizeAccountTitle(account.title || account.account_name || '账号详情');
   const coinsDisplay =
     account.coins_display || (account.coins ? `${Number(account.coins).toFixed(2).replace(/\.00$/, '')}M` : '-');
   const ratioValue = getTextValue(account.ratio_display || account.ratio || account.customAttributes?.ratio);
