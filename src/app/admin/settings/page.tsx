@@ -465,7 +465,7 @@ export default function AdminSettingsPage() {
                 <div className="font-medium">订单押金改为卖家手动填写</div>
                 <div className="mt-1 text-sm text-muted-foreground">这里不再配置“押金比例”。买家下单时使用的是卖家上架账号时填写的押金金额。</div>
               </div>
-              <div className="rounded-xl border p-4">
+              {false && <div className="rounded-xl border p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="font-medium">账号上架人工审核</div>
@@ -473,7 +473,7 @@ export default function AdminSettingsPage() {
                   </div>
                   <Switch checked={settings.requireManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireManualReview: checked }))} />
                 </div>
-              </div>
+              </div>}
               <div className="rounded-xl border p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
