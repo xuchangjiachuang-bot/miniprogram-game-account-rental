@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
 
     const storageConfig = sanitizeHomepageConfigForStorage(mergedConfig);
     await systemConfigManager.saveHomepageConfig(storageConfig);
+
     try {
       broadcastConfigUpdate('all');
     } catch (broadcastError) {
@@ -83,10 +84,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[POST /api/admin/homepage-config] Failed:', error);
+    const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
       {
         success: false,
         error: '保存配置失败',
+        detail,
       },
       { status: 500 },
     );

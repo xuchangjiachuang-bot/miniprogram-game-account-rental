@@ -26,6 +26,7 @@ export class SystemConfigManager {
     configValue: T,
     description?: string,
   ): Promise<SystemConfig> {
+    const serializedConfigValue = JSON.stringify(configValue ?? null);
     const [existingConfig] = await sqlClient<Array<SystemConfig>>`
       select
         id,
@@ -45,7 +46,7 @@ export class SystemConfigManager {
       const [updatedConfig] = await sqlClient<Array<SystemConfig>>`
         update system_config
         set
-          config_value = ${configValue as any}::jsonb,
+          config_value = ${serializedConfigValue}::jsonb,
           description = ${description || existingConfig.description},
           updated_at = ${now}
         where config_key = ${configKey}
@@ -70,7 +71,7 @@ export class SystemConfigManager {
         updated_at
       ) values (
         ${configKey},
-        ${configValue as any}::jsonb,
+        ${serializedConfigValue}::jsonb,
         ${description || configKey},
         ${now},
         ${now}
