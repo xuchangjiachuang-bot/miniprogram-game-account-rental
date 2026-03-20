@@ -11,6 +11,16 @@ import { toast } from 'sonner';
 import { Edit, Trash2, Plus, Search } from 'lucide-react';
 import { SkinOption, HomepageConfig } from '@/lib/config-types';
 
+const SKIN_CATEGORY_OPTIONS = ['刀皮', '干员皮肤', '武器皮肤'] as const;
+const normalizeSkinCategory = (value?: string) => {
+  if (!value) return '';
+  if (value === '刀皮' || value === '武器皮肤' || value === '干员皮肤') return value;
+  if (value.includes('刀')) return '刀皮';
+  if (value.includes('武器') || value.includes('枪')) return '武器皮肤';
+  if (value.includes('干员') || value.includes('角色')) return '干员皮肤';
+  return value;
+};
+
 export default function SkinOptionsPage() {
   const [config, setConfig] = useState<HomepageConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,7 +161,7 @@ export default function SkinOptionsPage() {
       name: skinForm.name!,
       code: autoCode,
       iconUrl: skinForm.iconUrl || '',
-      category: skinForm.category || '',
+      category: normalizeSkinCategory(skinForm.category) || '',
       enabled: skinForm.enabled ?? true,
       createdAt: editingSkin?.createdAt || new Date().toISOString()
     };
@@ -196,14 +206,25 @@ export default function SkinOptionsPage() {
 
   // 过滤皮肤选项
   const filteredSkins = config?.skinOptions.filter(skin => {
+    const normalizedCategory = normalizeSkinCategory(skin.category);
     const matchesSearch = skin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (skin.code && skin.code.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = categoryFilter === 'all' || skin.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || normalizedCategory === categoryFilter;
     return matchesSearch && matchesCategory;
-  }) || [];
+  }).map((skin) => ({
+    ...skin,
+    category: normalizeSkinCategory(skin.category),
+  })) || [];
 
   // 获取所有分类
-  const categories = ['all', ...Array.from(new Set(config?.skinOptions.map(s => s.category).filter(Boolean) || []))];
+  const categories = ['all', ...SKIN_CATEGORY_OPTIONS];
+  const groupedFilteredSkins = categories
+    .filter((category) => category !== 'all')
+    .map((category) => ({
+      category,
+      skins: filteredSkins.filter((skin) => skin.category === category),
+    }))
+    .filter((group) => categoryFilter === 'all' ? group.skins.length > 0 : group.category === categoryFilter);
 
   if (loading) {
     return <div className="p-6">加载中...</div>;
@@ -267,12 +288,19 @@ export default function SkinOptionsPage() {
                   )}
                   <div>
                     <Label htmlFor="skin-category">分类</Label>
-                    <Input
+                    <select
                       id="skin-category"
-                      value={skinForm.category}
+                      value={normalizeSkinCategory(skinForm.category)}
                       onChange={(e) => setSkinForm({ ...skinForm, category: e.target.value })}
-                      placeholder="例如：步枪、狙击枪、手枪"
-                    />
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                    >
+                      <option value="">请选择分类</option>
+                      {SKIN_CATEGORY_OPTIONS.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label htmlFor="skin-icon">图标URL</Label>
@@ -330,67 +358,69 @@ export default function SkinOptionsPage() {
           </div>
 
           {/* 皮肤列表 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSkins.map((skin) => (
-              <Card key={skin.id} className={!skin.enabled ? 'opacity-60' : ''}>
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {skin.iconUrl ? (
-                        <div className="w-12 h-12 bg-muted rounded overflow-hidden">
-                          <img src={skin.iconUrl} alt={skin.name} className="w-full h-full object-contain" />
+          <div className="space-y-6">
+            {groupedFilteredSkins.map((group) => (
+              <div key={group.category} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold">{group.category}</h3>
+                  <span className="text-sm text-muted-foreground">{group.skins.length} 项</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {group.skins.map((skin) => (
+                    <Card key={skin.id} className={!skin.enabled ? 'opacity-60' : ''}>
+                      <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            {skin.iconUrl ? (
+                              <div className="w-12 h-12 bg-muted rounded overflow-hidden">
+                                <img src={skin.iconUrl} alt={skin.name} className="w-full h-full object-contain" />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground">
+                                -
+                              </div>
+                            )}
+                            <div>
+                              <CardTitle className="text-lg">{skin.name}</CardTitle>
+                              {skin.code && (
+                                <CardDescription className="text-xs">代码: {skin.code}</CardDescription>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openDialog(skin)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => deleteSkin(skin.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground">
-                          -
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">分类:</span>
+                            <span className="font-medium">{skin.category || '-'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">状态:</span>
+                            <Switch
+                              checked={skin.enabled}
+                              onCheckedChange={(checked) => toggleSkinEnabled(skin.id, checked)}
+                            />
+                          </div>
+                          {skin.createdAt && (
+                            <div className="text-xs text-muted-foreground">
+                              创建时间: {new Date(skin.createdAt).toLocaleString('zh-CN')}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <CardTitle className="text-lg">{skin.name}</CardTitle>
-                        {skin.code && (
-                          <CardDescription className="text-xs">代码: {skin.code}</CardDescription>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDialog(skin)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteSkin(skin.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">分类:</span>
-                      <span className="font-medium">{skin.category || '-'}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">状态:</span>
-                      <Switch
-                        checked={skin.enabled}
-                        onCheckedChange={(checked) => toggleSkinEnabled(skin.id, checked)}
-                      />
-                    </div>
-                    {skin.createdAt && (
-                      <div className="text-xs text-muted-foreground">
-                        创建时间: {new Date(skin.createdAt).toLocaleString('zh-CN')}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 

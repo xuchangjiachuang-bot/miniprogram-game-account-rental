@@ -78,10 +78,25 @@ interface CommissionActivity {
   enabled: boolean;
 }
 
+interface SkinItem {
+  name: string;
+  category: string;
+}
+
 interface SkinConfig {
   enabled: boolean;
-  skins: string[];
+  skins: SkinItem[];
 }
+
+const SKIN_CATEGORY_ORDER = ['刀皮', '干员皮肤', '武器皮肤'] as const;
+const normalizeSkinCategory = (value?: string) => {
+  if (!value) return '未分类';
+  if (value === '刀皮' || value === '干员皮肤' || value === '武器皮肤') return value;
+  if (value.includes('刀')) return '刀皮';
+  if (value.includes('武器') || value.includes('枪')) return '武器皮肤';
+  if (value.includes('干员') || value.includes('角色')) return '干员皮肤';
+  return value;
+};
 
 const createDefaultFormData = () => ({
   product_type: '\u4e09\u89d2\u6d32\u884c\u52a8\u54c8\u592b\u5e01\u51fa\u79df',
@@ -592,7 +607,10 @@ function NewAccountPage() {
       if (cachedConfig?.skinOptions) {
         const enabledSkins = cachedConfig.skinOptions
           .filter((s: any) => s.enabled)
-          .map((s: any) => s.name);
+          .map((s: any) => ({
+            name: s.name,
+            category: normalizeSkinCategory(s.category),
+          }));
         if (enabledSkins.length > 0) {
           setSkinConfig({
             enabled: true,
@@ -719,6 +737,27 @@ function NewAccountPage() {
       });
     }
   };
+
+  const groupedSkinOptions = (() => {
+    const groups = skinConfig.skins.reduce<Record<string, SkinItem[]>>((acc, skin) => {
+      const category = normalizeSkinCategory(skin.category);
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(skin);
+      return acc;
+    }, {});
+
+    const orderedCategories = [
+      ...SKIN_CATEGORY_ORDER.filter((category) => groups[category]?.length),
+      ...Object.keys(groups).filter((category) => !SKIN_CATEGORY_ORDER.includes(category as typeof SKIN_CATEGORY_ORDER[number])),
+    ];
+
+    return orderedCategories.map((category) => ({
+      category,
+      skins: groups[category],
+    }));
+  })();
 
   // 提交上架
   const handleSubmit = async () => {
@@ -1746,19 +1785,26 @@ function NewAccountPage() {
                       <p className="text-xs text-muted-foreground mb-2">
                         请选择账号包含的皮肤
                       </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {skinConfig.skins.map((skin) => (
-                          <button
-                            key={skin}
-                            onClick={() => toggleSkin(skin)}
-                            className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                              formData.selected_skins.includes(skin)
-                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 hover:shadow-md'
-                                : 'bg-white border hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300'
-                            }`}
-                          >
-                            {skin}
-                          </button>
+                      <div className="space-y-3">
+                        {groupedSkinOptions.map((group) => (
+                          <div key={group.category} className="space-y-2">
+                            <div className="text-xs font-semibold text-slate-700">{group.category}</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {group.skins.map((skin) => (
+                                <button
+                                  key={`${group.category}-${skin.name}`}
+                                  onClick={() => toggleSkin(skin.name)}
+                                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                                    formData.selected_skins.includes(skin.name)
+                                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 hover:shadow-md'
+                                      : 'bg-white border hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300'
+                                  }`}
+                                >
+                                  {skin.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
