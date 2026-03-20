@@ -88,9 +88,16 @@ export async function getOrderDispute(orderId: string): Promise<DisputeView | nu
     .select()
     .from(disputes)
     .where(eq(disputes.orderId, orderId))
-    .limit(1);
+    .orderBy(disputes.createdAt);
 
-  const dispute = disputeRows[0];
+  const dispute = [...disputeRows].sort((a, b) => {
+    const pendingDelta = Number(b.status === 'pending') - Number(a.status === 'pending');
+    if (pendingDelta !== 0) {
+      return pendingDelta;
+    }
+
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  })[0];
   if (!dispute) {
     return null;
   }
@@ -142,9 +149,15 @@ export async function createOrderDispute(params: {
     throw new Error(`当前订单状态不支持发起纠纷：${order.status}`);
   }
 
-  const existing = await getOrderDispute(params.orderId);
-  if (existing && existing.status === 'pending') {
-    return existing;
+  const pendingDisputeRows = await db
+    .select()
+    .from(disputes)
+    .where(and(eq(disputes.orderId, params.orderId), eq(disputes.status, 'pending')))
+    .orderBy(disputes.createdAt);
+
+  const existingPendingDispute = pendingDisputeRows[pendingDisputeRows.length - 1];
+  if (existingPendingDispute) {
+    return getOrderDispute(existingPendingDispute.orderId);
   }
 
   const respondentId = order.buyerId === params.initiatorId ? order.sellerId : order.buyerId;

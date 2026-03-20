@@ -328,13 +328,13 @@ function NewAccountPage() {
   // 加载平台设置和优惠活动
   useEffect(() => {
     if (!isEditMode) {
-      loadData();
+      void loadData();
     }
 
     // 监听配置更新（通过 SSE）
     const handleConfigUpdate = () => {
       if (!isEditMode) {
-        loadData();
+        void loadData({ silent: true });
       }
     };
 
@@ -361,7 +361,7 @@ function NewAccountPage() {
   // 监听平台配置更新
   useConfigUpdate('settings', (event) => {
     console.log('账号发布页收到平台配置更新:', event);
-    loadData();
+    void loadData({ silent: true });
   }, []);
 
 
@@ -515,9 +515,11 @@ function NewAccountPage() {
     return { isValid: true };
   };
 
-  const loadData = async () => {
+  const loadData = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
 
       // 1. 优先从缓存加载配置（秒级）
       const cachedConfig = loadConfigFromCache<any>();
@@ -577,7 +579,9 @@ function NewAccountPage() {
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 

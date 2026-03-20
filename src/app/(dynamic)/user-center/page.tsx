@@ -1850,7 +1850,7 @@ export default function UserCenterPage() {
                                 <p className="text-sm text-gray-600 mt-1">{transaction.remark}</p>
                               )}
                               <p className="text-xs text-gray-400 mt-1">
-                                {new Date(transaction.created_at).toLocaleString('zh-CN')}
+                                {formatServerDateTime(transaction.created_at)}
                               </p>
                             </div>
                             <div className={`text-lg font-semibold ${getWalletTransactionColor(transaction.transaction_type)}`}>
@@ -1908,14 +1908,14 @@ export default function UserCenterPage() {
                                   <p>
                                     {'\u7533\u8bf7\u65f6\u95f4\uff1a'}
                                     <span className="ml-1">
-                                      {new Date(withdrawal.createdAt).toLocaleString('zh-CN')}
+                                      {formatServerDateTime(withdrawal.createdAt)}
                                     </span>
                                   </p>
                                   {withdrawal.reviewTime ? (
                                     <p>
                                       {'\u5ba1\u6838\u65f6\u95f4\uff1a'}
                                       <span className="ml-1">
-                                        {new Date(withdrawal.reviewTime).toLocaleString('zh-CN')}
+                                        {formatServerDateTime(withdrawal.reviewTime)}
                                       </span>
                                     </p>
                                   ) : null}
@@ -1994,7 +1994,7 @@ export default function UserCenterPage() {
                             </div>
                             <p className="text-sm text-gray-600 line-clamp-2 mb-2">{notification.content}</p>
                             <div className="flex items-center justify-between text-xs text-gray-400">
-                              <span>{new Date(notification.created_at).toLocaleString('zh-CN')}</span>
+                              <span>{formatServerDateTime(notification.created_at)}</span>
                               {notification.is_read && (
                                 <span className="flex items-center gap-1">
                                   <CheckCheck className="h-3 w-3" />
