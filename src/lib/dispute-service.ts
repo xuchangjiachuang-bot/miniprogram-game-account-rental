@@ -44,6 +44,39 @@ function toNumber(value: unknown) {
   return Number(value) || 0;
 }
 
+async function collapseDuplicatePendingDisputes(orderId: string) {
+  const pendingRows = await db
+    .select()
+    .from(disputes)
+    .where(and(eq(disputes.orderId, orderId), eq(disputes.status, 'pending')))
+    .orderBy(disputes.createdAt);
+
+  if (pendingRows.length <= 1) {
+    return pendingRows[0] || null;
+  }
+
+  const sortedRows = [...pendingRows].sort(
+    (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+  );
+  const latestPending = sortedRows[0];
+  const obsoleteRows = sortedRows.slice(1);
+  const now = new Date().toISOString();
+
+  for (const row of obsoleteRows) {
+    await db
+      .update(disputes)
+      .set({
+        status: 'resolved',
+        resolution: `系统清理重复待处理纠纷，已保留最新纠纷 ${latestPending.id} 继续处理。`,
+        updatedAt: now,
+        resolvedAt: now,
+      })
+      .where(eq(disputes.id, row.id));
+  }
+
+  return latestPending;
+}
+
 async function sendDisputeSystemMessage(orderId: string, content: string) {
   const groupRows = await db.select().from(groupChats).where(eq(groupChats.orderId, orderId)).limit(1);
   const group = groupRows[0];
@@ -84,6 +117,8 @@ async function loadDisputeParticipants(initiatorId: string, respondentId: string
 }
 
 export async function getOrderDispute(orderId: string): Promise<DisputeView | null> {
+  await collapseDuplicatePendingDisputes(orderId);
+
   const disputeRows = await db
     .select()
     .from(disputes)
@@ -149,13 +184,7 @@ export async function createOrderDispute(params: {
     throw new Error(`当前订单状态不支持发起纠纷：${order.status}`);
   }
 
-  const pendingDisputeRows = await db
-    .select()
-    .from(disputes)
-    .where(and(eq(disputes.orderId, params.orderId), eq(disputes.status, 'pending')))
-    .orderBy(disputes.createdAt);
-
-  const existingPendingDispute = pendingDisputeRows[pendingDisputeRows.length - 1];
+  const existingPendingDispute = await collapseDuplicatePendingDisputes(params.orderId);
   if (existingPendingDispute) {
     return getOrderDispute(existingPendingDispute.orderId);
   }

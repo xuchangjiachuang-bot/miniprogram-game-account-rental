@@ -1163,18 +1163,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
             <Card>
               <CardHeader>
-                <CardTitle>订单群聊</CardTitle>
+                <CardTitle>{order.status === 'pending_payment' ? '客服支持' : '订单群聊'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleOpenSupportChat}
-                  disabled={openingSupportChat}
-                >
-                  {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                  进入订单群聊
-                </Button>
+                {order.status !== 'pending_payment' ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleOpenSupportChat}
+                    disabled={openingSupportChat}
+                  >
+                    {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                    进入订单群聊
+                  </Button>
+                ) : null}
                 {customerServiceUrl ? (
                   <Button variant="outline" className="w-full" asChild>
                     <a href={customerServiceUrl} target="_blank" rel="noopener noreferrer">
@@ -1184,7 +1186,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </Button>
                 ) : null}
                 <div className="mt-3 text-sm text-muted-foreground">
-                  登录二维码、买卖双方沟通和平台客服介入都会在这里处理。
+                  {order.status === 'pending_payment'
+                    ? '付款前如需协助，请直接联系企业微信客服处理。'
+                    : '登录二维码、买卖双方沟通和平台客服介入都会在这里处理。'}
                 </div>
               </CardContent>
             </Card>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, Shield, Smartphone, Star, Target } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Shield, Smartphone, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -196,9 +196,10 @@ export function AccountDetailDialog({
       ? `${account.available_time?.start || '-'} - ${account.available_time?.end || '-'}`
       : '-';
   const description = getTextValue(account.description) === '-' ? '' : String(account.description);
-  const remark = getTextValue(account.customAttributes?.remark || account.remark) === '-'
-    ? ''
-    : String(account.customAttributes?.remark || account.remark);
+  const remark =
+    getTextValue(account.customAttributes?.remark || account.remark) === '-'
+      ? ''
+      : String(account.customAttributes?.remark || account.remark);
 
   const summaryRows = [
     { label: '保险箱', value: getTextValue(account.safebox) },
@@ -303,12 +304,8 @@ export function AccountDetailDialog({
                 <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
                   <MetricCard label="哈夫币" value={coinsDisplay} tone="orange" />
                   <MetricCard label="比例" value={ratioValue} tone="violet" />
-                  <MetricCard
-                    label="租金 / 押金"
-                    value={`¥${getMoney(account.actual_rental)} / ¥${getMoney(account.deposit)}`}
-                    compact
-                    className="lg:col-span-2"
-                  />
+                  <MetricCard label="租金" value={`¥${getMoney(account.actual_rental)}`} compact />
+                  <MetricCard label="押金" value={`¥${getMoney(account.deposit)}`} compact />
                   <MetricCard label="总价" value={`¥${getMoney(account.total_price)}`} tone="emerald" />
                   <MetricCard label="租期" value={rentalDisplay} />
                 </div>
