@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,9 @@ export default function Home() {
   const [creatingOrder, setCreatingOrder] = useState(false);
 
   const router = useRouter();
+  const heroGradientStyle: CSSProperties = {
+    backgroundImage: 'linear-gradient(90deg, #2563eb 0%, #9333ea 100%)',
+  };
 
   const handleOrderRequired = () => {
     if (!user) {
@@ -479,13 +482,22 @@ export default function Home() {
             </div>
           ) : (
             <div className="max-w-4xl mx-auto text-center space-y-6">
-              <Badge className="px-4 py-1 text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
+              <Badge
+                className="px-4 py-1 text-sm text-white border-0"
+                style={heroGradientStyle}
+              >
                 <TrendingUp className="w-3 h-3 mr-1" />
                 专业哈夫币出租平台
               </Badge>
               <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
                 三角洲行动{' '}
-                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <span
+                  className="text-[#4f46e5] md:text-transparent md:bg-clip-text"
+                  style={{
+                    ...heroGradientStyle,
+                    WebkitBackgroundClip: 'text',
+                  }}
+                >
                   哈夫币出租
                 </span>
               </h1>
@@ -495,7 +507,8 @@ export default function Home() {
               <div className="mt-6">
                 <Button
                   onClick={handlePublishAccount}
-                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700"
+                  className="cursor-pointer text-white font-medium"
+                  style={heroGradientStyle}
                 >
                   <PlusCircle className="w-5 h-5 mr-2" />
                   发布账号

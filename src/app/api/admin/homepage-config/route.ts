@@ -64,14 +64,17 @@ export async function POST(request: NextRequest) {
         ? (incomingConfig as any).logos
         : (existingConfig as any)?.logos,
       skinOptions: Array.isArray((incomingConfig as any)?.skinOptions)
-        && (incomingConfig as any).skinOptions.length > 0
         ? (incomingConfig as any).skinOptions
         : (existingConfig as any)?.skinOptions,
     };
 
     const storageConfig = sanitizeHomepageConfigForStorage(mergedConfig);
     await systemConfigManager.saveHomepageConfig(storageConfig);
-    await broadcastConfigUpdate('all');
+    try {
+      broadcastConfigUpdate('all');
+    } catch (broadcastError) {
+      console.warn('[POST /api/admin/homepage-config] Broadcast failed:', broadcastError);
+    }
 
     return NextResponse.json({
       success: true,

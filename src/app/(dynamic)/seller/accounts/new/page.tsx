@@ -986,7 +986,6 @@ function NewAccountPage() {
     );
   }
 
-  const suggestedRatio = calculateSuggestedRatio(formData.safebox_type, formData.stamina_level, formData.coins_value);
   const rentalPeriod = calculateRentalPeriod(formData.coins_value);
   const pricing = calculatePricing(formData.coins_value, formData.rental_ratio, formData.deposit, platformSettings, activeActivity);
 
@@ -1454,16 +1453,17 @@ function NewAccountPage() {
                       onChange={(e) => setFormData({...formData, rental_ratio: e.target.value})}
                       className="mt-1.5"
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">推荐比例1：40左右</p>
                   </div>
                 </div>
 
                 {/* 建议比例 */}
-                {formData.safebox_type && formData.stamina_level && (
+                {false && (
                   <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-lg">
                     <div className="flex items-center gap-2 text-xs">
                       <Info className="w-3.5 h-3.5 text-purple-600" />
                       <span className="text-purple-900">
-                        <>{'\u7ecf\u9a8c\u53c2\u8003\u533a\u95f4'}<span className="font-bold">{`: 1:${suggestedRatio}`}</span></>
+                        <>{'\u7ecf\u9a8c\u53c2\u8003\u533a\u95f4'}</>
                       </span>
                     </div>
                   </div>

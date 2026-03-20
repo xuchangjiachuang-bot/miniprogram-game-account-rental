@@ -99,7 +99,9 @@ export default function SkinOptionsPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
+        body: JSON.stringify({
+          skinOptions: config.skinOptions,
+        })
       });
 
       const result = await res.json().catch(() => null);
