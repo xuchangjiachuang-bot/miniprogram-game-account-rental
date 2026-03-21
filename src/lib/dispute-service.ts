@@ -450,21 +450,6 @@ export async function resolveOrderDispute(params: {
   remark: string;
   adminName: string;
 }) {
-  const disputeRows = await db
-    .select()
-    .from(disputes)
-    .where(eq(disputes.orderId, params.orderId))
-    .limit(1);
-
-  const dispute = disputeRows[0];
-  if (!dispute) {
-    throw new Error('纠纷单不存在');
-  }
-
-  if (dispute.status !== 'pending') {
-    throw new Error(`纠纷单已处理，当前状态：${dispute.status}`);
-  }
-
   const orderRows = await db
     .select()
     .from(orders)
@@ -474,6 +459,45 @@ export async function resolveOrderDispute(params: {
   const order = orderRows[0];
   if (!order) {
     throw new Error('订单不存在');
+  }
+
+  await collapseDuplicatePendingDisputes(params.orderId);
+
+  let dispute = null;
+
+  if (order.disputeId) {
+    const preferredDisputeRows = await db
+      .select()
+      .from(disputes)
+      .where(eq(disputes.id, order.disputeId))
+      .limit(1);
+
+    dispute = preferredDisputeRows[0] || null;
+  }
+
+  if (!dispute || dispute.orderId !== params.orderId || dispute.status !== 'pending') {
+    const disputeRows = await db
+      .select()
+      .from(disputes)
+      .where(eq(disputes.orderId, params.orderId))
+      .orderBy(disputes.createdAt);
+
+    dispute = [...disputeRows].sort((a, b) => {
+      const pendingDelta = Number(b.status === 'pending') - Number(a.status === 'pending');
+      if (pendingDelta !== 0) {
+        return pendingDelta;
+      }
+
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    })[0] || null;
+  }
+
+  if (!dispute) {
+    throw new Error('纠纷单不存在');
+  }
+
+  if (dispute.status !== 'pending') {
+    throw new Error(`纠纷单已处理，当前状态：${dispute.status}`);
   }
 
   const now = new Date().toISOString();
