@@ -7,10 +7,11 @@ import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
 import { cancelOrder, transformDbOrderToApiFormat } from '@/lib/order-service';
 import { getPaymentTimeoutSeconds, isOrderTimeout } from '@/lib/order-timeout-service';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
-import { sendOrderPaidNotification } from '@/lib/notification-service';
+import { sendAccountRentedNotification } from '@/lib/notification-service';
 import { getServerUserId } from '@/lib/server-auth';
 import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
+import { notifySellerAfterOrderPaid } from '@/lib/seller-order-reminder-service';
 
 export async function GET(
   request: NextRequest,
@@ -143,6 +144,26 @@ export async function POST(
           };
         }
 
+        const claimedOrders = await tx
+          .update(orders)
+          .set({
+            status: 'active',
+            paymentMethod: 'wallet',
+            paymentTime: now,
+            startTime: now,
+            endTime,
+            updatedAt: now,
+          })
+          .where(and(eq(orders.id, order.id), eq(orders.status, 'pending_payment')))
+          .returning({ id: orders.id });
+
+        if (claimedOrders.length === 0) {
+          return {
+            success: false as const,
+            reason: 'ORDER_ALREADY_PAID',
+          };
+        }
+
         await tx
           .update(userBalances)
           .set({
@@ -178,17 +199,6 @@ export async function POST(
           });
         }
 
-        await tx
-          .update(orders)
-          .set({
-            status: 'active',
-            paymentMethod: 'wallet',
-            paymentTime: now,
-            startTime: now,
-            endTime,
-            updatedAt: now,
-          })
-          .where(and(eq(orders.id, order.id), eq(orders.status, 'pending_payment')));
 
         const [existingPayment] = await tx
           .select({ id: paymentRecords.id })
@@ -245,8 +255,15 @@ export async function POST(
 
         return { success: true as const };
       });
-
       if (!payResult.success) {
+        if (payResult.reason === 'ORDER_ALREADY_PAID') {
+          return NextResponse.json({
+            success: false,
+            error: '订单已支付，请勿重复提交',
+            code: payResult.reason,
+          }, { status: 409 });
+        }
+
         return NextResponse.json({
           success: false,
           error: '余额不足',
@@ -258,8 +275,13 @@ export async function POST(
         }, { status: 400 });
       }
 
-      await sendOrderPaidNotification(order.id, false);
-      await ensureOrderGroupChat(order.id);
+      const groupChat = await ensureOrderGroupChat(order.id);
+      await sendAccountRentedNotification({
+        orderId: order.id,
+        chatGroupId: groupChat.id,
+        qrCodeUrl: `/api/orders/${order.id}/qrcode`,
+      });
+      await notifySellerAfterOrderPaid(order.id);
 
       return NextResponse.json({
         success: true,
