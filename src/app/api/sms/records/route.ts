@@ -45,14 +45,14 @@ export async function GET(request: NextRequest) {
     const statistics = searchParams.get('statistics') === 'true';
 
     if (statistics) {
-      const stats = getSmsStatistics();
+      const stats = await getSmsStatistics();
       return NextResponse.json({
         success: true,
         data: stats,
       });
     }
 
-    const records = getSmsRecords({
+    const records = await getSmsRecords({
       phone: phone || undefined,
       provider: provider || undefined,
       status: status || undefined,

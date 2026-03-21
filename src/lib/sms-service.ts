@@ -111,80 +111,86 @@ export async function updateSmsConfig(provider: string, config: Partial<SmsConfi
   return success;
 }
 
-// ==================== 短信记录存储 ====================
-
-const smsRecords: SmsRecord[] = [];
+// ==================== ?????? ====================
 
 /**
- * 添加短信记录
+ * ??????
  */
-export function addSmsRecord(record: Omit<SmsRecord, 'id' | 'createdAt'>): SmsRecord {
-  const newRecord: SmsRecord = {
-    ...record,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString()
+export async function addSmsRecord(record: Omit<SmsRecord, 'id' | 'createdAt'>): Promise<SmsRecord | null> {
+  const newRecord = await smsConfigManager.addSmsRecord({
+    provider: record.provider,
+    phone: record.phone,
+    code: record.code,
+    templateCode: record.templateCode,
+    status: record.status,
+    message: record.message,
+    requestId: record.requestId,
+    bizId: record.bizId,
+  });
+
+  if (!newRecord) {
+    return null;
+  }
+
+  return {
+    id: newRecord.id,
+    provider: newRecord.provider,
+    phone: newRecord.phone,
+    code: newRecord.code || '',
+    templateCode: newRecord.templateCode || '',
+    status: newRecord.status,
+    message: newRecord.message || '',
+    requestId: newRecord.requestId || undefined,
+    bizId: newRecord.bizId || undefined,
+    createdAt: newRecord.createdAt || new Date().toISOString(),
   };
-  smsRecords.push(newRecord);
-  return newRecord;
 }
 
 /**
- * 获取短信记录列表
+ * ????????
  */
-export function getSmsRecords(filters?: {
+export async function getSmsRecords(filters?: {
   phone?: string;
   provider?: string;
   status?: 'success' | 'failed';
   limit?: number;
-}): SmsRecord[] {
-  let records = [...smsRecords].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+}): Promise<SmsRecord[]> {
+  const records = await smsConfigManager.getSmsRecords(filters);
 
-  if (filters) {
-    if (filters.phone) {
-      records = records.filter(r => r.phone === filters.phone);
-    }
-    if (filters.provider) {
-      records = records.filter(r => r.provider === filters.provider);
-    }
-    if (filters.status) {
-      records = records.filter(r => r.status === filters.status);
-    }
-    if (filters.limit) {
-      records = records.slice(0, filters.limit);
-    }
-  }
-
-  return records;
+  return records.map((record) => ({
+    id: record.id,
+    provider: record.provider,
+    phone: record.phone,
+    code: record.code || '',
+    templateCode: record.templateCode || '',
+    status: record.status,
+    message: record.message || '',
+    requestId: record.requestId || undefined,
+    bizId: record.bizId || undefined,
+    createdAt: record.createdAt || new Date().toISOString(),
+  }));
 }
 
 /**
- * 获取短信记录统计
+ * ????????
  */
-export function getSmsStatistics() {
-  const total = smsRecords.length;
-  const success = smsRecords.filter(r => r.status === 'success').length;
-  const failed = smsRecords.filter(r => r.status === 'failed').length;
+export async function getSmsStatistics() {
+  const records = await getSmsRecords({ limit: 1000 });
+  const total = records.length;
+  const success = records.filter((r) => r.status === 'success').length;
+  const failed = records.filter((r) => r.status === 'failed').length;
   const today = new Date().toDateString();
-  const todayCount = smsRecords.filter(r =>
-    new Date(r.createdAt).toDateString() === today
-  ).length;
+  const todayCount = records.filter((r) => new Date(r.createdAt).toDateString() === today).length;
 
   return {
     total,
     success,
     failed,
     successRate: total > 0 ? ((success / total) * 100).toFixed(2) : '0',
-    todayCount
+    todayCount,
   };
 }
 
-// ==================== 验证码生成 ====================
-
-/**
- * 生成6位数字验证码
- */
 export function generateVerifyCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -255,7 +261,7 @@ export async function sendSms(
     }
 
     // 添加短信记录
-    addSmsRecord({
+    await addSmsRecord({
       provider,
       phone: params.phone,
       code: params.code || '',
@@ -276,7 +282,7 @@ export async function sendSms(
     console.error(`发送短信失败 (${provider}):`, error);
 
     // 添加失败记录
-    addSmsRecord({
+    await addSmsRecord({
       provider,
       phone: params.phone,
       code: params.code || '',
