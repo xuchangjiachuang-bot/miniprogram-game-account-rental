@@ -158,7 +158,11 @@ export function Header() {
     if (!user?.id) return;
 
     try {
-      const res = await fetch(`/api/notifications/unread-count?userId=${user.id}`);
+      const token = getToken();
+      const res = await fetch('/api/notifications/unread-count', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      });
       const result = await res.json();
       if (result.success && result.count !== undefined) {
         setUnreadCount(result.count);
@@ -179,15 +183,17 @@ export function Header() {
         cache: 'no-store',
       });
       const result = await res.json();
-      if (result.success) {
-        const list = Array.isArray(result.notifications)
-          ? result.notifications
-          : Array.isArray(result.data)
-            ? result.data
-            : [];
-        const unreadOnly = list.filter((item: any) => !(item.isRead ?? item.is_read));
-        setNotifications(unreadOnly);
-      }
+        if (result.success) {
+          const list = Array.isArray(result.notifications)
+            ? result.notifications
+            : Array.isArray(result.data)
+              ? result.data
+              : [];
+          setNotifications(list);
+          if (typeof result.unreadCount === 'number') {
+            setUnreadCount(result.unreadCount);
+          }
+        }
     } catch (error) {
       console.error('加载通知列表失败:', error);
     } finally {

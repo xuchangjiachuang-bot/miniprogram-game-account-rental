@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db, messages } from '@/lib/db';
 import { getServerUserId } from '@/lib/server-auth';
 import { getUserById } from '@/lib/user-service';
@@ -19,11 +19,16 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = Number.parseInt(searchParams.get('limit') || '50', 10);
     const offset = Number.parseInt(searchParams.get('offset') || '0', 10);
+    const unreadOnly = searchParams.get('unreadOnly') === 'true';
 
     const notificationList = await db
       .select()
       .from(messages)
-      .where(eq(messages.userId, user.id))
+      .where(
+        unreadOnly
+          ? and(eq(messages.userId, user.id), eq(messages.isRead, false))
+          : eq(messages.userId, user.id)
+      )
       .orderBy(desc(messages.createdAt))
       .limit(limit)
       .offset(offset);
@@ -32,6 +37,11 @@ export async function GET(request: NextRequest) {
       .select()
       .from(messages)
       .where(eq(messages.userId, user.id));
+
+    const unreadCount = await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.userId, user.id), eq(messages.isRead, false)));
 
     const notifications = notificationList.map((message) => ({
       id: message.id,
@@ -54,6 +64,7 @@ export async function GET(request: NextRequest) {
       success: true,
       notifications,
       total: totalCount.length,
+      unreadCount: unreadCount.length,
     });
   } catch (error) {
     console.error('获取通知列表失败:', error);

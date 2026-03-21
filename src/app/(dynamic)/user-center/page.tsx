@@ -1177,6 +1177,31 @@ export default function UserCenterPage() {
 
       // 显示成功提示
       toast.success(result.message || '实名认证申请已提交，请等待人工审核');
+      const normalizedPhone = verificationForm.phone.trim();
+      if (normalizedPhone && normalizedPhone !== (profileForm.phone || '').trim()) {
+        const profileResponse = await fetch('/api/auth/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            phone: normalizedPhone
+          })
+        });
+
+        const profileResult = await profileResponse.json();
+        if (!profileResponse.ok || !profileResult.success) {
+          throw new Error(profileResult.error || '个人资料手机号同步失败');
+        }
+
+        setProfileForm((current) => ({
+          ...current,
+          phone: normalizedPhone
+        }));
+        await refreshUser(true);
+      }
+
       setVerificationStatus('pending');
       setVerificationReviewComment('');
       setVerificationDialogOpen(false);
@@ -2067,7 +2092,14 @@ export default function UserCenterPage() {
               <Input
                 id="verificationPhone"
                 value={verificationForm.phone}
-                onChange={(e) => setVerificationForm({...verificationForm, phone: e.target.value})}
+                onChange={(e) => {
+                  const nextPhone = e.target.value;
+                  setVerificationForm({...verificationForm, phone: nextPhone});
+                  setProfileForm((current) => ({
+                    ...current,
+                    phone: nextPhone
+                  }));
+                }}
                 placeholder="请输入本人手机号"
                 maxLength={11}
               />
