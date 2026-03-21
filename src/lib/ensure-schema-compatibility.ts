@@ -72,6 +72,11 @@ export async function ensureSchemaCompatibility() {
   `);
 
   await db.execute(`
+    ALTER TABLE verification_applications
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT '';
+  `);
+
+  await db.execute(`
     UPDATE platform_settings
       SET require_withdrawal_manual_review = true
     WHERE require_withdrawal_manual_review IS NULL;

@@ -97,6 +97,10 @@ function resolveWechatWithdrawOpenid(user: any) {
     || null;
 }
 
+function isValidMainlandMobile(phone?: string | null) {
+  return /^1[3-9]\d{9}$/.test(phone?.trim() || '');
+}
+
 interface WithdrawalRecord {
   id: string;
   withdrawalNo?: string;
@@ -211,6 +215,7 @@ export default function UserCenterPage() {
   // 实名认证表单
   const [verificationForm, setVerificationForm] = useState({
     realName: '',
+    phone: '',
     idCard: '',
     idCardFront: '',
     idCardBack: ''
@@ -277,6 +282,10 @@ export default function UserCenterPage() {
       email: user.email || ''
     });
     setWithdrawAccount(resolveWechatWithdrawOpenid(user) || '');
+    setVerificationForm((current) => ({
+      ...current,
+      phone: isValidMainlandMobile(user.phone) ? (user.phone || '') : current.phone,
+    }));
     loadPublicPlatformSettings();
   }, [user]);
 
@@ -1123,8 +1132,13 @@ export default function UserCenterPage() {
 
   // 提交实名认证
   const handleSubmitVerification = async () => {
-    if (!verificationForm.realName || !verificationForm.idCard) {
+    if (!verificationForm.realName || !verificationForm.phone || !verificationForm.idCard) {
       toast.error('请填写完整信息');
+      return;
+    }
+
+    if (!isValidMainlandMobile(verificationForm.phone)) {
+      toast.error('请输入正确的手机号');
       return;
     }
 
@@ -1147,6 +1161,7 @@ export default function UserCenterPage() {
         },
         body: JSON.stringify({
           realName: verificationForm.realName,
+          phone: verificationForm.phone,
           idCard: verificationForm.idCard,
           idCardFrontUrl: verificationKeys.front || verificationForm.idCardFront,
           idCardBackUrl: verificationKeys.back || verificationForm.idCardBack,
@@ -2044,6 +2059,17 @@ export default function UserCenterPage() {
                 onChange={(e) => setVerificationForm({...verificationForm, idCard: e.target.value})}
                 placeholder="请输入身份证号"
                 maxLength={18}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="verificationPhone">手机号 *</Label>
+              <Input
+                id="verificationPhone"
+                value={verificationForm.phone}
+                onChange={(e) => setVerificationForm({...verificationForm, phone: e.target.value})}
+                placeholder="请输入本人手机号"
+                maxLength={11}
               />
             </div>
 

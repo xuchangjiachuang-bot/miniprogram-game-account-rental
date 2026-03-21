@@ -532,6 +532,43 @@ export async function sendGroupMessageForUser(params: {
   };
 }
 
+export async function sendSystemGroupMessage(params: {
+  groupId: string;
+  content: string;
+}) {
+  const content = params.content.trim();
+  if (!content) {
+    throw new Error('CHAT_MESSAGE_EMPTY');
+  }
+
+  const supportMember = await ensurePlatformCustomerServiceMember({ groupChatId: params.groupId });
+  const now = new Date().toISOString();
+
+  const [message] = await db
+    .insert(chatMessages)
+    .values({
+      groupChatId: params.groupId,
+      senderId: supportMember.user.id,
+      senderType: 'system',
+      content,
+      messageType: 'system',
+      createdAt: now,
+    })
+    .returning();
+
+  await db.update(groupChats).set({ updatedAt: now }).where(eq(groupChats.id, params.groupId));
+
+  return {
+    id: message.id,
+    senderId: message.senderId,
+    senderType: 'system' as const,
+    senderName: '系统',
+    content: message.content,
+    messageType: 'system' as const,
+    createdAt: message.createdAt || now,
+  };
+}
+
 export async function sendMessage(params: {
   groupChatId: string;
   userId: string;

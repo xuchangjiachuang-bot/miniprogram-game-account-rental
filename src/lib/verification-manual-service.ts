@@ -2,8 +2,8 @@
  * 实名认证服务（人工审核）
  */
 
-import { db, verificationApplications, users } from '@/lib/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
+import { db, users, verificationApplications } from '@/lib/db';
 import { classifyStoredFileReference } from '@/lib/storage-service';
 
 function normalizeStoredFileValue(value: string) {
@@ -16,8 +16,6 @@ function normalizeStoredFileValue(value: string) {
   return classified.kind === 'storage-key' ? classified.normalized : trimmed;
 }
 
-// ==================== 类型定义 ====================
-
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';
 export type VerificationService = 'manual' | 'aliyun' | 'tencent';
 
@@ -25,6 +23,7 @@ export interface VerificationApplication {
   id: string;
   userId: string;
   realName: string;
+  phone: string;
   idCard: string;
   idCardFrontUrl: string;
   idCardBackUrl: string;
@@ -41,6 +40,7 @@ export interface VerificationApplication {
 export interface CreateVerificationParams {
   userId: string;
   realName: string;
+  phone: string;
   idCard: string;
   idCardFrontUrl: string;
   idCardBackUrl: string;
@@ -55,88 +55,89 @@ export interface ReviewVerificationParams {
   reviewerName?: string;
 }
 
-// ==================== 服务实现 ====================
-
-/**
- * 创建实名认证申请
- */
 export async function createVerificationApplication(
-  params: CreateVerificationParams
+  params: CreateVerificationParams,
 ): Promise<{ success: boolean; data?: VerificationApplication; error?: string }> {
   try {
     const normalizedFrontUrl = normalizeStoredFileValue(params.idCardFrontUrl);
     const normalizedBackUrl = normalizeStoredFileValue(params.idCardBackUrl);
 
-    // 检查是否已有待审核或已通过的申请
-    const existingApplication = await db
+    const existingPhoneOwner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, params.phone), ne(users.id, params.userId)))
+      .limit(1);
+
+    if (existingPhoneOwner.length > 0) {
+      return {
+        success: false,
+        error: '该手机号已被其他账号使用',
+      };
+    }
+
+    const existingPending = await db
       .select()
       .from(verificationApplications)
       .where(
         and(
           eq(verificationApplications.userId, params.userId),
-          eq(verificationApplications.status, 'pending')
-        )
+          eq(verificationApplications.status, 'pending'),
+        ),
       )
       .limit(1);
 
-    if (existingApplication.length > 0) {
+    if (existingPending.length > 0) {
       return {
         success: false,
-        error: '您已有待审核的实名认证申请，请勿重复提交'
+        error: '您已有待审核的实名认证申请，请勿重复提交',
       };
     }
 
-    // 检查是否已通过认证
     const approvedApplication = await db
       .select()
       .from(verificationApplications)
       .where(
         and(
           eq(verificationApplications.userId, params.userId),
-          eq(verificationApplications.status, 'approved')
-        )
+          eq(verificationApplications.status, 'approved'),
+        ),
       )
       .limit(1);
 
     if (approvedApplication.length > 0) {
       return {
         success: false,
-        error: '您已完成实名认证，无需重复提交'
+        error: '您已完成实名认证，无需重复提交',
       };
     }
 
-    // 创建新申请
     const result = await db
       .insert(verificationApplications)
       .values({
         userId: params.userId,
         realName: params.realName,
+        phone: params.phone,
         idCard: params.idCard,
         idCardFrontUrl: normalizedFrontUrl,
         idCardBackUrl: normalizedBackUrl,
-        verificationService: params.verificationService || 'manual'
+        verificationService: params.verificationService || 'manual',
       })
       .returning();
 
     return {
       success: true,
-      data: result[0] as VerificationApplication
+      data: result[0] as VerificationApplication,
     };
   } catch (error: any) {
     console.error('创建实名认证申请失败:', error);
     return {
       success: false,
-      error: error.message || '创建实名认证申请失败'
+      error: error.message || '创建实名认证申请失败',
     };
   }
 }
 
-/**
- * 获取用户的实名认证申请
- */
-export async function getUserVerificationApplication(
-  userId: string
-): Promise<VerificationApplication | null> {
+export async function getUserVerificationApplication(userId: string): Promise<VerificationApplication | null> {
   try {
     const result = await db
       .select()
@@ -145,29 +146,25 @@ export async function getUserVerificationApplication(
       .orderBy(desc(verificationApplications.createdAt))
       .limit(1);
 
-    return result[0] as VerificationApplication || null;
+    return (result[0] as VerificationApplication) || null;
   } catch (error) {
     console.error('获取用户实名认证申请失败:', error);
     return null;
   }
 }
 
-/**
- * 获取待审核的实名认证申请列表
- */
 export async function getPendingVerificationApplications(
-  page: number = 1,
-  pageSize: number = 20
+  page = 1,
+  pageSize = 20,
 ): Promise<{ success: boolean; data?: VerificationApplication[]; total?: number; error?: string }> {
   try {
     const offset = (page - 1) * pageSize;
 
     const pendingFilter = and(
       eq(verificationApplications.status, 'pending'),
-      eq(users.isVerified, false)
+      eq(users.isVerified, false),
     );
 
-    // 只返回仍未完成实名的待审核申请，避免后台和前台状态打架
     const totalCount = await db
       .select({ id: verificationApplications.id })
       .from(verificationApplications)
@@ -186,35 +183,31 @@ export async function getPendingVerificationApplications(
     return {
       success: true,
       data: result.map(({ application }) => application as VerificationApplication),
-      total: totalCount.length
+      total: totalCount.length,
     };
   } catch (error: any) {
     console.error('获取待审核实名认证申请失败:', error);
     return {
       success: false,
-      error: error.message || '获取待审核实名认证申请失败'
+      error: error.message || '获取待审核实名认证申请失败',
     };
   }
 }
 
-/**
- * 审核实名认证申请
- */
 export async function reviewVerificationApplication(
-  params: ReviewVerificationParams
+  params: ReviewVerificationParams,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { applicationId, status, reviewComment, reviewerId, reviewerName } = params;
 
-    // 更新申请状态（存储管理员名称而不是 ID）
     const result = await db
       .update(verificationApplications)
       .set({
         status,
-        reviewedBy: reviewerName || reviewerId, // 存储管理员名称
+        reviewedBy: reviewerName || reviewerId,
         reviewedAt: new Date().toISOString(),
         reviewComment,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(verificationApplications.id, applicationId))
       .returning();
@@ -222,11 +215,10 @@ export async function reviewVerificationApplication(
     if (result.length === 0) {
       return {
         success: false,
-        error: '实名认证申请不存在'
+        error: '实名认证申请不存在',
       };
     }
 
-    // 如果审核通过，更新用户信息
     if (status === 'approved') {
       const application = result[0];
       await db
@@ -234,30 +226,24 @@ export async function reviewVerificationApplication(
         .set({
           isVerified: true,
           realName: application.realName,
+          phone: application.phone,
           idCard: application.idCard,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         })
         .where(eq(users.id, application.userId));
     }
 
-    return {
-      success: true
-    };
+    return { success: true };
   } catch (error: any) {
     console.error('审核实名认证申请失败:', error);
     return {
       success: false,
-      error: error.message || '审核实名认证申请失败'
+      error: error.message || '审核实名认证申请失败',
     };
   }
 }
 
-/**
- * 获取实名认证申请详情
- */
-export async function getVerificationApplicationById(
-  applicationId: string
-): Promise<VerificationApplication | null> {
+export async function getVerificationApplicationById(applicationId: string): Promise<VerificationApplication | null> {
   try {
     const result = await db
       .select()
@@ -265,7 +251,7 @@ export async function getVerificationApplicationById(
       .where(eq(verificationApplications.id, applicationId))
       .limit(1);
 
-    return result[0] as VerificationApplication || null;
+    return (result[0] as VerificationApplication) || null;
   } catch (error) {
     console.error('获取实名认证申请详情失败:', error);
     return null;

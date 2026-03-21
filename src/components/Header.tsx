@@ -204,8 +204,10 @@ export function Header() {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
+      const token = getToken();
       const res = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const result = await res.json();
       if (result.success) {

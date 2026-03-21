@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           ...app,
           idCardFrontUrl: frontUrl || '',
           idCardBackUrl: backUrl || '',
-          userPhone: normalizeAuditPhoneDisplay(appUser?.phone),
+          userPhone: normalizeAuditPhoneDisplay((app as any).phone || appUser?.phone),
           userName: appUser?.nickname || ''
         };
       })

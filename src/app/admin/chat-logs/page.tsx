@@ -127,7 +127,8 @@ export default function AdminChatLogs() {
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
   const [chatDetail, setChatDetail] = useState<ChatDetailData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -182,7 +183,7 @@ export default function AdminChatLogs() {
 
   const fetchChatLogs = async () => {
     try {
-      setLoading(true);
+      setListLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
@@ -211,13 +212,15 @@ export default function AdminChatLogs() {
       setChatGroups([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
   };
 
-  const fetchChatDetail = async (orderId: string) => {
+  const fetchChatDetail = async (orderId: string, options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setDetailLoading(true);
+      }
       const response = await fetch(`/api/admin/chat-logs/${encodeURIComponent(orderId)}`);
       const result = await response.json();
 
@@ -231,7 +234,9 @@ export default function AdminChatLogs() {
       alert(error.message || '获取聊天详情失败');
       setChatDetail(null);
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setDetailLoading(false);
+      }
     }
   };
 
@@ -359,10 +364,10 @@ export default function AdminChatLogs() {
   }, [page, statusFilter]);
 
   useEffect(() => {
-    if (selectedGroup) {
+    if (selectedGroup?.orderId) {
       void fetchChatDetail(selectedGroup.orderId);
     }
-  }, [selectedGroup]);
+  }, [selectedGroup?.orderId]);
 
   const handleSearch = () => {
     setPage(1);
@@ -512,7 +517,7 @@ export default function AdminChatLogs() {
 
       {!selectedGroup ? (
         <div className="space-y-4">
-          {loading ? (
+          {listLoading ? (
             <Card>
               <CardContent className="pt-6">
                 <div className="py-8 text-center text-gray-500">加载中...</div>
@@ -568,7 +573,7 @@ export default function AdminChatLogs() {
             ))
           )}
 
-          {!loading && chatGroups.length > 0 && total > pageSize ? (
+          {!listLoading && chatGroups.length > 0 && total > pageSize ? (
             <div className="mt-4 flex justify-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
                 上一页
@@ -614,7 +619,7 @@ export default function AdminChatLogs() {
             </div>
           </div>
 
-          {loading ? (
+          {detailLoading ? (
             <Card>
               <CardContent className="pt-6">
                 <div className="py-8 text-center text-gray-500">加载中...</div>

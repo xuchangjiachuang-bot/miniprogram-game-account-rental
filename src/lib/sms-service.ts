@@ -319,7 +319,7 @@ async function sendAliyunSms(
   const templateCode = params.templateCode || config.defaultTemplate;
 
   // 构造模板参数（JSON字符串格式）
-  const templateParam = JSON.stringify({ code });
+  const templateParam = JSON.stringify(params.templateParam || { code });
 
   try {
     // 使用阿里云SDK发送短信

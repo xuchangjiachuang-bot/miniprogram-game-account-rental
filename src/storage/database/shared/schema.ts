@@ -490,6 +490,7 @@ export const verificationApplications = pgTable("verification_applications", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
 	realName: varchar("real_name", { length: 50 }).notNull(),
+	phone: varchar({ length: 20 }).notNull().default(''),
 	idCard: varchar("id_card", { length: 20 }).notNull(),
 	idCardFrontUrl: varchar("id_card_front_url", { length: 500 }).notNull(),
 	idCardBackUrl: varchar("id_card_back_url", { length: 500 }).notNull(),
