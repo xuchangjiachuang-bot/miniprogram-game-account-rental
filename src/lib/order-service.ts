@@ -7,12 +7,10 @@
 import { OrderStatus, RefundType, calculateOrderCompletionSplit, calculateRefundSplit, getOrderStatusText } from './split-service';
 import { UserType, TransactionType, changeBalance, unfreezeBalance, getUserBalance, ChangeBalanceParams } from './balance-service';
 import { sendNotification } from './notification-service';
-import { sendSms } from './sms-service';
 import { getAccountById, restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
 import { chatManager } from '@/storage/database/chatManager';
 import { accounts, db, orders, users } from '@/lib/db';
 import { eq, and, desc, or } from 'drizzle-orm';
-import { sendSystemGroupMessage } from './chat-service-new';
 
 // ==================== 类型定义 ====================
 
@@ -265,9 +263,6 @@ export function generateOrderNo(): string {
   return `ORD${timestamp}${random}`;
 }
 
-function isValidMainlandMobile(phone?: string | null) {
-  return /^1[3-9]\d{9}$/.test(phone?.trim() || '');
-}
 
 /**
  * 验证订单状态流转
@@ -400,16 +395,7 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
 
   // 发送通知给卖家：新订单创建
   const account = await getAccountById(params.account_id);
-  const relatedUsers = await db
-    .select({
-      id: users.id,
-      nickname: users.nickname,
-      phone: users.phone,
-    })
-    .from(users)
-    .where(or(eq(users.id, params.buyer_id), eq(users.id, params.seller_id)));
-  const sellerUser = relatedUsers.find((item) => item.id === params.seller_id);
-  const buyerUser = relatedUsers.find((item) => item.id === params.buyer_id);
+
 
   sendNotification({
     userId: params.seller_id,
@@ -434,29 +420,6 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
         buyerId: params.buyer_id,
         sellerId: params.seller_id,
       });
-      const sellerPhone = isValidMainlandMobile(sellerUser?.phone) ? sellerUser?.phone || '' : '';
-      const buyerPhone = isValidMainlandMobile(buyerUser?.phone) ? buyerUser?.phone || '' : '';
-
-      if (sellerPhone) {
-        await sendSystemGroupMessage({
-          groupId: groupChat.id,
-          content: `卖家联系电话：${sellerPhone}，买家如需快速联系可直接拨打。`,
-        });
-
-        const smsResult = await sendSms('aliyun', {
-          phone: sellerPhone,
-          templateParam: {
-            orderNo: order.order_no,
-            accountTitle: account?.title || '游戏账号',
-            buyerName: buyerUser?.nickname || '买家',
-            buyerPhone,
-          },
-        });
-
-        if (!smsResult.success) {
-          console.warn(`[createOrder] 卖家短信提醒发送失败: ${smsResult.message}`);
-        }
-      }
       console.log(`为订单 ${order.order_no} 创建聊天群成功：${groupChat.id}`);
     } catch (error) {
       console.error(`为订单 ${order.order_no} 创建聊天群或发送提醒失败：`, error);

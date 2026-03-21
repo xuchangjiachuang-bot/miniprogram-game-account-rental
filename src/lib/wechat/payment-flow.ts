@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
 import { and, desc, eq, sql } from 'drizzle-orm';
-import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
+import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances, users } from '@/lib/db';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import { sendOrderPaidNotification } from '@/lib/notification-service';
-import { ensureOrderGroupChat } from '@/lib/chat-service-new';
+import { ensureOrderGroupChat, sendSystemGroupMessage } from '@/lib/chat-service-new';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
+import { sendSms } from '@/lib/sms-service';
 import { fenToYuan } from '@/lib/wechat/utils';
 import { queryTransactionByOutTradeNo } from '@/lib/wechat/v3';
 
@@ -26,6 +27,86 @@ export function getRequestClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || request.headers.get('x-real-ip')
     || '127.0.0.1';
+}
+
+function isValidMainlandMobile(phone?: string | null) {
+  return /^1[3-9]\d{9}$/.test(phone?.trim() || '');
+}
+
+async function notifySellerAfterOrderPaid(orderId: string) {
+  const [order] = await db
+    .select({
+      id: orders.id,
+      orderNo: orders.orderNo,
+      accountId: orders.accountId,
+      buyerId: orders.buyerId,
+      sellerId: orders.sellerId,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order) {
+    return;
+  }
+
+  const [account] = await db
+    .select({
+      title: accounts.title,
+    })
+    .from(accounts)
+    .where(eq(accounts.id, order.accountId))
+    .limit(1);
+
+  const buyerList = await db
+    .select({
+      id: users.id,
+      nickname: users.nickname,
+      phone: users.phone,
+    })
+    .from(users)
+    .where(eq(users.id, order.buyerId))
+    .limit(1);
+
+  const buyer = buyerList[0];
+  const sellerList = await db
+    .select({
+      id: users.id,
+      nickname: users.nickname,
+      phone: users.phone,
+    })
+    .from(users)
+    .where(eq(users.id, order.sellerId))
+    .limit(1);
+
+  const seller = sellerList[0];
+  const sellerPhone = isValidMainlandMobile(seller?.phone) ? seller?.phone || '' : '';
+  const buyerPhone = isValidMainlandMobile(buyer?.phone) ? buyer?.phone || '' : '';
+
+  if (!sellerPhone) {
+    return;
+  }
+
+  const groupChat = await ensureOrderGroupChat(order.id);
+
+  await sendSystemGroupMessage({
+    groupId: groupChat.id,
+    content: `卖家联系电话：${sellerPhone}，买家如需快速联系可直接拨打。`,
+  });
+
+  const smsResult = await sendSms('aliyun', {
+    phone: sellerPhone,
+    templateParam: {
+      orderNo: order.orderNo,
+      accountTitle: account?.title || '游戏账号',
+      buyerName: buyer?.nickname || '买家',
+      buyerPhone,
+    },
+  });
+
+  if (!smsResult.success) {
+    console.warn(`[markWechatOrderPaid] 卖家短信提醒发送失败: ${smsResult.message}`);
+  }
 }
 
 export async function markWechatOrderPaid(params: {
@@ -132,7 +213,7 @@ export async function markWechatOrderPaid(params: {
 
   if (!result.alreadyPaid) {
     await sendOrderPaidNotification(result.order.id, false);
-    await ensureOrderGroupChat(result.order.id);
+    await notifySellerAfterOrderPaid(result.order.id);
   }
 
   return result;
