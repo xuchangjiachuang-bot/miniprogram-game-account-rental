@@ -38,16 +38,61 @@ export interface ChatMessageSummary {
 
 type ChatMemberRole = 'buyer' | 'seller' | 'admin';
 
+const TEXT_SYSTEM = '\u7cfb\u7edf';
+const TEXT_BUYER = '\u4e70\u5bb6';
+const TEXT_SELLER = '\u5356\u5bb6';
+const TEXT_SUPPORT = '\u5ba2\u670d';
+const TEXT_IMAGE = '\u56fe\u7247';
+const TEXT_ORDER_CHAT = '\u8ba2\u5355\u7fa4\u804a';
+const ORDER_CHAT_CREATED_MESSAGE =
+  '\u8ba2\u5355\u7fa4\u804a\u5df2\u521b\u5efa\uff0c\u4e70\u5356\u53cc\u65b9\u53ef\u5728\u8fd9\u91cc\u6c9f\u901a\u4ea4\u6613\u3001\u4f7f\u7528\u3001\u9a8c\u53f7\u548c\u552e\u540e\u95ee\u9898\u3002';
+const LEGACY_GROUP_CREATED_MARKERS = [
+  '\u7481\u3220\u5d1f\u7f07\u3088\u4eb0\u5bb8\u63d2\u57b1\u5be4',
+  '\u6d94\u677f\u5d20\u9359\u5c7e\u67df\u9359\ue21a\u6e6a\u6769\u6b13\u5677',
+];
+const LEGACY_GROUP_TITLE_SUFFIX = ' - \u7481\u3220\u5d1f\u7f07\u3088\u4eb0';
+
 function buildChatMessageImageUrl(messageId: string) {
   return `/api/chat/messages/${encodeURIComponent(messageId)}/image`;
 }
 
-function normalizeMessagePreview(content: string, messageType?: string | null) {
-  if (messageType === 'image') {
-    return '[图片]';
+function buildSellerPaidReminderMessage(phone: string) {
+  return `\u7cfb\u7edf\u63d0\u9192\uff1a\u5356\u5bb6\u624b\u673a\u53f7 ${phone} \u5df2\u6536\u5230\u4ed8\u6b3e\u901a\u77e5\uff0c\u8bf7\u5c3d\u5feb\u8054\u7cfb\u4e70\u5bb6\u5f00\u59cb\u670d\u52a1\u3002`;
+}
+
+function normalizeLegacyChatContent(content: string) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) {
+    return '';
   }
 
-  return content;
+  if (LEGACY_GROUP_CREATED_MARKERS.some((marker) => trimmed.includes(marker))) {
+    return ORDER_CHAT_CREATED_MESSAGE;
+  }
+
+  const sellerReminderMatch = trimmed.match(/^\?+(\d{11})\?+$/);
+  if (sellerReminderMatch) {
+    return buildSellerPaidReminderMessage(sellerReminderMatch[1]);
+  }
+
+  return trimmed;
+}
+
+function normalizeGroupTitle(title: string) {
+  const trimmed = String(title || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replaceAll(LEGACY_GROUP_TITLE_SUFFIX, ` - ${TEXT_ORDER_CHAT}`);
+}
+
+function normalizeMessagePreview(content: string, messageType?: string | null) {
+  if (messageType === 'image') {
+    return `[${TEXT_IMAGE}]`;
+  }
+
+  return normalizeLegacyChatContent(content);
 }
 
 function getGroupSortTime(group: { updatedAt?: string | null; createdAt?: string | null }) {
@@ -87,7 +132,7 @@ function formatUserName(
   role?: string,
 ) {
   if (role === 'system') {
-    return '系统';
+    return TEXT_SYSTEM;
   }
 
   if (user?.nickname) {
@@ -99,22 +144,24 @@ function formatUserName(
   }
 
   if (role === 'buyer') {
-    return '买家';
+    return TEXT_BUYER;
   }
 
   if (role === 'seller') {
-    return '卖家';
+    return TEXT_SELLER;
   }
 
   if (role === 'admin') {
-    return '客服';
+    return TEXT_SUPPORT;
   }
 
-  return '系统';
+  return TEXT_SYSTEM;
 }
 
 function buildOrderChatTitle(accountTitle: string | null | undefined, orderNo: string) {
-  return accountTitle?.trim() ? `${accountTitle} - 订单群聊` : `订单 ${orderNo} 群聊`;
+  return accountTitle?.trim()
+    ? `${accountTitle} - ${TEXT_ORDER_CHAT}`
+    : `\u8ba2\u5355 ${orderNo} ${TEXT_ORDER_CHAT}`;
 }
 
 async function getMembershipRecord(groupId: string, userId: string) {
@@ -184,7 +231,7 @@ async function loadLastMessages(groupIds: string[]) {
     if (!map.has(message.groupChatId)) {
       map.set(message.groupChatId, {
         content: normalizeMessagePreview(message.content, message.messageType),
-        sender: message.senderType === 'system' ? '系统' : message.senderType,
+        sender: formatUserName(undefined, message.senderType || 'system'),
         time: message.createdAt || '',
       });
     }
@@ -201,7 +248,7 @@ async function ensureSupportMemberForExistingGroup(groupId: string) {
       groupChatId: groupId,
       senderId: supportMember.user.id,
       senderType: 'system',
-      content: '订单群聊已创建，买卖双方可在这里沟通交易、使用、验号和售后问题。',
+      content: ORDER_CHAT_CREATED_MESSAGE,
       messageType: 'system',
       createdAt: new Date().toISOString(),
     });
@@ -293,7 +340,7 @@ export async function ensureOrderGroupChat(orderId: string): Promise<{
       groupChatId: group.id,
       senderId: supportMember.user.id,
       senderType: 'system',
-      content: '订单群聊已创建，买卖双方可在这里沟通交易、使用、验号和售后问题。',
+      content: ORDER_CHAT_CREATED_MESSAGE,
       messageType: 'system',
       createdAt: now,
     });
@@ -346,7 +393,7 @@ export async function getUserGroups(userId: string): Promise<ChatGroupSummary[]>
     uniqueGroups.map(async (group) => ({
       id: group.id,
       orderId: group.orderId,
-      orderTitle: group.title,
+      orderTitle: normalizeGroupTitle(group.title),
       members: await loadGroupMembers(group.id),
       createdAt: group.createdAt || '',
       updatedAt: group.updatedAt || group.createdAt || '',
@@ -376,7 +423,7 @@ export async function getGroupForUser(groupId: string, userId: string): Promise<
   return {
     id: group.id,
     orderId: group.orderId,
-    orderTitle: group.title,
+    orderTitle: normalizeGroupTitle(group.title),
     members: await loadGroupMembers(group.id),
     createdAt: group.createdAt || '',
     updatedAt: group.updatedAt || group.createdAt || '',
@@ -413,7 +460,7 @@ export async function getMessage(messageId: string): Promise<ChatMessageSummary 
     senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
     senderName: formatUserName(message, message.senderType),
     senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-    content: message.messageType === 'image' ? '' : message.content,
+    content: message.messageType === 'image' ? '' : normalizeLegacyChatContent(message.content),
     fileKey: message.messageType === 'image' ? message.content : undefined,
     imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
     messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
@@ -451,20 +498,18 @@ export async function getGroupMessagesForUser(
     .orderBy(asc(chatMessages.createdAt))
     .limit(limit);
 
-  return Promise.all(
-    messages.map(async (message) => ({
-      id: message.id,
-      senderId: message.senderId,
-      senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
-      senderName: formatUserName(message, message.senderType),
-      senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
-      content: message.messageType === 'image' ? '' : message.content,
-      fileKey: message.messageType === 'image' ? message.content : undefined,
-      imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
-      messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
-      createdAt: message.createdAt || '',
-    })),
-  );
+  return messages.map((message) => ({
+    id: message.id,
+    senderId: message.senderId,
+    senderType: (message.senderType || 'system') as ChatMessageSummary['senderType'],
+    senderName: formatUserName(message, message.senderType),
+    senderAvatar: message.senderType === 'system' ? undefined : message.avatar || undefined,
+    content: message.messageType === 'image' ? '' : normalizeLegacyChatContent(message.content),
+    fileKey: message.messageType === 'image' ? message.content : undefined,
+    imageUrl: message.messageType === 'image' ? buildChatMessageImageUrl(message.id) : undefined,
+    messageType: (message.messageType || 'text') as ChatMessageSummary['messageType'],
+    createdAt: message.createdAt || '',
+  }));
 }
 
 export async function sendGroupMessageForUser(params: {
@@ -562,8 +607,8 @@ export async function sendSystemGroupMessage(params: {
     id: message.id,
     senderId: message.senderId,
     senderType: 'system' as const,
-    senderName: '系统',
-    content: message.content,
+    senderName: TEXT_SYSTEM,
+    content: normalizeLegacyChatContent(message.content),
     messageType: 'system' as const,
     createdAt: message.createdAt || now,
   };

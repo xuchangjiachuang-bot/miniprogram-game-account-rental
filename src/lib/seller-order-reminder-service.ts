@@ -38,7 +38,8 @@ export async function notifySellerAfterOrderPaid(orderId: string) {
 
   await sendSystemGroupMessage({
     groupId: groupChat.id,
-    content: `???????${sellerPhone}???????????????`,
+    content:
+      `\u7cfb\u7edf\u63d0\u9192\uff1a\u5356\u5bb6\u624b\u673a\u53f7 ${sellerPhone} \u5df2\u6536\u5230\u4ed8\u6b3e\u901a\u77e5\uff0c\u8bf7\u5c3d\u5feb\u8054\u7cfb\u4e70\u5bb6\u5f00\u59cb\u670d\u52a1\u3002`,
   });
 
   const smsResult = await sendSms('aliyun', {
@@ -46,6 +47,6 @@ export async function notifySellerAfterOrderPaid(orderId: string) {
   });
 
   if (!smsResult.success) {
-    console.warn(`[notifySellerAfterOrderPaid] ??????????: ${smsResult.message}`);
+    console.warn('[notifySellerAfterOrderPaid] \u5356\u5bb6\u4ed8\u6b3e\u63d0\u9192\u77ed\u4fe1\u53d1\u9001\u5931\u8d25:', smsResult.message);
   }
 }
