@@ -811,7 +811,7 @@ async function getWechatPayEncryptMaterial() {
 }
 
 function buildTransferSceneReportInfos(config: WechatPayV3Config): TransferSceneReportInfo[] {
-  if (config.transferSceneId === '__legacy_1000__') {
+  if (config.transferSceneId === '1000') {
     return [
       {
         info_type: '\u6d3b\u52a8\u540d\u79f0',
@@ -824,7 +824,7 @@ function buildTransferSceneReportInfos(config: WechatPayV3Config): TransferScene
     ];
   }
 
-  if (config.transferSceneId === '1000') {
+  if (config.transferSceneId === '__legacy_1000__') {
     return [
       {
         info_type: '娲诲姩鍚嶇О',
