@@ -4,6 +4,7 @@ import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
 
 const MOBILE_PATTERN = /^1[3-9]\d{9}$/;
+const ID_CARD_PATTERN = /^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/;
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,8 +46,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '手机号格式不正确' }, { status: 400 });
     }
 
-    if (!/^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(idCard)) {
-      return NextResponse.json({ success: false, error: '身份证号码格式不正确' }, { status: 400 });
+    if (!ID_CARD_PATTERN.test(idCard)) {
+      return NextResponse.json({ success: false, error: '身份证号格式不正确' }, { status: 400 });
     }
 
     const result = await createVerificationApplication({
@@ -65,7 +66,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '实名认证申请已提交，请等待人工审核',
+      message:
+        result.data?.status === 'approved'
+          ? '实名认证已自动通过'
+          : '实名认证申请已提交，请等待人工审核',
       data: result.data,
     });
   } catch (error: any) {

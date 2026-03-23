@@ -5,6 +5,7 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { db, users, verificationApplications } from '@/lib/db';
 import { classifyStoredFileReference } from '@/lib/storage-service';
+import { getVerificationManualReviewEnabled } from '@/lib/verification-review-config';
 
 function normalizeStoredFileValue(value: string) {
   const trimmed = value.trim();
@@ -59,8 +60,10 @@ export async function createVerificationApplication(
   params: CreateVerificationParams,
 ): Promise<{ success: boolean; data?: VerificationApplication; error?: string }> {
   try {
+    const requireManualReview = await getVerificationManualReviewEnabled();
     const normalizedFrontUrl = normalizeStoredFileValue(params.idCardFrontUrl);
     const normalizedBackUrl = normalizeStoredFileValue(params.idCardBackUrl);
+    const now = new Date().toISOString();
 
     const existingPhoneOwner = await db
       .select({ id: users.id })
@@ -120,9 +123,31 @@ export async function createVerificationApplication(
         idCard: params.idCard,
         idCardFrontUrl: normalizedFrontUrl,
         idCardBackUrl: normalizedBackUrl,
+        status: requireManualReview ? 'pending' : 'approved',
+        reviewedBy: requireManualReview ? null : 'system',
+        reviewedAt: requireManualReview ? null : now,
+        reviewComment: requireManualReview ? null : '系统自动审核通过',
         verificationService: params.verificationService || 'manual',
+        verificationResult: requireManualReview ? null : {
+          type: 'system_auto_approved',
+          approvedAt: now,
+        },
+        updatedAt: now,
       })
       .returning();
+
+    if (!requireManualReview) {
+      await db
+        .update(users)
+        .set({
+          isVerified: true,
+          realName: params.realName,
+          phone: params.phone,
+          idCard: params.idCard,
+          updatedAt: now,
+        })
+        .where(eq(users.id, params.userId));
+    }
 
     return {
       success: true,

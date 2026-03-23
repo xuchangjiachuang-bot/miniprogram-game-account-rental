@@ -372,6 +372,12 @@ export default function UserCenterPage() {
   }, [user?.id, activeTab, refreshUser]);
 
   useEffect(() => {
+    if (verificationStatus === 'pending' || verificationStatus === 'approved' || user?.isRealNameVerified) {
+      setVerificationDialogOpen(false);
+    }
+  }, [verificationStatus, user?.isRealNameVerified]);
+
+  useEffect(() => {
     if (activeTab !== 'chats' || !user) {
       return;
     }
@@ -1282,7 +1288,6 @@ export default function UserCenterPage() {
         throw new Error(result.error || '提交认证申请失败');
       }
 
-      // 显示成功提示
       toast.success(result.message || '实名认证申请已提交，请等待人工审核');
       const normalizedPhone = verificationForm.phone.trim();
       if (normalizedPhone && normalizedPhone !== (profileForm.phone || '').trim()) {
@@ -1306,12 +1311,19 @@ export default function UserCenterPage() {
           ...current,
           phone: normalizedPhone
         }));
-        await refreshUser(true);
       }
 
-      setVerificationStatus('pending');
-      setVerificationReviewComment('');
+      const nextStatus = result.data?.status || 'pending';
+      setVerificationStatus(nextStatus);
+      setVerificationReviewComment(result.data?.reviewComment || '');
       setVerificationDialogOpen(false);
+
+      if (nextStatus === 'approved') {
+        hasSyncedApprovedVerificationRef.current = true;
+        await refreshUser(true);
+      } else if (normalizedPhone) {
+        await refreshUser(true);
+      }
     } catch (error: any) {
       toast.error(error.message || '提交失败，请重试');
     } finally {
@@ -1355,7 +1367,11 @@ export default function UserCenterPage() {
   }
 
   const isVerified = user.isRealNameVerified;
-  const canOpenVerificationDialog = !isVerified && verificationStatus !== 'pending';
+  const canOpenVerificationDialog =
+    !verifying
+    && !isVerified
+    && verificationStatus !== 'pending'
+    && verificationStatus !== 'approved';
 
   return (
     <div className="min-h-screen bg-background">

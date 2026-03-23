@@ -35,6 +35,7 @@ interface PlatformSettings {
   maxDeposit: number;
   requireManualReview: boolean;
   requireWithdrawalManualReview: boolean;
+  requireVerificationManualReview: boolean;
   autoApproveVerified: boolean;
   listingDepositAmount: number;
   orderPaymentTimeout: number;
@@ -83,6 +84,7 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   maxDeposit: 10000,
   requireManualReview: true,
   requireWithdrawalManualReview: true,
+  requireVerificationManualReview: true,
   autoApproveVerified: false,
   listingDepositAmount: 50,
   orderPaymentTimeout: 180,
@@ -186,6 +188,7 @@ export default function AdminSettingsPage() {
     maxDeposit: settings.maxDeposit,
     requireManualReview: settings.requireManualReview,
     requireWithdrawalManualReview: settings.requireWithdrawalManualReview,
+    requireVerificationManualReview: settings.requireVerificationManualReview,
     autoApproveVerified: settings.autoApproveVerified,
     listingDepositAmount: settings.listingDepositAmount,
     orderPaymentTimeout: settings.orderPaymentTimeout,
@@ -481,6 +484,15 @@ export default function AdminSettingsPage() {
                     <div className="text-sm text-muted-foreground">建议保持开启。关闭后，提现申请会直接进入已通过状态。</div>
                   </div>
                   <Switch checked={settings.requireWithdrawalManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireWithdrawalManualReview: checked }))} />
+                </div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-medium">实名认证人工审核</div>
+                    <div className="text-sm text-muted-foreground">关闭后，用户提交实名认证会自动通过，并立即更新实名状态。</div>
+                  </div>
+                  <Switch checked={settings.requireVerificationManualReview} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, requireVerificationManualReview: checked }))} />
                 </div>
               </div>
               <div className="rounded-xl border p-4">
