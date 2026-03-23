@@ -407,6 +407,27 @@ export default function AdminSettingsPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardDescription>快捷开关</CardDescription>
+          <CardTitle className="text-base">实名认证人工审核</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
+            <div>
+              <div className="font-medium">实名认证人工审核</div>
+              <div className="text-sm text-muted-foreground">关闭后，用户提交实名认证会自动通过，并立即更新实名状态。</div>
+            </div>
+            <Switch
+              checked={settings.requireVerificationManualReview}
+              onCheckedChange={(checked) =>
+                setSettings((prev) => ({ ...prev, requireVerificationManualReview: checked }))
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="business" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="business">业务设置</TabsTrigger>

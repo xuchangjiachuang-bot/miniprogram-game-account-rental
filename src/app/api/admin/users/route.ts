@@ -11,6 +11,19 @@ function normalizeBalance(row: { availableBalance?: unknown; frozenBalance?: unk
   };
 }
 
+function normalizeAdminUserPhone(phone?: string | null) {
+  const trimmed = phone?.trim() || '';
+  if (!trimmed) {
+    return '';
+  }
+
+  if (/^(wx|wechat)_[a-z0-9]+$/i.test(trimmed)) {
+    return '';
+  }
+
+  return /^1[3-9]\d{9}$/.test(trimmed) ? trimmed : '';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -102,6 +115,7 @@ export async function GET(request: NextRequest) {
 
         return {
           ...row.user,
+          phone: normalizeAdminUserPhone(row.user.phone),
           walletBalance: balance.availableBalance,
           frozenBalance: balance.frozenBalance,
         };
