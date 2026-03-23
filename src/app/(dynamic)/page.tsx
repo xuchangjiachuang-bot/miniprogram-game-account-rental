@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -77,6 +77,7 @@ export default function Home() {
   const [carousels, setCarousels] = useState<any[]>([]);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const createOrderIdempotencyKeyRef = useRef<string | null>(null);
 
   const router = useRouter();
   const heroGradientStyle: CSSProperties = {
@@ -105,6 +106,10 @@ export default function Home() {
 
     try {
       setCreatingOrder(true);
+      if (!createOrderIdempotencyKeyRef.current) {
+        createOrderIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+
       const rentDays = Number(selectedAccount.rental_duration || 1);
       const rentHours = Math.max(1, Math.round(rentDays * 24));
 
@@ -113,10 +118,12 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'X-Idempotency-Key': createOrderIdempotencyKeyRef.current,
         },
         body: JSON.stringify({
           account_id: selectedAccount.id,
           rent_hours: rentHours,
+          idempotency_key: createOrderIdempotencyKeyRef.current,
         }),
       });
 
@@ -126,6 +133,7 @@ export default function Home() {
       }
 
       setShowAccountDetail(false);
+      createOrderIdempotencyKeyRef.current = null;
       router.push(`/orders/${result.data.id}`);
     } catch (error) {
       console.error('创建订单失败:', error);
@@ -213,6 +221,10 @@ export default function Home() {
       console.error('加载配置失败:', error);
     }
   };
+
+  useEffect(() => {
+    createOrderIdempotencyKeyRef.current = null;
+  }, [selectedAccount?.id]);
 
   // 处理发布账号
   const handlePublishAccount = () => {

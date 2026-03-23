@@ -18,6 +18,7 @@ export interface WechatPayV3Config {
   transferSceneId: string;
   transferSceneInfoType: string;
   transferSceneInfoContent: string;
+  transferSceneInfoExtraContent: string;
 }
 
 interface TransferSceneReportInfo {
@@ -260,6 +261,7 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     transferSceneId,
     transferSceneInfoType,
     transferSceneInfoContent,
+    transferSceneInfoExtraContent,
   ] = await Promise.all([
     getConfiguredValue([
       getRuntimeEnv('WECHAT_PAY_MCHID'),
@@ -304,6 +306,9 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     getConfiguredValue([
       getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT'),
     ], '平台提现'),
+    getConfiguredValue([
+      getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_EXTRA_CONTENT'),
+    ], '骞冲彴娲诲姩鐜伴噾濂栧姳'),
   ]);
 
   return {
@@ -319,8 +324,9 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     publicKey: normalizeMultilineSecret(publicKey, 'PUBLIC KEY'),
     publicKeyId,
     transferSceneId,
-    transferSceneInfoType,
-    transferSceneInfoContent,
+    transferSceneInfoType: getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_TYPE')?.trim() || '\u73b0\u91d1\u5956\u52b1',
+    transferSceneInfoContent: getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_CONTENT')?.trim() || '\u73b0\u91d1\u5956\u52b1',
+    transferSceneInfoExtraContent: getRuntimeEnv('WECHAT_PAY_TRANSFER_SCENE_INFO_EXTRA_CONTENT')?.trim() || '\u73b0\u91d1\u5956\u52b1',
   };
 }
 
@@ -805,6 +811,32 @@ async function getWechatPayEncryptMaterial() {
 }
 
 function buildTransferSceneReportInfos(config: WechatPayV3Config): TransferSceneReportInfo[] {
+  if (config.transferSceneId === '__legacy_1000__') {
+    return [
+      {
+        info_type: '\u6d3b\u52a8\u540d\u79f0',
+        info_content: config.transferSceneInfoContent || '\u73b0\u91d1\u5956\u52b1',
+      },
+      {
+        info_type: '\u5956\u52b1\u8bf4\u660e',
+        info_content: config.transferSceneInfoExtraContent || '\u73b0\u91d1\u5956\u52b1',
+      },
+    ];
+  }
+
+  if (config.transferSceneId === '1000') {
+    return [
+      {
+        info_type: '娲诲姩鍚嶇О',
+        info_content: config.transferSceneInfoContent || '骞冲彴娲诲姩',
+      },
+      {
+        info_type: '濂栧姳璇存槑',
+        info_content: config.transferSceneInfoExtraContent || '骞冲彴娲诲姩鐜伴噾濂栧姳',
+      },
+    ];
+  }
+
   if (config.transferSceneId === '1005') {
     return [
       {

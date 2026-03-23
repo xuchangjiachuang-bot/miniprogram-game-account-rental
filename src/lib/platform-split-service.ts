@@ -277,6 +277,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           splitTime: now,
           createdAt: now,
           updatedAt: now,
+        }).onConflictDoNothing({
+          target: [splitRecords.orderId, splitRecords.receiverType, splitRecords.receiverId, splitRecords.commissionType],
         });
       }
 
@@ -294,6 +296,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         splitTime: now,
         createdAt: now,
         updatedAt: now,
+      }).onConflictDoNothing({
+        target: [splitRecords.orderId, splitRecords.receiverType, splitRecords.receiverId, splitRecords.commissionType],
       });
 
       await tx.insert(splitRecords).values({
@@ -310,6 +314,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         splitTime: now,
         createdAt: now,
         updatedAt: now,
+      }).onConflictDoNothing({
+        target: [splitRecords.orderId, splitRecords.receiverType, splitRecords.receiverId, splitRecords.commissionType],
       });
 
       if (buyerRefund > 0) {
@@ -327,6 +333,8 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           splitTime: now,
           createdAt: now,
           updatedAt: now,
+        }).onConflictDoNothing({
+          target: [splitRecords.orderId, splitRecords.receiverType, splitRecords.receiverId, splitRecords.commissionType],
         });
       }
 

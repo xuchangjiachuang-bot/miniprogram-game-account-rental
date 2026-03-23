@@ -77,6 +77,11 @@ export async function ensureSchemaCompatibility() {
   `);
 
   await db.execute(`
+    ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(64);
+  `);
+
+  await db.execute(`
     UPDATE platform_settings
       SET require_withdrawal_manual_review = true
     WHERE require_withdrawal_manual_review IS NULL;
@@ -95,6 +100,17 @@ export async function ensureSchemaCompatibility() {
   await db.execute(`
     CREATE INDEX IF NOT EXISTS split_records_order_id_idx
       ON split_records(order_id);
+  `);
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS orders_buyer_idempotency_key_unique
+      ON orders(buyer_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL;
+  `);
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS split_records_order_receiver_commission_unique
+      ON split_records(order_id, receiver_type, receiver_id, commission_type);
   `);
 
   schemaCompatibilityReady = true;

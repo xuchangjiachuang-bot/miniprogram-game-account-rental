@@ -10,6 +10,10 @@ async function lockFinanceScope(executor: SqlExecutor, scopeKey: string) {
   );
 }
 
+export async function lockBusinessScope(executor: SqlExecutor, scopeKey: string) {
+  await lockFinanceScope(executor, scopeKey);
+}
+
 export async function lockOrderFinanceScope(executor: SqlExecutor, orderId: string) {
   await lockFinanceScope(executor, `order-finance:${orderId}`);
 }

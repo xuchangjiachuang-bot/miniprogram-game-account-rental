@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db, orders } from '@/lib/db';
 import { createOrderDispute } from '@/lib/dispute-service';
 import { settleCompletedOrder } from '@/lib/order-settlement-service';
@@ -38,7 +38,9 @@ export async function POST(
       }
     }
 
-    if (order.status !== 'pending_verification') {
+    const verificationAlreadyPassed = order.status === 'completed' && order.verificationResult === 'passed';
+
+    if (order.status !== 'pending_verification' && !(verificationAlreadyPassed && (action === 'pass' || action === 'auto'))) {
       return NextResponse.json(
         {
           success: false,
@@ -48,7 +50,7 @@ export async function POST(
       );
     }
 
-    if (order.isSettled) {
+    if (order.isSettled && action !== 'pass' && action !== 'auto') {
       return NextResponse.json(
         {
           success: false,
@@ -64,7 +66,7 @@ export async function POST(
       const verificationRemark =
         action === 'auto' ? '超时自动验收通过' : remark || '验收通过';
 
-      await db
+      const updatedOrder = await db
         .update(orders)
         .set({
           status: 'completed',
@@ -72,7 +74,33 @@ export async function POST(
           verificationRemark,
           updatedAt: now,
         })
-        .where(eq(orders.id, id));
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.status, 'pending_verification'),
+        ))
+        .returning({
+          id: orders.id,
+          orderNo: orders.orderNo,
+        });
+
+      if (updatedOrder.length === 0) {
+        const latestOrder = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+        const latest = latestOrder[0];
+
+        if (!latest) {
+          return NextResponse.json({ success: false, error: '订单不存在' }, { status: 404 });
+        }
+
+        if (latest.status !== 'completed' || latest.verificationResult !== 'passed') {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `当前订单状态不能验收：${latest.status}`,
+            },
+            { status: 400 },
+          );
+        }
+      }
 
       const splitResult = await settleCompletedOrder(id);
       if (!splitResult.success) {
@@ -82,7 +110,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         message: splitResult.pendingRefund
-          ? '验收已通过，买家押金原路退款处理中，退款成功后自动完成结算'
+          ? '验收已通过，买家押金退款处理中，退款完成后自动结算'
           : action === 'auto'
             ? '已自动验收通过并完成分账'
             : '验收通过，订单已完成并分账',
@@ -113,7 +141,7 @@ export async function POST(
         .set({
           status: 'disputed',
           verificationResult: 'rejected',
-          verificationRemark: remark || '验收失败，发起纠纷',
+          verificationRemark: remark || '验收失败，已发起纠纷',
           disputeEvidence: evidence ?? null,
           disputeReason: remark || '账号状态异常',
           disputeId: dispute?.id ?? null,
@@ -123,7 +151,7 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        message: '验收已拒绝，纠纷已创建，平台将介入审核',
+        message: '验收已拒绝，纠纷已创建，平台将介入处理',
         data: {
           orderId: id,
           orderNo: order.orderNo,

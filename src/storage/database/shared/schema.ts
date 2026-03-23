@@ -219,6 +219,7 @@ export const users = pgTable("users", {
 export const orders = pgTable("orders", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	orderNo: varchar("order_no", { length: 32 }).notNull(),
+	idempotencyKey: varchar("idempotency_key", { length: 64 }),
 	buyerId: uuid("buyer_id").notNull(),
 	sellerId: uuid("seller_id").notNull(),
 	accountId: uuid("account_id").notNull(),

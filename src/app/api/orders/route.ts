@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
 import {
@@ -133,6 +133,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const accountId = body.account_id as string | undefined;
+    const idempotencyKey = (
+      request.headers.get('x-idempotency-key')
+      || body.idempotency_key
+      || ''
+    ).trim();
+
     if (!accountId) {
       return NextResponse.json(
         {
@@ -160,6 +166,27 @@ export async function POST(request: NextRequest) {
     }
 
     const account = accountList[0];
+
+    const existingPendingOrder = await db
+      .select()
+      .from(orders)
+      .where(and(
+        eq(orders.accountId, account.id),
+        eq(orders.buyerId, user.id),
+        eq(orders.status, 'pending_payment'),
+        ...(idempotencyKey ? [eq(orders.idempotencyKey, idempotencyKey)] : []),
+      ))
+      .orderBy(desc(orders.createdAt))
+      .limit(1);
+
+    if (existingPendingOrder.length > 0) {
+      return NextResponse.json({
+        success: true,
+        message: '璁㈠崟鍒涘缓鎴愬姛',
+        data: existingPendingOrder[0],
+      });
+    }
+
     if (account.status !== 'available') {
       return NextResponse.json(
         {
@@ -228,6 +255,7 @@ export async function POST(request: NextRequest) {
       deposit_amount: pricing.depositAmount,
       total_amount: pricing.totalAmount,
       rent_hours: Number(body.rent_hours || account.rentalHours || 24),
+      idempotency_key: idempotencyKey || undefined,
     };
 
     if (!params.account_id || !params.buyer_id || !params.seller_id) {

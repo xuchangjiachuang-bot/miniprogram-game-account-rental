@@ -11,6 +11,7 @@ import { getAccountById, restoreAccountAvailabilityIfNoBlockingOrders } from './
 import { chatManager } from '@/storage/database/chatManager';
 import { accounts, db, orders, users } from '@/lib/db';
 import { eq, and, desc, or } from 'drizzle-orm';
+import { lockBusinessScope } from '@/lib/finance-lock-service';
 
 // ==================== 类型定义 ====================
 
@@ -71,6 +72,7 @@ export interface CreateOrderParams {
   deposit_amount: number;
   total_amount: number;
   rent_hours: number;
+  idempotency_key?: string;
 }
 
 // 完成订单结果
@@ -300,11 +302,53 @@ const mockOrders: Map<string, Order> = new Map();
  */
 export async function createOrder(params: CreateOrderParams): Promise<Order> {
   // 生成订单ID和订单号
-  const orderId = crypto.randomUUID();
-  const orderNo = generateOrderNo();
   const now = new Date().toISOString();
+  let orderId = '';
 
   await db.transaction(async (tx) => {
+    const createScope = params.idempotency_key
+      ? `order-create:${params.buyer_id}:${params.idempotency_key}`
+      : `order-create:${params.buyer_id}:${params.account_id}`;
+
+    await lockBusinessScope(
+      tx as unknown as { execute: (query: any) => Promise<unknown> },
+      createScope,
+    );
+
+    if (params.idempotency_key) {
+      const existingOrder = await tx
+        .select()
+        .from(orders)
+        .where(and(
+          eq(orders.buyerId, params.buyer_id),
+          eq(orders.idempotencyKey, params.idempotency_key),
+        ))
+        .limit(1);
+
+      if (existingOrder.length > 0) {
+        orderId = existingOrder[0].id;
+        return;
+      }
+    } else {
+      const existingPendingOrder = await tx
+        .select()
+        .from(orders)
+        .where(and(
+          eq(orders.buyerId, params.buyer_id),
+          eq(orders.accountId, params.account_id),
+          eq(orders.status, 'pending_payment'),
+        ))
+        .orderBy(desc(orders.createdAt))
+        .limit(1);
+
+      if (existingPendingOrder.length > 0) {
+        orderId = existingPendingOrder[0].id;
+        return;
+      }
+    }
+
+    orderId = crypto.randomUUID();
+    const orderNo = generateOrderNo();
     const occupiedAccount = await tx
       .update(accounts)
       .set({
@@ -325,6 +369,7 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
     await tx.insert(orders).values({
       id: orderId,
       orderNo: orderNo,
+      idempotencyKey: params.idempotency_key ?? null,
       accountId: params.account_id,
       buyerId: params.buyer_id,
       sellerId: params.seller_id,
