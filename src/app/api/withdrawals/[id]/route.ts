@@ -72,7 +72,15 @@ export async function POST(
     let reconcileWarning: string | null = null;
 
     try {
-      await reconcileWithdrawalTransferStatus(id);
+      const reconcileResult = await reconcileWithdrawalTransferStatus(id);
+      if (
+        reconcileResult
+        && reconcileResult.success === false
+        && 'error' in reconcileResult
+        && reconcileResult.error
+      ) {
+        reconcileWarning = mapReconcileErrorMessage(reconcileResult.error);
+      }
     } catch (error) {
       reconcileWarning = mapReconcileErrorMessage(error);
       console.error('[withdrawals] reconcile before confirm failed:', {
