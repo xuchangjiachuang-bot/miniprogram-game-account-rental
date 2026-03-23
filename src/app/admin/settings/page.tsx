@@ -407,27 +407,6 @@ export default function AdminSettingsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardDescription>快捷开关</CardDescription>
-          <CardTitle className="text-base">实名认证人工审核</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
-            <div>
-              <div className="font-medium">实名认证人工审核</div>
-              <div className="text-sm text-muted-foreground">关闭后，用户提交实名认证会自动通过，并立即更新实名状态。</div>
-            </div>
-            <Switch
-              checked={settings.requireVerificationManualReview}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, requireVerificationManualReview: checked }))
-              }
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       <Tabs defaultValue="business" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="business">业务设置</TabsTrigger>
@@ -484,10 +463,6 @@ export default function AdminSettingsPage() {
                   value={settings.orderPaymentTimeout}
                   onChange={(e) => setSettings((prev) => ({ ...prev, orderPaymentTimeout: toNumber(e.target.value, prev.orderPaymentTimeout) }))}
                 />
-              </div>
-              <div className="rounded-xl border border-dashed bg-muted/30 p-4 md:col-span-2 xl:col-span-3">
-                <div className="font-medium">订单押金改为卖家手动填写</div>
-                <div className="mt-1 text-sm text-muted-foreground">这里不再配置“押金比例”。买家下单时使用的是卖家上架账号时填写的押金金额。</div>
               </div>
               {false && <div className="rounded-xl border p-4">
                 <div className="flex items-center justify-between gap-4">

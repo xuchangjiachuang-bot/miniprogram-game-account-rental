@@ -1,8 +1,4 @@
-/**
- * 实名认证服务（人工审核）
- */
-
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { db, users, verificationApplications } from '@/lib/db';
 import { classifyStoredFileReference } from '@/lib/storage-service';
 import { getVerificationManualReviewEnabled } from '@/lib/verification-review-config';
@@ -29,9 +25,9 @@ export interface VerificationApplication {
   idCardFrontUrl: string;
   idCardBackUrl: string;
   status: VerificationStatus;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewComment?: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewComment?: string | null;
   verificationService: VerificationService;
   verificationResult?: any;
   createdAt: string;
@@ -54,6 +50,12 @@ export interface ReviewVerificationParams {
   reviewComment?: string;
   reviewerId: string;
   reviewerName?: string;
+}
+
+export interface ListVerificationApplicationsParams {
+  page?: number;
+  pageSize?: number;
+  status?: 'all' | VerificationStatus;
 }
 
 export async function createVerificationApplication(
@@ -128,10 +130,12 @@ export async function createVerificationApplication(
         reviewedAt: requireManualReview ? null : now,
         reviewComment: requireManualReview ? null : '系统自动审核通过',
         verificationService: params.verificationService || 'manual',
-        verificationResult: requireManualReview ? null : {
-          type: 'system_auto_approved',
-          approvedAt: now,
-        },
+        verificationResult: requireManualReview
+          ? null
+          : {
+              type: 'system_auto_approved',
+              approvedAt: now,
+            },
         updatedAt: now,
       })
       .returning();
@@ -162,7 +166,9 @@ export async function createVerificationApplication(
   }
 }
 
-export async function getUserVerificationApplication(userId: string): Promise<VerificationApplication | null> {
+export async function getUserVerificationApplication(
+  userId: string,
+): Promise<VerificationApplication | null> {
   try {
     const result = await db
       .select()
@@ -182,39 +188,44 @@ export async function getPendingVerificationApplications(
   page = 1,
   pageSize = 20,
 ): Promise<{ success: boolean; data?: VerificationApplication[]; total?: number; error?: string }> {
+  return listVerificationApplications({ page, pageSize, status: 'pending' });
+}
+
+export async function listVerificationApplications(
+  params: ListVerificationApplicationsParams = {},
+): Promise<{ success: boolean; data?: VerificationApplication[]; total?: number; error?: string }> {
   try {
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 20;
     const offset = (page - 1) * pageSize;
+    const status = params.status || 'all';
 
-    const pendingFilter = and(
-      eq(verificationApplications.status, 'pending'),
-      eq(users.isVerified, false),
-    );
+    const whereClause =
+      status === 'all' ? undefined : eq(verificationApplications.status, status);
 
-    const totalCount = await db
-      .select({ id: verificationApplications.id })
+    const totalRows = await db
+      .select({ count: sql<number>`count(*)::int` })
       .from(verificationApplications)
-      .innerJoin(users, eq(users.id, verificationApplications.userId))
-      .where(pendingFilter);
+      .where(whereClause);
 
     const result = await db
-      .select({ application: verificationApplications })
+      .select()
       .from(verificationApplications)
-      .innerJoin(users, eq(users.id, verificationApplications.userId))
-      .where(pendingFilter)
+      .where(whereClause)
       .orderBy(desc(verificationApplications.createdAt))
       .limit(pageSize)
       .offset(offset);
 
     return {
       success: true,
-      data: result.map(({ application }) => application as VerificationApplication),
-      total: totalCount.length,
+      data: result as VerificationApplication[],
+      total: totalRows[0]?.count || 0,
     };
   } catch (error: any) {
-    console.error('获取待审核实名认证申请失败:', error);
+    console.error('获取实名认证申请列表失败:', error);
     return {
       success: false,
-      error: error.message || '获取待审核实名认证申请失败',
+      error: error.message || '获取实名认证申请列表失败',
     };
   }
 }
@@ -224,15 +235,16 @@ export async function reviewVerificationApplication(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { applicationId, status, reviewComment, reviewerId, reviewerName } = params;
+    const now = new Date().toISOString();
 
     const result = await db
       .update(verificationApplications)
       .set({
         status,
         reviewedBy: reviewerName || reviewerId,
-        reviewedAt: new Date().toISOString(),
+        reviewedAt: now,
         reviewComment,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       })
       .where(eq(verificationApplications.id, applicationId))
       .returning();
@@ -244,8 +256,9 @@ export async function reviewVerificationApplication(
       };
     }
 
+    const application = result[0];
+
     if (status === 'approved') {
-      const application = result[0];
       await db
         .update(users)
         .set({
@@ -253,7 +266,17 @@ export async function reviewVerificationApplication(
           realName: application.realName,
           phone: application.phone,
           idCard: application.idCard,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(users.id, application.userId));
+    } else {
+      await db
+        .update(users)
+        .set({
+          isVerified: false,
+          realName: null,
+          idCard: null,
+          updatedAt: now,
         })
         .where(eq(users.id, application.userId));
     }
@@ -268,7 +291,9 @@ export async function reviewVerificationApplication(
   }
 }
 
-export async function getVerificationApplicationById(applicationId: string): Promise<VerificationApplication | null> {
+export async function getVerificationApplicationById(
+  applicationId: string,
+): Promise<VerificationApplication | null> {
   try {
     const result = await db
       .select()
