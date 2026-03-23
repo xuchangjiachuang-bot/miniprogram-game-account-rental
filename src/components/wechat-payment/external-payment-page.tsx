@@ -25,9 +25,10 @@ interface ApiResult<T> {
   success: boolean;
   data?: T;
   error?: string;
+  message?: string;
+  code?: string;
 }
 
-type PaymentMode = 'order' | 'recharge';
 type ExternalWechatChannel = 'h5' | 'native';
 
 function appendRedirectUrl(mwebUrl: string, redirectUrl: string) {
@@ -47,9 +48,7 @@ async function parseJsonResponse<T>(response: Response): Promise<ApiResult<T>> {
     });
     return {
       success: false,
-      error: response.ok
-        ? '支付状态查询暂时返回了非 JSON 响应，请稍后重试'
-        : `请求失败，状态码 ${response.status}`,
+      error: response.ok ? '接口返回了非 JSON 响应，请稍后重试' : `请求失败，状态码 ${response.status}`,
     };
   }
 
@@ -59,11 +58,12 @@ async function parseJsonResponse<T>(response: Response): Promise<ApiResult<T>> {
 function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChannel }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('orderId');
+  const legacyOrderId = searchParams.get('orderId');
+  const payOrderId = searchParams.get('payOrderId');
   const rechargeId = searchParams.get('rechargeId');
   const rechargeAmount = searchParams.get('rechargeAmount');
   const redirected = searchParams.get('redirected') === '1';
-  const mode: PaymentMode = orderId ? 'order' : 'recharge';
+  const orderPaymentDisabled = Boolean(legacyOrderId);
 
   const [loading, setLoading] = useState(true);
   const [creatingPayment, setCreatingPayment] = useState(false);
@@ -76,35 +76,32 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [externalUrl, setExternalUrl] = useState('');
   const [codeUrl, setCodeUrl] = useState('');
+  const [finalizingOrder, setFinalizingOrder] = useState(false);
 
-  const amount = useMemo(() => (
-    mode === 'order'
-      ? Number(orderInfo?.totalPrice || 0)
-      : Number(rechargeInfo?.amount || rechargeAmount || 0)
-  ), [mode, orderInfo, rechargeInfo, rechargeAmount]);
+  const amount = useMemo(() => {
+    if (orderPaymentDisabled) {
+      return Number(orderInfo?.totalPrice || 0);
+    }
+
+    return Number(rechargeInfo?.amount || rechargeAmount || 0);
+  }, [orderInfo, orderPaymentDisabled, rechargeAmount, rechargeInfo]);
 
   useEffect(() => {
     setCurrentRechargeId(rechargeId || '');
   }, [rechargeId]);
 
   useEffect(() => {
-    if (mode === 'order' && !orderId) {
-      setError('订单号不存在');
-      setLoading(false);
-      return;
-    }
-
-    if (mode === 'recharge' && !currentRechargeId && !rechargeAmount) {
+    if (!orderPaymentDisabled && !currentRechargeId && !rechargeAmount) {
       setError('缺少充值参数');
       setLoading(false);
       return;
     }
 
     void loadInitialData();
-  }, [currentRechargeId, mode, orderId, rechargeAmount]);
+  }, [currentRechargeId, legacyOrderId, orderPaymentDisabled, rechargeAmount]);
 
   useEffect(() => {
-    if (!polling) {
+    if (!polling || orderPaymentDisabled) {
       return;
     }
 
@@ -113,18 +110,14 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [polling, mode, orderId, currentRechargeId]);
+  }, [currentRechargeId, orderPaymentDisabled, polling]);
 
   useEffect(() => {
-    if (loading || creatingPayment || autoStarted || paymentStatus !== 'idle') {
+    if (orderPaymentDisabled || loading || creatingPayment || autoStarted || paymentStatus !== 'idle') {
       return;
     }
 
-    if (mode === 'order' && !orderInfo) {
-      return;
-    }
-
-    if (mode === 'recharge' && amount <= 0) {
+    if (amount <= 0) {
       return;
     }
 
@@ -134,11 +127,9 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
       return;
     }
 
-    if (channel === 'h5' || channel === 'native') {
-      setAutoStarted(true);
-      void handlePayment(true);
-    }
-  }, [amount, autoStarted, channel, creatingPayment, loading, mode, orderInfo, paymentStatus, redirected]);
+    setAutoStarted(true);
+    void handlePayment(true);
+  }, [amount, autoStarted, channel, creatingPayment, loading, orderPaymentDisabled, paymentStatus, redirected]);
 
   async function loadInitialData() {
     try {
@@ -151,62 +142,56 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
         return;
       }
 
-      const authHeaders = {
-        Authorization: `Bearer ${token}`,
-      };
+      const headers = { Authorization: `Bearer ${token}` };
 
-      if (mode === 'order' && orderId) {
-        const orderResponse = await fetch(`/api/orders/${orderId}`, {
-          headers: authHeaders,
+      if (orderPaymentDisabled && legacyOrderId) {
+        const orderResponse = await fetch(`/api/orders/${legacyOrderId}`, {
+          headers,
           cache: 'no-store',
         });
-        const orderResult = await parseJsonResponse<OrderInfo>(orderResponse);
+        const orderResult = await parseJsonResponse<any>(orderResponse);
 
         if (!orderResult.success || !orderResult.data) {
           setError(orderResult.error || '加载订单失败');
           return;
         }
 
-        const order = orderResult.data as any;
         setOrderInfo({
-          id: order.id,
-          totalPrice: Number(order.totalPrice || 0),
-          status: order.status,
+          id: orderResult.data.id,
+          totalPrice: Number(orderResult.data.totalPrice || 0),
+          status: orderResult.data.status,
         });
 
-        if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status)) {
+        return;
+      }
+
+      if (currentRechargeId) {
+        const rechargeResponse = await fetch(`/api/payment/recharge/${currentRechargeId}`, {
+          headers,
+          cache: 'no-store',
+        });
+        const rechargeResult = await parseJsonResponse<RechargeInfo>(rechargeResponse);
+
+        if (!rechargeResult.success || !rechargeResult.data) {
+          setError(rechargeResult.error || '加载充值单失败');
+          return;
+        }
+
+        setRechargeInfo(rechargeResult.data);
+
+        if (rechargeResult.data.status === 'success') {
           setPaymentStatus('success');
-          setPolling(true);
+          await continueAfterRecharge();
         }
+
+        return;
       }
 
-      if (mode === 'recharge') {
-        if (currentRechargeId) {
-          const rechargeResponse = await fetch(`/api/payment/recharge/${currentRechargeId}`, {
-            headers: authHeaders,
-            cache: 'no-store',
-          });
-          const rechargeResult = await parseJsonResponse<RechargeInfo>(rechargeResponse);
-
-          if (!rechargeResult.success || !rechargeResult.data) {
-            setError(rechargeResult.error || '加载充值单失败');
-            return;
-          }
-
-          setRechargeInfo(rechargeResult.data);
-
-          if (rechargeResult.data.status === 'success') {
-            setPaymentStatus('success');
-            setPolling(true);
-          }
-        } else if (rechargeAmount) {
-          setRechargeInfo({
-            id: '',
-            amount: Number(rechargeAmount || 0),
-            status: 'draft',
-          });
-        }
-      }
+      setRechargeInfo({
+        id: '',
+        amount: Number(rechargeAmount || 0),
+        status: 'draft',
+      });
     } catch (requestError: any) {
       setError(requestError.message || '加载支付页面失败');
     } finally {
@@ -214,51 +199,73 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
     }
   }
 
-  async function checkPaymentStatus() {
+  async function continueAfterRecharge() {
+    if (finalizingOrder) {
+      return;
+    }
+
+    if (!payOrderId) {
+      router.push('/user-center?tab=wallet');
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      setPaymentStatus('failed');
+      setError('充值成功，但登录状态已失效，请重新登录后查看订单');
+      return;
+    }
+
+    setFinalizingOrder(true);
     try {
-      const token = getToken();
-      if (!token) {
+      const payResponse = await fetch(`/api/orders/${payOrderId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'pay' }),
+      });
+      const payResult = await parseJsonResponse<any>(payResponse);
+
+      if (payResult.success || payResult.code === 'ORDER_ALREADY_PAID') {
+        router.push(`/orders/${payOrderId}`);
         return;
       }
 
-      if (mode === 'order' && orderId) {
-        const response = await fetch(`/api/orders/${orderId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
-        const result = await parseJsonResponse<any>(response);
+      setPaymentStatus('failed');
+      setError(payResult.error || '充值成功，但订单自动支付失败，请返回订单页重试');
+    } catch (autoPayError: any) {
+      setPaymentStatus('failed');
+      setError(autoPayError.message || '充值成功，但订单自动支付失败，请返回订单页重试');
+    } finally {
+      setFinalizingOrder(false);
+    }
+  }
 
-        if (
-          result.success
-          && result.data
-          && ['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(result.data.status)
-        ) {
-          setPolling(false);
-          setPaymentStatus('success');
-          router.push(`/orders/${orderId}`);
-        } else if (!result.success) {
-          setError(result.error || '检查订单支付状态失败');
-        }
+  async function checkPaymentStatus() {
+    try {
+      const token = getToken();
+      if (!token || !currentRechargeId) {
+        return;
       }
 
-      if (mode === 'recharge' && currentRechargeId) {
-        const response = await fetch(`/api/payment/recharge/${currentRechargeId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
-        const result = await parseJsonResponse<RechargeInfo & { transactionId?: string; failureReason?: string }>(response);
+      const response = await fetch(`/api/payment/recharge/${currentRechargeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const result = await parseJsonResponse<RechargeInfo & { failureReason?: string }>(response);
 
-        if (result.success && result.data?.status === 'success') {
-          setPolling(false);
-          setPaymentStatus('success');
-          router.push('/user-center?tab=wallet');
-        } else if (result.success && result.data?.status === 'failed') {
-          setPolling(false);
-          setPaymentStatus('failed');
-          setError(result.data.failureReason || '微信支付未成功，请重新发起支付');
-        } else if (!result.success) {
-          setError(result.error || '检查充值支付状态失败');
-        }
+      if (result.success && result.data?.status === 'success') {
+        setPolling(false);
+        setPaymentStatus('success');
+        await continueAfterRecharge();
+      } else if (result.success && result.data?.status === 'failed') {
+        setPolling(false);
+        setPaymentStatus('failed');
+        setError(result.data.failureReason || '微信支付未成功，请重新发起充值');
+      } else if (!result.success) {
+        setError(result.error || '检查充值状态失败');
       }
     } catch (statusError) {
       console.error('[WeChat External Payment] check payment status failed:', statusError);
@@ -276,51 +283,48 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
       setCreatingPayment(true);
       setError(null);
 
-      const endpoint = mode === 'order'
-        ? `/api/payment/wechat/${channel}/create`
-        : `/api/payment/wechat/${channel}/recharge/create`;
-      const payload = mode === 'order'
-        ? { orderId }
-        : { amount: Number(rechargeInfo?.amount || rechargeAmount || 0) };
-
-      const createResponse = await fetch(endpoint, {
+      const createResponse = await fetch(`/api/payment/wechat/${channel}/recharge/create`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          amount: Number(rechargeInfo?.amount || rechargeAmount || 0),
+        }),
       });
 
       const createResult = await parseJsonResponse<any>(createResponse);
       if (!createResult.success || !createResult.data) {
         setPaymentStatus('failed');
-        setError(createResult.error || '创建支付失败');
+        setError(createResult.message || createResult.error || '创建充值支付失败');
         return;
       }
 
-      if (mode === 'recharge' && createResult.data.rechargeId) {
-        setRechargeInfo((current) => ({
-          id: createResult.data.rechargeId,
-          amount: Number(createResult.data.amount || current?.amount || 0),
-          status: 'pending',
-        }));
+      const nextRechargeId = createResult.data.rechargeId || currentRechargeId;
+      if (nextRechargeId) {
+        setCurrentRechargeId(nextRechargeId);
       }
 
+      setRechargeInfo((current) => ({
+        id: nextRechargeId || '',
+        amount: Number(createResult.data.amount || current?.amount || rechargeAmount || 0),
+        status: 'pending',
+      }));
+
       if (channel === 'h5') {
-        const nextRechargeId = createResult.data.rechargeId || currentRechargeId;
         const redirectParams = new URLSearchParams();
-        if (orderId) {
-          redirectParams.set('orderId', orderId);
-        }
         if (nextRechargeId) {
           redirectParams.set('rechargeId', nextRechargeId);
         }
+        if (payOrderId) {
+          redirectParams.set('payOrderId', payOrderId);
+        }
         redirectParams.set('redirected', '1');
+
         const redirectUrl = `${window.location.origin}/payment/wechat/h5?${redirectParams.toString()}`;
         const nextExternalUrl = appendRedirectUrl(createResult.data.mwebUrl, redirectUrl);
         setExternalUrl(nextExternalUrl);
-        setCurrentRechargeId(nextRechargeId || '');
 
         if (nextRechargeId) {
           window.history.replaceState({}, '', `/payment/wechat/h5?${redirectParams.toString()}`);
@@ -333,10 +337,13 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
       }
 
       if (channel === 'native') {
-        const nextRechargeId = createResult.data.rechargeId || currentRechargeId;
         if (nextRechargeId) {
-          setCurrentRechargeId(nextRechargeId);
-          window.history.replaceState({}, '', `/payment/wechat/native?rechargeId=${nextRechargeId}`);
+          const nativeParams = new URLSearchParams();
+          nativeParams.set('rechargeId', nextRechargeId);
+          if (payOrderId) {
+            nativeParams.set('payOrderId', payOrderId);
+          }
+          window.history.replaceState({}, '', `/payment/wechat/native?${nativeParams.toString()}`);
         }
 
         setCodeUrl(createResult.data.codeUrl);
@@ -344,18 +351,16 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
       }
     } catch (payRequestError: any) {
       setPaymentStatus('failed');
-      setError(payRequestError.message || '发起支付失败');
+      setError(payRequestError.message || '发起充值失败');
     } finally {
       setCreatingPayment(false);
     }
   }
 
-  const title = channel === 'h5'
-    ? (mode === 'order' ? '微信 H5 订单支付' : '微信 H5 充值')
-    : (mode === 'order' ? '微信扫码订单支付' : '微信扫码充值');
+  const title = channel === 'h5' ? '微信 H5 充值' : '微信扫码充值';
   const description = channel === 'h5'
-    ? '将自动跳转到微信支付页面，请在手机微信中完成支付。'
-    : '请使用微信扫一扫完成支付，支付成功后会自动刷新状态。';
+    ? '系统会拉起微信支付完成钱包充值。'
+    : '请使用微信扫描二维码完成钱包充值。';
 
   if (loading) {
     return (
@@ -389,6 +394,42 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
     );
   }
 
+  if (orderPaymentDisabled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white px-4 py-12">
+        <div className="mx-auto max-w-md">
+          <Card>
+            <CardHeader>
+              <CardTitle>订单支付已切换为余额支付</CardTitle>
+              <CardDescription>微信支付现在只用于钱包充值，订单不能再直接拉起微信支付。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>请先充值</AlertTitle>
+                <AlertDescription>先充值到钱包余额，再回订单页点击“立即支付”。</AlertDescription>
+              </Alert>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-2 text-sm text-slate-500">订单金额</div>
+                <div className="text-3xl font-bold text-slate-900">¥{amount.toFixed(2)}</div>
+              </div>
+
+              <div className="grid gap-2">
+                <Button className="w-full" onClick={() => router.push('/user-center?tab=wallet')}>
+                  前往钱包充值
+                </Button>
+                <Button className="w-full" variant="outline" onClick={() => router.push(legacyOrderId ? `/orders/${legacyOrderId}` : '/orders')}>
+                  返回订单页
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-12 px-4">
       <div className="max-w-md mx-auto space-y-6">
@@ -397,10 +438,12 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
             <CardContent className="pt-6">
               <div className="text-center">
                 <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">支付成功</h2>
-                <p className="text-slate-600 mb-6">正在跳转到结果页面...</p>
-                <Button onClick={() => router.push(mode === 'order' && orderId ? `/orders/${orderId}` : '/user-center?tab=wallet')} className="w-full">
-                  {mode === 'order' ? '查看订单' : '返回钱包'}
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">充值成功</h2>
+                <p className="text-slate-600 mb-6">
+                  {payOrderId ? '正在自动支付当前订单，完成后会自动跳转。' : '正在跳转回钱包页面...'}
+                </p>
+                <Button onClick={() => router.push(payOrderId ? `/orders/${payOrderId}` : '/user-center?tab=wallet')} className="w-full">
+                  {payOrderId ? '返回订单页' : '返回钱包'}
                 </Button>
               </div>
             </CardContent>
@@ -418,7 +461,7 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
                 <Alert>
                   <Smartphone className="h-4 w-4" />
                   <AlertTitle>手机浏览器支付</AlertTitle>
-                  <AlertDescription>适合微信外打开的手机浏览器，系统会跳转到微信完成支付。</AlertDescription>
+                  <AlertDescription>适用于微信外打开的手机浏览器，系统会跳转到微信完成充值。</AlertDescription>
                 </Alert>
               )}
 
@@ -434,12 +477,20 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
                 <Alert>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <AlertTitle>正在确认支付状态</AlertTitle>
-                  <AlertDescription>微信支付完成后，这里会自动刷新并跳转。</AlertDescription>
+                  <AlertDescription>{payOrderId ? '微信充值成功后，系统会自动补扣订单并跳转。' : '微信支付完成后，这里会自动刷新并跳转。'}</AlertDescription>
+                </Alert>
+              )}
+
+              {finalizingOrder && payOrderId && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertTitle>正在自动支付订单</AlertTitle>
+                  <AlertDescription>充值已到账，系统正在自动完成订单支付。</AlertDescription>
                 </Alert>
               )}
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm text-slate-500 mb-2">{mode === 'order' ? '订单金额' : '充值金额'}</div>
+                <div className="text-sm text-slate-500 mb-2">充值金额</div>
                 <div className="text-3xl font-bold text-slate-900">¥{amount.toFixed(2)}</div>
               </div>
 
@@ -448,7 +499,7 @@ function ExternalWechatPaymentContent({ channel }: { channel: ExternalWechatChan
                   <div className="mx-auto flex w-fit items-center justify-center rounded-lg border bg-white p-3">
                     <QRCode value={codeUrl} size={220} />
                   </div>
-                  <p className="mt-4 text-center text-sm text-slate-500">请使用微信扫一扫完成支付</p>
+                  <p className="mt-4 text-center text-sm text-slate-500">请使用微信扫码完成充值</p>
                 </div>
               )}
 

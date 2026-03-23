@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import type { User } from '@/lib/user-service';
 import { checkWechatPayConfig } from '@/lib/wechat/config';
 import { getAuthenticatedPaymentUser } from '@/lib/wechat/payment-flow';
-import { createWechatOrderPayment, createWechatRechargePayment, type WechatPaymentChannel } from '@/lib/wechat/payment-request';
+import { createWechatRechargePayment, type WechatPaymentChannel } from '@/lib/wechat/payment-request';
 
 export async function requireWechatPaymentUser(request: NextRequest) {
   const user = await getAuthenticatedPaymentUser(request);
@@ -41,7 +41,8 @@ export async function createOrderWechatPayment(params: {
   channel: WechatPaymentChannel;
   openid?: string;
 }) {
-  return createWechatOrderPayment(params);
+  void params;
+  throw new Error('ORDER_WECHAT_PAYMENT_DISABLED');
 }
 
 export async function createRechargeWechatPayment(params: {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveWechatWithdrawalOpenid, verifyToken } from '@/lib/user-service';
+import { desc, eq } from 'drizzle-orm';
+import { db, withdrawals } from '@/lib/db';
+import { reconcileRecentWechatWithdrawals } from '@/lib/withdrawal-service';
 import { getUserBalance, requestWithdrawal } from '@/lib/user-balance-service';
+import { resolveWechatWithdrawalOpenid, verifyToken } from '@/lib/user-service';
 
 function mapWithdrawalMessage(message: string) {
   switch (message) {
@@ -11,11 +14,15 @@ function mapWithdrawalMessage(message: string) {
     case 'INSUFFICIENT_AVAILABLE_BALANCE':
       return '提现金额超过可用余额';
     case 'NON_WITHDRAWABLE_BALANCE_LIMIT':
-      return '当前可用余额中包含测试充值金额，测试充值不可提现';
+      return '当前可用余额中包含测试充值金额，测试充值金额不可提现';
     case 'WITHDRAWAL_CREATED':
       return '提现申请已提交，等待审核';
+    case 'WITHDRAWAL_PROCESSING':
+      return '提现已发起，微信零钱处理中';
     case 'WITHDRAWAL_APPROVED':
-      return '提现申请已通过';
+      return '提现已到账';
+    case 'WITHDRAWAL_FAILED':
+      return '微信提现失败，余额已退回';
     case 'WITHDRAWAL_REQUEST_FAILED':
       return '提现申请失败，请稍后重试';
     default:
@@ -83,6 +90,8 @@ export async function POST(request: NextRequest) {
         amount: result.amount,
         fee: result.fee,
         actualAmount: result.actualAmount,
+        status: result.status || 'pending',
+        thirdPartyTransactionId: result.thirdPartyTransactionId || null,
       },
     });
   } catch (error: any) {
@@ -109,8 +118,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: '登录已过期' }, { status: 401 });
     }
 
-    const { db, withdrawals } = await import('@/lib/db');
-    const { desc, eq } = await import('drizzle-orm');
+    await reconcileRecentWechatWithdrawals({
+      userId: user.id,
+      limit: 10,
+    });
+
     const withdrawalList = await db
       .select()
       .from(withdrawals)

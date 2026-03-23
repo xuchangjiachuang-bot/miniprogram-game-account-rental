@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service';
@@ -12,6 +12,20 @@ import { getServerUserId } from '@/lib/server-auth';
 import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 import { reconcileWechatOrderStatus } from '@/lib/wechat/payment-flow';
 import { notifySellerAfterOrderPaid } from '@/lib/seller-order-reminder-service';
+
+class OrderPayError extends Error {
+  code: string;
+  availableBalance?: number;
+  requiredAmount?: number;
+
+  constructor(code: string, message: string, details?: { availableBalance?: number; requiredAmount?: number }) {
+    super(message);
+    this.name = 'OrderPayError';
+    this.code = code;
+    this.availableBalance = details?.availableBalance;
+    this.requiredAmount = details?.requiredAmount;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -126,22 +140,49 @@ export async function POST(
       const now = new Date().toISOString();
       const endTime = new Date(Date.now() + rentalHours * 60 * 60 * 1000).toISOString();
 
-      const payResult = await db.transaction(async (tx) => {
-        const [balance] = await tx
-          .select()
-          .from(userBalances)
-          .where(eq(userBalances.userId, userId))
-          .limit(1);
+      try {
+        await db.transaction(async (tx) => {
+        await tx
+          .insert(userBalances)
+          .values({
+            id: crypto.randomUUID(),
+            userId,
+            availableBalance: '0',
+            frozenBalance: '0',
+            totalWithdrawn: '0',
+            totalEarned: '0',
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoNothing({ target: userBalances.userId });
 
-        const availableBalance = Number(balance?.availableBalance || 0);
-        const frozenBalance = Number(balance?.frozenBalance || 0);
-        if (availableBalance < totalAmount) {
-          return {
-            success: false as const,
-            reason: 'INSUFFICIENT_AVAILABLE_BALANCE',
-            availableBalance,
+        const updatedBalances = await tx
+          .update(userBalances)
+          .set({
+            availableBalance: sql`${userBalances.availableBalance} - ${totalAmount.toFixed(2)}`,
+            frozenBalance: sql`${userBalances.frozenBalance} + ${depositAmount.toFixed(2)}`,
+            updatedAt: now,
+          })
+          .where(and(
+            eq(userBalances.userId, userId),
+            sql`${userBalances.availableBalance} >= ${totalAmount.toFixed(2)}`,
+          ))
+          .returning({
+            availableBalance: userBalances.availableBalance,
+            frozenBalance: userBalances.frozenBalance,
+          });
+
+        if (updatedBalances.length === 0) {
+          const [latestBalance] = await tx
+            .select()
+            .from(userBalances)
+            .where(eq(userBalances.userId, userId))
+            .limit(1);
+
+          throw new OrderPayError('INSUFFICIENT_AVAILABLE_BALANCE', '余额不足', {
+            availableBalance: Number(latestBalance?.availableBalance || 0),
             requiredAmount: totalAmount,
-          };
+          });
         }
 
         const claimedOrders = await tx
@@ -158,20 +199,13 @@ export async function POST(
           .returning({ id: orders.id });
 
         if (claimedOrders.length === 0) {
-          return {
-            success: false as const,
-            reason: 'ORDER_ALREADY_PAID',
-          };
+          throw new OrderPayError('ORDER_ALREADY_PAID', '订单已支付，请勿重复提交');
         }
 
-        await tx
-          .update(userBalances)
-          .set({
-            availableBalance: (availableBalance - totalAmount).toFixed(2),
-            frozenBalance: (frozenBalance + depositAmount).toFixed(2),
-            updatedAt: now,
-          })
-          .where(eq(userBalances.userId, userId));
+        const newAvailableBalance = Number(updatedBalances[0].availableBalance || 0);
+        const newFrozenBalance = Number(updatedBalances[0].frozenBalance || 0);
+        const availableBalance = newAvailableBalance + totalAmount;
+        const frozenBalance = newFrozenBalance - depositAmount;
 
         await tx.insert(balanceTransactions).values({
           id: crypto.randomUUID(),
@@ -225,6 +259,16 @@ export async function POST(
             createdAt: now,
             updatedAt: now,
           });
+        } else {
+          await tx
+            .update(paymentRecords)
+            .set({
+              amount: totalAmount.toFixed(2),
+              status: 'success',
+              failureReason: null,
+              updatedAt: now,
+            })
+            .where(eq(paymentRecords.id, existingPayment.id));
         }
 
         await tx
@@ -252,27 +296,29 @@ export async function POST(
             frozenBalanceAfter: frozenBalance + depositAmount,
           },
         }, tx);
+        });
+      } catch (error) {
+        if (error instanceof OrderPayError) {
+          if (error.code === 'ORDER_ALREADY_PAID') {
+            return NextResponse.json({
+              success: false,
+              error: '订单已支付，请勿重复提交',
+              code: error.code,
+            }, { status: 409 });
+          }
 
-        return { success: true as const };
-      });
-      if (!payResult.success) {
-        if (payResult.reason === 'ORDER_ALREADY_PAID') {
           return NextResponse.json({
             success: false,
-            error: '订单已支付，请勿重复提交',
-            code: payResult.reason,
-          }, { status: 409 });
+            error: '余额不足',
+            code: error.code,
+            data: {
+              availableBalance: error.availableBalance,
+              requiredAmount: error.requiredAmount,
+            },
+          }, { status: 400 });
         }
 
-        return NextResponse.json({
-          success: false,
-          error: '余额不足',
-          code: payResult.reason,
-          data: {
-            availableBalance: payResult.availableBalance,
-            requiredAmount: payResult.requiredAmount,
-          },
-        }, { status: 400 });
+        throw error;
       }
 
       const groupChat = await ensureOrderGroupChat(order.id);

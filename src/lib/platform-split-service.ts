@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   accounts,
   balanceTransactions,
@@ -10,6 +10,7 @@ import {
 } from './db';
 import { getEffectiveCommissionRate } from './commission-activity-service';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
+import { lockOrderFinanceScope } from './finance-lock-service';
 import { getApprovedConsumptionSummary } from './order-consumption-service';
 
 export interface SplitResult {
@@ -29,78 +30,79 @@ function buildSellerIncomeDescription(params: {
   sellerIncome: number;
 }) {
   const parts = [
-    `订单 ${params.orderNo} 租金到账`,
-    `租金￥${params.rentalPrice.toFixed(2)}`,
-    `平台服务费 ${params.commissionRate.toFixed(2)}% ￥${params.platformCommission.toFixed(2)}`,
+    `Order ${params.orderNo} rental settlement`,
+    `rental ${params.rentalPrice.toFixed(2)}`,
+    `platform fee ${params.commissionRate.toFixed(2)}% = ${params.platformCommission.toFixed(2)}`,
   ];
 
   if (params.depositDeductedAmount > 0) {
-    parts.push(`资源消耗赔付￥${params.depositDeductedAmount.toFixed(2)}`);
+    parts.push(`consumption deduction ${params.depositDeductedAmount.toFixed(2)}`);
   }
 
-  parts.push(`实际到账￥${params.sellerIncome.toFixed(2)}`);
-  return parts.join('，');
+  parts.push(`net income ${params.sellerIncome.toFixed(2)}`);
+  return parts.join(', ');
 }
 
 export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
   try {
-    const orderList = await db.select().from(orders).where(eq(orders.id, orderId));
-    const order = orderList[0];
+    return await db.transaction(async (tx) => {
+      await lockOrderFinanceScope(
+        tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+        orderId,
+      );
 
-    if (!order) {
-      return {
-        success: false,
-        message: '订单不存在',
-        platformCommission: 0,
-        sellerIncome: 0,
-        buyerRefund: 0,
-      };
-    }
+      const orderList = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+      const order = orderList[0];
 
-    if (order.status !== 'completed') {
-      return {
-        success: false,
-        message: `订单状态不正确，当前状态：${order.status}`,
-        platformCommission: 0,
-        sellerIncome: 0,
-        buyerRefund: 0,
-      };
-    }
+      if (!order) {
+        return {
+          success: false,
+          message: 'ORDER_NOT_FOUND',
+          platformCommission: 0,
+          sellerIncome: 0,
+          buyerRefund: 0,
+        };
+      }
 
-    if (order.isSettled) {
-      return {
-        success: false,
-        message: '订单已经结算',
-        platformCommission: 0,
-        sellerIncome: 0,
-        buyerRefund: 0,
-      };
-    }
+      if (order.status !== 'completed') {
+        return {
+          success: false,
+          message: `ORDER_STATUS_INVALID:${order.status}`,
+          platformCommission: 0,
+          sellerIncome: 0,
+          buyerRefund: 0,
+        };
+      }
 
-    const settingsList = await db.select().from(platformSettings);
-    const settings = settingsList[0] || { commissionRate: 5 };
+      if (order.isSettled) {
+        return {
+          success: true,
+          message: 'ORDER_ALREADY_SETTLED',
+          platformCommission: Number(order.platformFee) || 0,
+          sellerIncome: Number(order.sellerIncome) || 0,
+          buyerRefund: Number(order.deposit || 0),
+        };
+      }
 
-    const baseCommissionRate = Number(settings.commissionRate) || 5;
-    const { effectiveRate: commissionRate } = await getEffectiveCommissionRate(baseCommissionRate);
+      const settingsList = await tx.select().from(platformSettings);
+      const settings = settingsList[0] || { commissionRate: 5 };
+      const baseCommissionRate = Number(settings.commissionRate) || 5;
+      const { effectiveRate: commissionRate } = await getEffectiveCommissionRate(baseCommissionRate);
 
-    const rentalPrice = Number(order.rentalPrice) || 0;
-    const deposit = Number(order.deposit) || 0;
-    const consumptionSummary = await getApprovedConsumptionSummary(orderId);
-    const depositDeductedAmount = consumptionSummary.depositDeductedAmount || 0;
-    const platformCommission = rentalPrice * (commissionRate / 100);
-    const sellerIncome = rentalPrice - platformCommission + depositDeductedAmount;
-    const buyerRefund = order.paymentMethod === 'wallet'
-      ? Math.max(0, deposit - depositDeductedAmount)
-      : 0;
-
-    await db.transaction(async (tx) => {
+      const rentalPrice = Number(order.rentalPrice) || 0;
+      const deposit = Number(order.deposit) || 0;
+      const consumptionSummary = await getApprovedConsumptionSummary(orderId);
+      const depositDeductedAmount = consumptionSummary.depositDeductedAmount || 0;
+      const platformCommission = rentalPrice * (commissionRate / 100);
+      const sellerIncome = rentalPrice - platformCommission + depositDeductedAmount;
+      const buyerRefund = Math.max(0, deposit - depositDeductedAmount);
       const now = new Date().toISOString();
 
       await tx
         .update(orders)
         .set({
-          platformFee: platformCommission.toString(),
-          sellerIncome: sellerIncome.toString(),
+          platformFee: platformCommission.toFixed(2),
+          sellerIncome: sellerIncome.toFixed(2),
           isSettled: true,
           settledAt: now,
           updatedAt: now,
@@ -115,84 +117,107 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         })
         .where(eq(accounts.id, order.accountId));
 
-      const sellerBalances = await tx
-        .select()
-        .from(userBalances)
-        .where(eq(userBalances.userId, order.sellerId));
-
-      if (sellerBalances.length > 0) {
-        const oldBalance = Number(sellerBalances[0].availableBalance) || 0;
-        const oldTotalEarned = Number(sellerBalances[0].totalEarned) || 0;
-        const newBalance = oldBalance + sellerIncome;
-        const newTotalEarned = oldTotalEarned + sellerIncome;
-
-        await tx
-          .update(userBalances)
-          .set({
-            availableBalance: newBalance.toFixed(2),
-            totalEarned: newTotalEarned.toFixed(2),
-            updatedAt: now,
-          })
-          .where(eq(userBalances.userId, order.sellerId));
-
-        await tx.insert(balanceTransactions).values({
+      await tx
+        .insert(userBalances)
+        .values({
           id: crypto.randomUUID(),
           userId: order.sellerId,
-          orderId,
-          transactionType: 'rental_income',
-          amount: sellerIncome.toFixed(2),
-          balanceBefore: oldBalance.toFixed(2),
-          balanceAfter: newBalance.toFixed(2),
-          description: buildSellerIncomeDescription({
-            orderNo: order.orderNo,
-            rentalPrice,
-            commissionRate,
-            platformCommission,
-            depositDeductedAmount,
-            sellerIncome,
-          }),
+          availableBalance: '0',
+          frozenBalance: '0',
+          totalWithdrawn: '0',
+          totalEarned: '0',
           createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({ target: userBalances.userId });
+
+      const sellerBalanceRows = await tx
+        .update(userBalances)
+        .set({
+          availableBalance: sql`${userBalances.availableBalance} + ${sellerIncome.toFixed(2)}`,
+          totalEarned: sql`${userBalances.totalEarned} + ${sellerIncome.toFixed(2)}`,
+          updatedAt: now,
+        })
+        .where(eq(userBalances.userId, order.sellerId))
+        .returning({
+          availableBalance: userBalances.availableBalance,
         });
 
-        await safeLogFinanceAuditEvent({
-          eventType: 'order_split_seller_income',
-          status: 'success',
-          userId: order.sellerId,
-          orderId,
-          amount: sellerIncome,
-          balanceBefore: oldBalance,
-          balanceAfter: newBalance,
-          details: {
-            orderNo: order.orderNo,
-            commissionRate,
-            depositDeductedAmount,
-          },
-        }, tx);
+      if (sellerBalanceRows.length === 0) {
+        throw new Error('SELLER_BALANCE_NOT_FOUND');
       }
 
-      const shouldHandleBuyerDeposit = order.paymentMethod === 'wallet' && deposit > 0;
-      const buyerBalances = shouldHandleBuyerDeposit
-        ? await tx
-          .select()
-          .from(userBalances)
-          .where(eq(userBalances.userId, order.buyerId))
-        : [];
+      const sellerBalanceAfter = Number(sellerBalanceRows[0].availableBalance || 0);
+      const sellerBalanceBefore = sellerBalanceAfter - sellerIncome;
 
-      if (buyerBalances.length > 0) {
-        const oldFrozen = Number(buyerBalances[0].frozenBalance) || 0;
-        const oldAvailable = Number(buyerBalances[0].availableBalance) || 0;
-        const releasedFrozen = Math.min(oldFrozen, deposit);
-        const newFrozen = Math.max(0, oldFrozen - releasedFrozen);
-        const newAvailable = oldAvailable + buyerRefund;
+      await tx.insert(balanceTransactions).values({
+        id: crypto.randomUUID(),
+        userId: order.sellerId,
+        orderId,
+        transactionType: 'rental_income',
+        amount: sellerIncome.toFixed(2),
+        balanceBefore: sellerBalanceBefore.toFixed(2),
+        balanceAfter: sellerBalanceAfter.toFixed(2),
+        description: buildSellerIncomeDescription({
+          orderNo: order.orderNo,
+          rentalPrice,
+          commissionRate,
+          platformCommission,
+          depositDeductedAmount,
+          sellerIncome,
+        }),
+        createdAt: now,
+      });
 
+      await safeLogFinanceAuditEvent({
+        eventType: 'order_split_seller_income',
+        status: 'success',
+        userId: order.sellerId,
+        orderId,
+        amount: sellerIncome,
+        balanceBefore: sellerBalanceBefore,
+        balanceAfter: sellerBalanceAfter,
+        details: {
+          orderNo: order.orderNo,
+          commissionRate,
+          depositDeductedAmount,
+        },
+      }, tx);
+
+      if (deposit > 0) {
         await tx
-          .update(userBalances)
-          .set({
-            frozenBalance: newFrozen.toFixed(2),
-            availableBalance: newAvailable.toFixed(2),
+          .insert(userBalances)
+          .values({
+            id: crypto.randomUUID(),
+            userId: order.buyerId,
+            availableBalance: '0',
+            frozenBalance: '0',
+            totalWithdrawn: '0',
+            totalEarned: '0',
+            createdAt: now,
             updatedAt: now,
           })
-          .where(eq(userBalances.userId, order.buyerId));
+          .onConflictDoNothing({ target: userBalances.userId });
+
+        const buyerBalanceRows = await tx
+          .update(userBalances)
+          .set({
+            frozenBalance: sql`GREATEST(${userBalances.frozenBalance} - ${deposit.toFixed(2)}, 0)`,
+            availableBalance: sql`${userBalances.availableBalance} + ${buyerRefund.toFixed(2)}`,
+            updatedAt: now,
+          })
+          .where(eq(userBalances.userId, order.buyerId))
+          .returning({
+            availableBalance: userBalances.availableBalance,
+            frozenBalance: userBalances.frozenBalance,
+          });
+
+        if (buyerBalanceRows.length === 0) {
+          throw new Error('BUYER_BALANCE_NOT_FOUND');
+        }
+
+        const buyerAvailableAfter = Number(buyerBalanceRows[0].availableBalance || 0);
+        const buyerAvailableBefore = buyerAvailableAfter - buyerRefund;
 
         if (buyerRefund > 0) {
           await tx.insert(balanceTransactions).values({
@@ -201,9 +226,9 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
             orderId,
             transactionType: 'deposit_refund',
             amount: buyerRefund.toFixed(2),
-            balanceBefore: oldAvailable.toFixed(2),
-            balanceAfter: newAvailable.toFixed(2),
-            description: `订单 ${order.orderNo} 押金退还`,
+            balanceBefore: buyerAvailableBefore.toFixed(2),
+            balanceAfter: buyerAvailableAfter.toFixed(2),
+            description: `Order ${order.orderNo} deposit refund`,
             createdAt: now,
           });
         }
@@ -215,9 +240,9 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
             orderId,
             transactionType: 'deposit_consumption_deduction',
             amount: depositDeductedAmount.toFixed(2),
-            balanceBefore: oldAvailable.toFixed(2),
-            balanceAfter: oldAvailable.toFixed(2),
-            description: `订单 ${order.orderNo} 资源消耗扣除押金￥${depositDeductedAmount.toFixed(2)}`,
+            balanceBefore: buyerAvailableAfter.toFixed(2),
+            balanceAfter: buyerAvailableAfter.toFixed(2),
+            description: `Order ${order.orderNo} consumption deduction ${depositDeductedAmount.toFixed(2)}`,
             createdAt: now,
           });
         }
@@ -228,11 +253,10 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           userId: order.buyerId,
           orderId,
           amount: buyerRefund,
-          balanceBefore: oldAvailable,
-          balanceAfter: newAvailable,
+          balanceBefore: buyerAvailableBefore,
+          balanceAfter: buyerAvailableAfter,
           details: {
             orderNo: order.orderNo,
-            releasedFrozen,
             depositDeductedAmount,
           },
         }, tx);
@@ -245,7 +269,7 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           orderNo: order.orderNo,
           receiverType: 'seller',
           receiverId: order.sellerId,
-          receiverName: '卖家',
+          receiverName: 'seller',
           splitAmount: depositDeductedAmount.toFixed(2),
           splitRatio: '100.00',
           commissionType: 'consumption_deduction',
@@ -262,7 +286,7 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         orderNo: order.orderNo,
         receiverType: 'seller',
         receiverId: order.sellerId,
-        receiverName: '卖家',
+        receiverName: 'seller',
         splitAmount: sellerIncome.toFixed(2),
         splitRatio: rentalPrice > 0 ? ((sellerIncome / rentalPrice) * 100).toFixed(2) : '0.00',
         commissionType: 'rental_income',
@@ -278,7 +302,7 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         orderNo: order.orderNo,
         receiverType: 'platform',
         receiverId: 'platform',
-        receiverName: '平台',
+        receiverName: 'platform',
         splitAmount: platformCommission.toFixed(2),
         splitRatio: commissionRate.toFixed(2),
         commissionType: 'platform_fee',
@@ -295,7 +319,7 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           orderNo: order.orderNo,
           receiverType: 'buyer',
           receiverId: order.buyerId,
-          receiverName: '买家',
+          receiverName: 'buyer',
           splitAmount: buyerRefund.toFixed(2),
           splitRatio: '100.00',
           commissionType: 'deposit_refund',
@@ -320,20 +344,20 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
           paymentMethod: order.paymentMethod || null,
         },
       }, tx);
-    });
 
-    return {
-      success: true,
-      message: '结算成功',
-      platformCommission,
-      sellerIncome,
-      buyerRefund,
-    };
+      return {
+        success: true,
+        message: 'SETTLEMENT_SUCCESS',
+        platformCommission,
+        sellerIncome,
+        buyerRefund,
+      };
+    });
   } catch (error: any) {
-    console.error('执行结算失败:', error);
+    console.error('executeAutoSplit failed:', error);
     return {
       success: false,
-      message: error.message || '结算失败',
+      message: error.message || 'SETTLEMENT_FAILED',
       platformCommission: 0,
       sellerIncome: 0,
       buyerRefund: 0,
@@ -343,13 +367,13 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
 
 export async function getSplitStatus(orderId: string) {
   try {
-    const orderList = await db.select().from(orders).where(eq(orders.id, orderId));
+    const orderList = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     const order = orderList[0];
 
     if (!order) {
       return {
         success: false,
-        message: '订单不存在',
+        message: 'ORDER_NOT_FOUND',
       };
     }
 
@@ -369,7 +393,7 @@ export async function getSplitStatus(orderId: string) {
   } catch (error: any) {
     return {
       success: false,
-      message: error.message || '查询结算状态失败',
+      message: error.message || 'GET_SPLIT_STATUS_FAILED',
     };
   }
 }

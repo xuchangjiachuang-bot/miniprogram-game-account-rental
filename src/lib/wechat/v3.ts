@@ -9,6 +9,7 @@ export interface WechatPayV3Config {
   mpAppId: string;
   mpSecret: string;
   notifyUrl: string;
+  transferNotifyUrl: string;
   apiV3Key: string;
   serialNo: string;
   privateKey: string;
@@ -132,6 +133,32 @@ function getRuntimeEnv(key: string) {
   return process.env[key];
 }
 
+function normalizeBaseUrl(raw?: string | null) {
+  if (!raw) {
+    return '';
+  }
+
+  try {
+    return new URL(raw).origin.replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function resolveTransferNotifyUrl() {
+  const explicitUrl = getRuntimeEnv('WECHAT_PAY_TRANSFER_NOTIFY_URL');
+  if (explicitUrl?.trim()) {
+    return explicitUrl.trim();
+  }
+
+  const baseUrl =
+    normalizeBaseUrl(getRuntimeEnv('NEXT_PUBLIC_BASE_URL')) ||
+    normalizeBaseUrl(getRuntimeEnv('NEXT_PUBLIC_APP_URL')) ||
+    'https://hfb.yugioh.top';
+
+  return `${baseUrl}/api/payment/wechat/transfer/callback`;
+}
+
 function stripWrappingQuotes(value: string) {
   const trimmed = value.trim();
   if (
@@ -224,6 +251,7 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     mpAppId,
     mpSecret,
     notifyUrl,
+    transferNotifyUrl,
     apiV3Key,
     serialNo,
     privateKey,
@@ -248,6 +276,7 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     getConfiguredValue([
       getRuntimeEnv('WECHAT_PAY_NOTIFY_URL'),
     ], 'https://hfb.yugioh.top/api/payment/wechat/jsapi/callback'),
+    resolveTransferNotifyUrl(),
     getConfiguredValue([
       getRuntimeEnv('WECHAT_PAY_API_V3_KEY'),
     ]),
@@ -283,6 +312,7 @@ export async function getWechatPayV3Config(): Promise<WechatPayV3Config> {
     mpAppId,
     mpSecret,
     notifyUrl,
+    transferNotifyUrl,
     apiV3Key,
     serialNo,
     privateKey: normalizeMultilineSecret(privateKey, 'PRIVATE KEY'),
@@ -701,6 +731,21 @@ export async function queryTransactionByOutTradeNo(outTradeNo: string) {
   );
 }
 
+export async function closeTransactionByOutTradeNo(outTradeNo: string) {
+  const config = await getWechatPayV3Config();
+  const encodedOutTradeNo = encodeURIComponent(outTradeNo);
+
+  return sendWechatPayRequest<Record<string, never>>(
+    'POST',
+    `/v3/pay/transactions/out-trade-no/${encodedOutTradeNo}/close`,
+    {
+      body: {
+        mchid: config.mchid,
+      },
+    }
+  );
+}
+
 export async function buildJsapiPaymentParams(prepayId: string, appId?: string) {
   const config = await getWechatPayV3Config();
   const finalAppId = appId || config.mpAppId || config.appid;
@@ -795,7 +840,7 @@ export async function createTransferBill(params: CreateTransferBillParams) {
     openid: params.openid,
     transfer_amount: params.transferAmountFen,
     transfer_remark: params.transferRemark,
-    notify_url: params.notifyUrl || config.notifyUrl,
+    notify_url: params.notifyUrl || config.transferNotifyUrl,
     transfer_scene_report_infos: buildTransferSceneReportInfos(config),
   };
 
@@ -825,6 +870,7 @@ export async function queryTransferBill(outBillNo: string) {
     out_bill_no: string;
     transfer_bill_no: string;
     state: string;
+    package_info?: string;
     fail_reason?: string;
     update_time?: string;
   }>('GET', `/v3/fund-app/mch-transfer/transfer-bills/out-bill-no/${outBillNo}`);

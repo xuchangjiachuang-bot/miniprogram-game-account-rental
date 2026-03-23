@@ -82,5 +82,20 @@ export async function ensureSchemaCompatibility() {
     WHERE require_withdrawal_manual_review IS NULL;
   `);
 
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS payment_records_order_type_method_idx
+      ON payment_records(order_id, type, method);
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS payment_records_third_party_order_id_idx
+      ON payment_records(third_party_order_id);
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS split_records_order_id_idx
+      ON split_records(order_id);
+  `);
+
   schemaCompatibilityReady = true;
 }

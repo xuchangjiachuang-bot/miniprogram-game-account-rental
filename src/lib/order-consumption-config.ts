@@ -33,11 +33,14 @@ function normalizeCatalogItem(item: unknown, index: number): OrderConsumptionCat
     return null;
   }
 
+  const rawPrice = record.price ?? record.unitPrice ?? record.unit_price;
+  const rawUnitLabel = record.unitLabel ?? record.unit_label ?? '个';
+
   return {
     id: String(record.id || `catalog-${index + 1}`),
     name,
-    price: Math.max(0, Number(toNumber(record.price).toFixed(2))),
-    unitLabel: String(record.unitLabel || '个').trim() || '个',
+    price: Math.max(0, Number(toNumber(rawPrice).toFixed(2))),
+    unitLabel: String(rawUnitLabel).trim() || '个',
     enabled: record.enabled !== false,
   };
 }

@@ -297,7 +297,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     );
   }, [order?.status]);
 
-  const showLoginCard = !!order && ['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'completed'].includes(order.status);
+  const showLoginCard = !!order && ['active', 'pending_verification', 'pending_consumption_confirm', 'disputed', 'completed'].includes(order.status);
 
   useEffect(() => {
     if (!showLoginCard || loginInfoLoaded || loadingLoginInfo) {
@@ -402,7 +402,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       }
 
       if (result.code === 'INSUFFICIENT_AVAILABLE_BALANCE') {
-        window.location.href = buildWechatPaymentHrefForCurrentEnv({ orderId: order.id });
+        const requiredAmount = Number(result.data?.requiredAmount || order.totalPrice || order.total_price || 0);
+        const availableBalance = Number(result.data?.availableBalance || 0);
+        const missingAmount = Math.max(0, requiredAmount - availableBalance);
+        if (missingAmount <= 0) {
+          throw new Error('余额不足，请稍后重试');
+        }
+
+        toast.error(`余额不足，正在拉起微信补差额 ¥${missingAmount.toFixed(2)}`);
+        window.location.href = buildWechatPaymentHrefForCurrentEnv({
+          rechargeAmount: missingAmount.toFixed(2),
+          payOrderId: order.id,
+        });
         return;
       }
 

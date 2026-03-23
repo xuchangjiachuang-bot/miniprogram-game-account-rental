@@ -65,6 +65,19 @@ export async function freezeListingDeposit(
 
     const depositAmount = Number(settings.listingDepositAmount ?? 50);
 
+    if (depositAmount <= 0) {
+      return {
+        success: true,
+        message: '当前上架保证金为 0，无需冻结',
+        deposit: {
+          accountId,
+          userId,
+          amount: 0,
+          status: 'skipped',
+        }
+      };
+    }
+
     // 3. 检查用户余额是否足够
     const userBalancesList = await db
       .select()

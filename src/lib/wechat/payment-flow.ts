@@ -1,14 +1,25 @@
 import { NextRequest } from 'next/server';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances } from '@/lib/db';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import { sendOrderPaidNotification } from '@/lib/notification-service';
-import { ensureOrderGroupChat } from '@/lib/chat-service-new';
 import { getServerToken } from '@/lib/server-auth';
 import { User, verifyToken } from '@/lib/user-service';
 import { notifySellerAfterOrderPaid } from '@/lib/seller-order-reminder-service';
+import { lockOrderFinanceScope } from '@/lib/finance-lock-service';
+import { refund } from '@/lib/wechat/refund';
 import { fenToYuan } from '@/lib/wechat/utils';
 import { queryTransactionByOutTradeNo } from '@/lib/wechat/v3';
+
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const PAID_ORDER_STATUSES = [
+  'paid',
+  'active',
+  'pending_verification',
+  'pending_consumption_confirm',
+  'completed',
+];
 
 export async function getAuthenticatedPaymentUser(request: NextRequest): Promise<User | null> {
   const token = getServerToken(request);
@@ -29,6 +40,141 @@ export function getRequestClientIp(request: NextRequest): string {
     || '127.0.0.1';
 }
 
+async function upsertWechatOrderPaymentRecord(
+  tx: DbTransaction,
+  params: {
+    orderId: string;
+    orderNo: string;
+    buyerId: string;
+    amount: string;
+    transactionId: string;
+    thirdPartyOrderId: string;
+    now: string;
+  },
+) {
+  const existingRecord = await tx
+    .select({ id: paymentRecords.id })
+    .from(paymentRecords)
+    .where(and(
+      eq(paymentRecords.orderId, params.orderId),
+      eq(paymentRecords.type, 'payment'),
+      eq(paymentRecords.method, 'wechat'),
+    ))
+    .limit(1);
+
+  if (existingRecord.length > 0) {
+    await tx
+      .update(paymentRecords)
+      .set({
+        orderNo: params.orderNo,
+        userId: params.buyerId,
+        amount: params.amount,
+        transactionId: params.transactionId,
+        thirdPartyOrderId: params.thirdPartyOrderId,
+        status: 'success',
+        failureReason: null,
+        updatedAt: params.now,
+      })
+      .where(eq(paymentRecords.id, existingRecord[0].id));
+
+    return existingRecord[0].id;
+  }
+
+  const inserted = await tx
+    .insert(paymentRecords)
+    .values({
+      id: crypto.randomUUID(),
+      orderId: params.orderId,
+      orderNo: params.orderNo,
+      userId: params.buyerId,
+      amount: params.amount,
+      type: 'payment',
+      method: 'wechat',
+      transactionId: params.transactionId,
+      thirdPartyOrderId: params.thirdPartyOrderId,
+      status: 'success',
+      createdAt: params.now,
+      updatedAt: params.now,
+    })
+    .returning({ id: paymentRecords.id });
+
+  return inserted[0]?.id || null;
+}
+
+async function requestRefundForCancelledPaidOrder(params: {
+  orderId: string;
+  orderNo: string;
+  buyerId: string;
+  amount: string;
+  transactionId: string;
+}) {
+  const refundAmount = Number(params.amount || 0);
+  if (refundAmount <= 0 || !params.transactionId) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await lockOrderFinanceScope(
+      tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+      params.orderId,
+    );
+
+    const existingRefund = await tx
+      .select({ id: paymentRecords.id, status: paymentRecords.status })
+      .from(paymentRecords)
+      .where(and(
+        eq(paymentRecords.orderId, params.orderId),
+        eq(paymentRecords.type, 'refund'),
+        eq(paymentRecords.method, 'wechat'),
+      ))
+      .limit(1);
+
+    if (existingRefund.length > 0 && !['failed', 'exception'].includes(existingRefund[0].status || '')) {
+      return;
+    }
+
+    const outRefundNo = `RF${params.orderId.replace(/-/g, '').slice(0, 16)}${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const refundResult = await refund({
+      transactionId: params.transactionId,
+      outTradeNo: params.orderId,
+      outRefundNo,
+      totalFee: Math.round(refundAmount * 100),
+      refundFee: Math.round(refundAmount * 100),
+      refundDesc: `Cancelled order ${params.orderNo} auto refund`,
+    });
+
+    const now = new Date().toISOString();
+    await tx.insert(paymentRecords).values({
+      id: crypto.randomUUID(),
+      orderId: params.orderId,
+      orderNo: params.orderNo,
+      userId: params.buyerId,
+      amount: refundAmount.toFixed(2),
+      type: 'refund',
+      method: 'wechat',
+      transactionId: refundResult.refundId || '',
+      thirdPartyOrderId: outRefundNo,
+      status: 'processing',
+      failureReason: 'ORDER_ALREADY_CANCELLED',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'order_payment_wechat_cancelled_auto_refund_requested',
+      status: 'pending',
+      userId: params.buyerId,
+      orderId: params.orderId,
+      amount: refundAmount,
+      details: {
+        orderNo: params.orderNo,
+        transactionId: params.transactionId,
+        outRefundNo,
+      },
+    }, tx);
+  });
+}
+
 export async function markWechatOrderPaid(params: {
   orderId: string;
   transactionId?: string | null;
@@ -38,6 +184,8 @@ export async function markWechatOrderPaid(params: {
   const now = new Date().toISOString();
 
   const result = await db.transaction(async (tx) => {
+    await lockOrderFinanceScope(tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }, orderId);
+
     const orderList = await tx
       .select()
       .from(orders)
@@ -50,6 +198,9 @@ export async function markWechatOrderPaid(params: {
 
     const order = orderList[0];
     const expectedAmount = Number(order.totalPrice || 0);
+    const paidAmount = typeof totalFeeFen === 'number' ? fenToYuan(totalFeeFen) : String(order.totalPrice || 0);
+    const resolvedTransactionId = transactionId || order.transactionId || '';
+    const resolvedOutTradeNo = order.id.replace(/-/g, '');
 
     if (typeof totalFeeFen === 'number') {
       const actualAmount = Number(fenToYuan(totalFeeFen));
@@ -58,51 +209,82 @@ export async function markWechatOrderPaid(params: {
       }
     }
 
-    if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status || '')) {
-      return { order, alreadyPaid: true };
+    if (order.status === 'cancelled') {
+      const paymentRecordId = await upsertWechatOrderPaymentRecord(tx, {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        buyerId: order.buyerId,
+        amount: paidAmount,
+        transactionId: resolvedTransactionId,
+        thirdPartyOrderId: resolvedOutTradeNo,
+        now,
+      });
+
+      await safeLogFinanceAuditEvent({
+        eventType: 'order_payment_wechat_paid_after_cancelled',
+        status: 'failed',
+        userId: order.buyerId,
+        orderId: order.id,
+        paymentRecordId,
+        amount: paidAmount,
+        details: {
+          orderNo: order.orderNo,
+          transactionId: resolvedTransactionId,
+          paymentMethod: 'wechat',
+        },
+        errorMessage: 'ORDER_ALREADY_CANCELLED',
+      }, tx);
+
+      return {
+        order,
+        alreadyPaid: true,
+        ignored: true,
+        autoRefund: {
+          orderId: order.id,
+          orderNo: order.orderNo,
+          buyerId: order.buyerId,
+          amount: paidAmount,
+          transactionId: resolvedTransactionId,
+        },
+      };
     }
 
     const rentalHours = Number(order.rentalDuration) || 24;
     const endTime = new Date(Date.now() + rentalHours * 60 * 60 * 1000).toISOString();
 
-    await tx
+    const claimedOrderRows = await tx
       .update(orders)
       .set({
         status: 'active',
         paymentTime: now,
         paymentMethod: 'wechat',
-        transactionId: transactionId || order.transactionId,
+        transactionId: resolvedTransactionId,
         startTime: now,
         endTime,
         updatedAt: now,
       })
-      .where(eq(orders.id, orderId));
-
-    const paymentRecordList = await tx
-      .select({ id: paymentRecords.id })
-      .from(paymentRecords)
       .where(and(
-        eq(paymentRecords.orderId, order.id),
-        eq(paymentRecords.type, 'payment'),
-        eq(paymentRecords.method, 'wechat'),
+        eq(orders.id, orderId),
+        eq(orders.status, 'pending_payment'),
       ))
-      .limit(1);
+      .returning();
 
-    if (paymentRecordList.length === 0) {
-      await tx.insert(paymentRecords).values({
-        orderId: order.id,
-        orderNo: order.orderNo,
-        userId: order.buyerId,
-        amount: typeof totalFeeFen === 'number' ? fenToYuan(totalFeeFen) : String(order.totalPrice),
-        type: 'payment',
-        method: 'wechat',
-        transactionId: transactionId || order.transactionId || '',
-        thirdPartyOrderId: order.id.replace(/-/g, ''),
-        status: 'success',
-        createdAt: now,
-        updatedAt: now,
-      });
+    const effectiveOrder = claimedOrderRows[0] || order;
+    const alreadyPaid = claimedOrderRows.length === 0;
+
+    if (alreadyPaid && !PAID_ORDER_STATUSES.includes(order.status || '')) {
+      throw new Error(`ORDER_STATUS_INVALID:${order.status || 'unknown'}`);
     }
+
+    const paymentRecordId = await upsertWechatOrderPaymentRecord(tx, {
+      orderId: effectiveOrder.id,
+      orderNo: effectiveOrder.orderNo,
+      buyerId: effectiveOrder.buyerId,
+      amount: paidAmount,
+      transactionId: resolvedTransactionId,
+      thirdPartyOrderId: resolvedOutTradeNo,
+      now,
+    });
 
     await tx
       .update(accounts)
@@ -110,28 +292,34 @@ export async function markWechatOrderPaid(params: {
         status: 'rented',
         updatedAt: now,
       })
-      .where(and(
-        eq(accounts.id, order.accountId),
-        eq(accounts.status, 'available'),
-      ));
+      .where(eq(accounts.id, effectiveOrder.accountId));
 
     await safeLogFinanceAuditEvent({
       eventType: 'order_payment_wechat_paid',
       status: 'success',
-      userId: order.buyerId,
-      orderId: order.id,
-      amount: typeof totalFeeFen === 'number' ? fenToYuan(totalFeeFen) : String(order.totalPrice),
+      userId: effectiveOrder.buyerId,
+      orderId: effectiveOrder.id,
+      paymentRecordId,
+      amount: paidAmount,
       details: {
-        orderNo: order.orderNo,
-        transactionId: transactionId || order.transactionId || '',
+        orderNo: effectiveOrder.orderNo,
+        transactionId: resolvedTransactionId,
         paymentMethod: 'wechat',
       },
     }, tx);
 
-    return { order, alreadyPaid: false };
+      return { order: effectiveOrder, alreadyPaid, ignored: false, autoRefund: null };
   });
 
-  if (!result.alreadyPaid) {
+  if (result.autoRefund) {
+    try {
+      await requestRefundForCancelledPaidOrder(result.autoRefund);
+    } catch (error) {
+      console.error('[WeChat Pay] failed to auto refund cancelled paid order', result.autoRefund.orderId, error);
+    }
+  }
+
+  if (!result.alreadyPaid && !result.ignored) {
     await sendOrderPaidNotification(result.order.id, false);
     await notifySellerAfterOrderPaid(result.order.id);
   }
@@ -175,14 +363,42 @@ export async function markWechatWalletRechargePaid(params: {
       }
     }
 
-    const balanceList = await tx
-      .select()
-      .from(userBalances)
-      .where(eq(userBalances.userId, paymentRecord.userId))
-      .limit(1);
+    const claimedRecordRows = await tx
+      .update(paymentRecords)
+      .set({
+        status: 'success',
+        transactionId: transactionId || paymentRecord.transactionId || '',
+        failureReason: null,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(paymentRecords.id, paymentRecord.id),
+        inArray(paymentRecords.status, ['pending', 'processing']),
+      ))
+      .returning();
 
-    if (balanceList.length === 0) {
-      await tx.insert(userBalances).values({
+    if (claimedRecordRows.length === 0) {
+      const refreshedRecordList = await tx
+        .select()
+        .from(paymentRecords)
+        .where(eq(paymentRecords.id, paymentRecord.id))
+        .limit(1);
+
+      const refreshedRecord = refreshedRecordList[0];
+      if (!refreshedRecord) {
+        throw new Error('RECHARGE_RECORD_NOT_FOUND');
+      }
+
+      if (refreshedRecord.status === 'success') {
+        return { paymentRecord: refreshedRecord, alreadyPaid: true };
+      }
+
+      throw new Error(`RECHARGE_RECORD_STATUS_INVALID:${refreshedRecord.status}`);
+    }
+
+    await tx
+      .insert(userBalances)
+      .values({
         id: crypto.randomUUID(),
         userId: paymentRecord.userId,
         availableBalance: '0',
@@ -191,35 +407,28 @@ export async function markWechatWalletRechargePaid(params: {
         totalEarned: '0',
         createdAt: now,
         updatedAt: now,
+      })
+      .onConflictDoNothing({ target: userBalances.userId });
+
+    const amount = Number(paymentRecord.amount) || 0;
+    const balanceRows = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} + ${amount.toFixed(2)}`,
+        totalEarned: sql`${userBalances.totalEarned} + ${amount.toFixed(2)}`,
+        updatedAt: now,
+      })
+      .where(eq(userBalances.userId, paymentRecord.userId))
+      .returning({
+        availableBalance: userBalances.availableBalance,
       });
-    }
 
-    const refreshedBalanceList = balanceList.length > 0
-      ? balanceList
-      : await tx
-        .select()
-        .from(userBalances)
-        .where(eq(userBalances.userId, paymentRecord.userId))
-        .limit(1);
-
-    if (refreshedBalanceList.length === 0) {
+    if (balanceRows.length === 0) {
       throw new Error('USER_BALANCE_NOT_FOUND');
     }
 
-    const balance = refreshedBalanceList[0];
-    const oldBalance = Number(balance.availableBalance) || 0;
-    const amount = Number(paymentRecord.amount) || 0;
-    const newBalance = oldBalance + amount;
-    const oldEarned = Number(balance.totalEarned) || 0;
-
-    await tx
-      .update(userBalances)
-      .set({
-        availableBalance: newBalance.toFixed(2),
-        totalEarned: (oldEarned + amount).toFixed(2),
-        updatedAt: now,
-      })
-      .where(eq(userBalances.userId, paymentRecord.userId));
+    const newBalance = Number(balanceRows[0].availableBalance || 0);
+    const oldBalance = newBalance - amount;
 
     await tx.insert(balanceTransactions).values({
       id: crypto.randomUUID(),
@@ -228,18 +437,9 @@ export async function markWechatWalletRechargePaid(params: {
       amount: amount.toFixed(2),
       balanceBefore: oldBalance.toFixed(2),
       balanceAfter: newBalance.toFixed(2),
-      description: `微信充值 ${amount.toFixed(2)} 元`,
+      description: `Wechat recharge ${amount.toFixed(2)}`,
       createdAt: now,
     });
-
-    await tx
-      .update(paymentRecords)
-      .set({
-        status: 'success',
-        transactionId: transactionId || paymentRecord.transactionId || '',
-        updatedAt: now,
-      })
-      .where(eq(paymentRecords.id, paymentRecord.id));
 
     await safeLogFinanceAuditEvent({
       eventType: 'wallet_recharge_wechat_paid',
@@ -257,7 +457,14 @@ export async function markWechatWalletRechargePaid(params: {
       },
     }, tx);
 
-    return { paymentRecord, alreadyPaid: false };
+    return {
+      paymentRecord: {
+        ...paymentRecord,
+        status: 'success',
+        transactionId: transactionId || paymentRecord.transactionId || '',
+      },
+      alreadyPaid: false,
+    };
   });
 }
 
@@ -321,7 +528,7 @@ export async function reconcileWechatWalletRechargeStatus(params: {
     await markWechatPaymentFailed(
       paymentRecord.id,
       transaction.trade_state,
-      transaction.trade_state_desc
+      transaction.trade_state_desc,
     );
   }
 
@@ -354,7 +561,7 @@ export async function reconcilePendingWechatWalletRechargesForUser(userId: strin
         userId,
       });
     } catch (error) {
-      console.error('[WeChat Pay] 对账补入微信充值失败:', record.id, error);
+      console.error('[WeChat Pay] failed to reconcile wallet recharge', record.id, error);
     }
   }
 }
@@ -371,7 +578,11 @@ export async function reconcileWechatOrderStatus(orderId: string) {
   }
 
   const order = orderList[0];
-  if (['paid', 'active', 'pending_verification', 'pending_consumption_confirm', 'completed'].includes(order.status || '')) {
+  if (PAID_ORDER_STATUSES.includes(order.status || '')) {
+    return order;
+  }
+
+  if (order.status === 'cancelled') {
     return order;
   }
 

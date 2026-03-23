@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
 import {
@@ -14,6 +14,7 @@ import {
   users,
 } from './db';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
+import { lockOrderFinanceScope } from './finance-lock-service';
 import { getLatestConsumptionSettlement } from './order-consumption-service';
 import { settleCompletedOrder } from './order-settlement-service';
 import { checkWechatPayConfig } from '@/lib/wechat/config';
@@ -43,6 +44,8 @@ export interface DisputeView {
 function toNumber(value: unknown) {
   return Number(value) || 0;
 }
+
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function collapseDuplicatePendingDisputes(orderId: string) {
   const pendingRows = await db
@@ -411,37 +414,238 @@ async function requestWechatFullRefund(order: typeof orders.$inferSelect, reason
   };
 }
 
-async function requestFullRefund(orderId: string, reason: string) {
-  const orderRows = await db
+async function requestWalletFullRefundLocked(
+  tx: DbTransaction,
+  order: typeof orders.$inferSelect,
+  reason: string,
+) {
+  const refundAmount = toNumber(order.totalPrice);
+  const depositAmount = toNumber(order.deposit);
+  const now = new Date().toISOString();
+
+  await tx
+    .insert(userBalances)
+    .values({
+      id: randomUUID(),
+      userId: order.buyerId,
+      availableBalance: '0',
+      frozenBalance: '0',
+      totalWithdrawn: '0',
+      totalEarned: '0',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({ target: userBalances.userId });
+
+  const balanceRows = await tx
     .select()
-    .from(orders)
-    .where(eq(orders.id, orderId))
+    .from(userBalances)
+    .where(eq(userBalances.userId, order.buyerId))
     .limit(1);
 
-  const order = orderRows[0];
-  if (!order) {
-    throw new Error('ORDER_NOT_FOUND');
+  const balance = balanceRows[0];
+  if (!balance) {
+    throw new Error('BUYER_BALANCE_NOT_FOUND');
   }
 
-  if (order.isSettled) {
-    throw new Error('ORDER_ALREADY_SETTLED');
+  const availableBefore = toNumber(balance.availableBalance);
+  const frozenBefore = toNumber(balance.frozenBalance);
+  const releasedFrozen = Math.min(frozenBefore, depositAmount);
+  const availableCredit = Math.max(refundAmount - releasedFrozen, 0);
+  const availableAfter = availableBefore + availableCredit;
+
+  await tx
+    .update(userBalances)
+    .set({
+      availableBalance: sql`${userBalances.availableBalance} + ${availableCredit.toFixed(2)}`,
+      frozenBalance: sql`GREATEST(${userBalances.frozenBalance} - ${releasedFrozen.toFixed(2)}, 0)`,
+      updatedAt: now,
+    })
+    .where(eq(userBalances.userId, order.buyerId));
+
+  if (availableCredit > 0) {
+    await tx.insert(balanceTransactions).values({
+      id: randomUUID(),
+      userId: order.buyerId,
+      orderId: order.id,
+      transactionType: 'refund',
+      amount: availableCredit.toFixed(2),
+      balanceBefore: availableBefore.toFixed(2),
+      balanceAfter: availableAfter.toFixed(2),
+      description: `Order ${order.orderNo} full refund`,
+      createdAt: now,
+    });
   }
 
-  const existingRefund = await db
-    .select({ id: paymentRecords.id })
-    .from(paymentRecords)
-    .where(and(eq(paymentRecords.orderId, order.id), eq(paymentRecords.type, 'refund')))
-    .limit(1);
-
-  if (existingRefund.length > 0) {
-    throw new Error('ORDER_REFUND_ALREADY_EXISTS');
+  if (releasedFrozen > 0) {
+    await tx.insert(balanceTransactions).values({
+      id: randomUUID(),
+      userId: order.buyerId,
+      orderId: order.id,
+      transactionType: 'unfreeze',
+      amount: releasedFrozen.toFixed(2),
+      balanceBefore: availableAfter.toFixed(2),
+      balanceAfter: availableAfter.toFixed(2),
+      description: `Order ${order.orderNo} unfreeze deposit`,
+      createdAt: now,
+    });
   }
 
-  if (order.paymentMethod === 'wallet') {
-    return requestWalletFullRefund(order, reason);
+  await tx.insert(paymentRecords).values({
+    id: randomUUID(),
+    orderId: order.id,
+    orderNo: order.orderNo,
+    userId: order.buyerId,
+    amount: refundAmount.toFixed(2),
+    type: 'refund',
+    method: 'wallet',
+    transactionId: '',
+    thirdPartyOrderId: order.id,
+    status: 'success',
+    failureReason: reason,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await tx
+    .update(orders)
+    .set({
+      status: 'refunded',
+      updatedAt: now,
+    })
+    .where(eq(orders.id, order.id));
+
+  await safeLogFinanceAuditEvent({
+    eventType: 'order_refund_wallet_completed',
+    status: 'success',
+    userId: order.buyerId,
+    orderId: order.id,
+    amount: refundAmount,
+    balanceBefore: availableBefore,
+    balanceAfter: availableAfter,
+    details: {
+      orderNo: order.orderNo,
+      reason,
+      releasedFrozen,
+      availableCredit,
+    },
+  }, tx);
+
+  await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
+
+  return {
+    refundId: `WALLET-${order.id}`,
+    refundAmount,
+    walletRefund: true,
+  };
+}
+
+async function requestWechatFullRefundLocked(
+  tx: DbTransaction,
+  order: typeof orders.$inferSelect,
+  reason: string,
+) {
+  const transactionId = order.transactionId || '';
+  if (!transactionId) {
+    throw new Error('ORDER_PAYMENT_TRANSACTION_MISSING');
   }
 
-  return requestWechatFullRefund(order, reason);
+  const configCheck = await checkWechatPayConfig();
+  if (!configCheck.valid) {
+    throw new Error(`WECHAT_PAY_CONFIG_INVALID:${configCheck.missing.join(',')}`);
+  }
+
+  const refundAmount = toNumber(order.totalPrice);
+  const outRefundNo = `RF${order.id.replace(/-/g, '').slice(0, 16)}${generateNonceStr(8)}`;
+  const refundResult = await refund({
+    transactionId,
+    outTradeNo: order.id,
+    outRefundNo,
+    totalFee: yuanToFen(refundAmount),
+    refundFee: yuanToFen(refundAmount),
+    refundDesc: reason,
+  });
+
+  const now = new Date().toISOString();
+  await tx.insert(paymentRecords).values({
+    id: randomUUID(),
+    orderId: order.id,
+    orderNo: order.orderNo,
+    userId: order.buyerId,
+    amount: refundAmount.toFixed(2),
+    type: 'refund',
+    method: 'wechat',
+    transactionId: refundResult.refundId || '',
+    thirdPartyOrderId: outRefundNo,
+    status: 'processing',
+    failureReason: reason,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await tx
+    .update(orders)
+    .set({
+      status: 'refunding',
+      updatedAt: now,
+    })
+    .where(eq(orders.id, order.id));
+
+  await safeLogFinanceAuditEvent({
+    eventType: 'order_refund_requested',
+    status: 'pending',
+    userId: order.buyerId,
+    orderId: order.id,
+    amount: refundAmount,
+    details: {
+      orderNo: order.orderNo,
+      outRefundNo,
+      reason,
+      transactionId,
+    },
+  }, tx);
+
+  return {
+    refundId: outRefundNo,
+    refundAmount,
+    walletRefund: false,
+  };
+}
+
+async function requestFullRefund(orderId: string, reason: string) {
+  return db.transaction(async (tx) => {
+    await lockOrderFinanceScope(
+      tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+      orderId,
+    );
+
+    const orderRows = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+
+    const order = orderRows[0];
+    if (!order) {
+      throw new Error('ORDER_NOT_FOUND');
+    }
+
+    if (order.isSettled) {
+      throw new Error('ORDER_ALREADY_SETTLED');
+    }
+
+    const existingRefund = await tx
+      .select({ id: paymentRecords.id, status: paymentRecords.status })
+      .from(paymentRecords)
+      .where(and(eq(paymentRecords.orderId, order.id), eq(paymentRecords.type, 'refund')))
+      .limit(1);
+
+    if (existingRefund.length > 0 && !['failed', 'exception'].includes(existingRefund[0].status || '')) {
+      throw new Error('ORDER_REFUND_ALREADY_EXISTS');
+    }
+
+    return requestWalletFullRefundLocked(tx, order, reason);
+  });
 }
 
 export async function resolveOrderDispute(params: {
@@ -527,12 +731,12 @@ export async function resolveOrderDispute(params: {
 
     return {
       success: true,
-      message: refundResult.walletRefund ? '已完成钱包全额退款' : '已发起全额退款，等待微信回调完成',
+      message: '已完成余额全额退款',
       data: {
         decision: params.decision,
         refundId: refundResult.refundId,
         refundAmount: refundResult.refundAmount,
-        orderStatus: refundResult.walletRefund ? 'refunded' : 'refunding',
+        orderStatus: 'refunded',
       },
     };
   }

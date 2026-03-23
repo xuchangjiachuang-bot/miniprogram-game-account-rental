@@ -86,6 +86,49 @@ export async function createWechatOrderPayment(options: CreateOrderPaymentOption
   const notifyUrl = getNotifyUrl(request, channel);
   const attach = buildOrderAttach(order.id);
 
+  const now = new Date().toISOString();
+
+  const existingPaymentRecord = await db
+    .select({ id: paymentRecords.id })
+    .from(paymentRecords)
+    .where(and(
+      eq(paymentRecords.orderId, order.id),
+      eq(paymentRecords.type, 'payment'),
+      eq(paymentRecords.method, 'wechat'),
+    ))
+    .limit(1);
+
+  if (existingPaymentRecord.length > 0) {
+    await db
+      .update(paymentRecords)
+      .set({
+        userId: user.id,
+        orderNo: order.orderNo,
+        amount: Number(order.totalPrice || 0).toFixed(2),
+        transactionId: '',
+        thirdPartyOrderId: outTradeNo,
+        status: 'pending',
+        failureReason: null,
+        updatedAt: now,
+      })
+      .where(eq(paymentRecords.id, existingPaymentRecord[0].id));
+  } else {
+    await db.insert(paymentRecords).values({
+      id: crypto.randomUUID(),
+      orderId: order.id,
+      orderNo: order.orderNo,
+      userId: user.id,
+      amount: Number(order.totalPrice || 0).toFixed(2),
+      type: 'payment',
+      method: 'wechat',
+      transactionId: '',
+      thirdPartyOrderId: outTradeNo,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   if (channel === 'jsapi') {
     if (!resolvedOpenid) {
       throw new Error('MISSING_OPENID');

@@ -1,7 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, CheckCircle, CreditCard, Loader2, RefreshCw, Search, Wallet, XCircle } from 'lucide-react';
+import {
+  Banknote,
+  CheckCircle,
+  CreditCard,
+  Loader2,
+  RefreshCw,
+  Search,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,14 +28,28 @@ interface Withdrawal {
   accountNumber: string;
   accountName: string;
   bankName?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'processing' | 'approved' | 'failed' | 'rejected';
   applyTime: string;
   processTime?: string;
   reviewComment?: string;
   remark?: string;
+  failureReason?: string;
 }
 
-type WithdrawalStatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type WithdrawalStatusFilter = 'all' | 'pending' | 'processing' | 'approved' | 'failed' | 'rejected';
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return '--';
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function formatMoney(value: number) {
+  return `¥${value.toFixed(2)}`;
+}
 
 export default function AdminWithdrawals() {
   const [activeTab, setActiveTab] = useState<'list'>('list');
@@ -91,8 +114,12 @@ export default function AdminWithdrawals() {
     switch (status) {
       case 'pending':
         return <Badge variant="secondary">待审核</Badge>;
+      case 'processing':
+        return <Badge className="bg-blue-600">打款中</Badge>;
       case 'approved':
-        return <Badge className="bg-green-600">已通过</Badge>;
+        return <Badge className="bg-green-600">已到账</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">打款失败</Badge>;
       case 'rejected':
         return <Badge variant="destructive">已拒绝</Badge>;
       default:
@@ -114,7 +141,7 @@ export default function AdminWithdrawals() {
   }
 
   async function handleApprove(id: string) {
-    if (!confirm('确定通过这笔提现吗？')) {
+    if (!confirm('确认发起这笔提现吗？')) {
       return;
     }
 
@@ -137,7 +164,7 @@ export default function AdminWithdrawals() {
         return;
       }
 
-      toast.success('提现已通过');
+      toast.success(result.message || '提现状态已更新');
       await loadWithdrawals();
     } catch (error) {
       console.error('[admin-withdrawals] approve failed:', error);
@@ -148,7 +175,7 @@ export default function AdminWithdrawals() {
   }
 
   async function handleReject(id: string) {
-    const reviewComment = prompt('请输入拒绝原因:')?.trim();
+    const reviewComment = prompt('请输入拒绝原因')?.trim();
     if (!reviewComment) {
       return;
     }
@@ -172,7 +199,7 @@ export default function AdminWithdrawals() {
         return;
       }
 
-      toast.success('提现已拒绝');
+      toast.success(result.message || '提现状态已更新');
       await loadWithdrawals();
     } catch (error) {
       console.error('[admin-withdrawals] reject failed:', error);
@@ -183,7 +210,9 @@ export default function AdminWithdrawals() {
   }
 
   const pendingCount = withdrawals.filter((item) => item.status === 'pending').length;
+  const processingCount = withdrawals.filter((item) => item.status === 'processing').length;
   const approvedCount = withdrawals.filter((item) => item.status === 'approved').length;
+  const failedCount = withdrawals.filter((item) => item.status === 'failed').length;
   const rejectedCount = withdrawals.filter((item) => item.status === 'rejected').length;
 
   return (
@@ -191,7 +220,9 @@ export default function AdminWithdrawals() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">提现审核</h1>
-          <p className="mt-1 text-sm text-gray-600">仅保留一条审核链路：申请 -&gt; 后台审核 -&gt; 微信转账或退回余额</p>
+          <p className="mt-1 text-sm text-gray-600">
+            当前链路为：提交提现申请 - 后台发起微信零钱转账 - 等待微信最终结果。
+          </p>
         </div>
         <Button variant="outline" onClick={() => void loadWithdrawals()} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -199,7 +230,7 @@ export default function AdminWithdrawals() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -215,7 +246,18 @@ export default function AdminWithdrawals() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">已通过</p>
+                <p className="text-sm text-gray-600">打款中</p>
+                <p className="mt-1 text-2xl font-bold">{processingCount}</p>
+              </div>
+              <Loader2 className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">已到账</p>
                 <p className="mt-1 text-2xl font-bold">{approvedCount}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -226,10 +268,21 @@ export default function AdminWithdrawals() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-gray-600">打款失败</p>
+                <p className="mt-1 text-2xl font-bold">{failedCount}</p>
+              </div>
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-gray-600">已拒绝</p>
                 <p className="mt-1 text-2xl font-bold">{rejectedCount}</p>
               </div>
-              <XCircle className="h-8 w-8 text-red-500" />
+              <XCircle className="h-8 w-8 text-gray-500" />
             </div>
           </CardContent>
         </Card>
@@ -258,7 +311,9 @@ export default function AdminWithdrawals() {
                 >
                   <option value="all">全部状态</option>
                   <option value="pending">待审核</option>
-                  <option value="approved">已通过</option>
+                  <option value="processing">打款中</option>
+                  <option value="approved">已到账</option>
+                  <option value="failed">打款失败</option>
                   <option value="rejected">已拒绝</option>
                 </select>
               </div>
@@ -301,19 +356,19 @@ export default function AdminWithdrawals() {
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                           <div>
                             <p className="text-xs text-gray-500">提现金额</p>
-                            <p className="text-lg font-bold">¥{withdrawal.amount.toFixed(2)}</p>
+                            <p className="text-lg font-bold">{formatMoney(withdrawal.amount)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">手续费</p>
-                            <p className="text-sm">¥{withdrawal.fee.toFixed(2)}</p>
+                            <p className="text-sm">{formatMoney(withdrawal.fee)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">实际到账</p>
-                            <p className="text-sm font-medium text-green-600">¥{withdrawal.actualAmount.toFixed(2)}</p>
+                            <p className="text-sm font-medium text-green-600">{formatMoney(withdrawal.actualAmount)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">申请时间</p>
-                            <p className="text-sm">{new Date(withdrawal.applyTime).toLocaleString('zh-CN')}</p>
+                            <p className="text-sm">{formatDateTime(withdrawal.applyTime)}</p>
                           </div>
                         </div>
 
@@ -334,8 +389,14 @@ export default function AdminWithdrawals() {
                           ) : null}
                           {withdrawal.reviewComment ? (
                             <p className="text-sm text-gray-600">
-                              <span className="text-gray-500">审核意见：</span>
+                              <span className="text-gray-500">审核备注：</span>
                               {withdrawal.reviewComment}
+                            </p>
+                          ) : null}
+                          {withdrawal.failureReason ? (
+                            <p className="text-sm text-red-600">
+                              <span className="text-gray-500">失败原因：</span>
+                              {withdrawal.failureReason}
                             </p>
                           ) : null}
                         </div>
@@ -353,7 +414,7 @@ export default function AdminWithdrawals() {
                             ) : (
                               <CheckCircle className="mr-2 h-4 w-4" />
                             )}
-                            通过
+                            发起打款
                           </Button>
                           <Button
                             onClick={() => void handleReject(withdrawal.id)}

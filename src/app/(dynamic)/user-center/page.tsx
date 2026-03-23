@@ -17,6 +17,7 @@ import { useUser } from '@/contexts/UserContext';
 import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
 import { LoginDialog } from '@/components/LoginDialog';
+import { useWechatJSAPI } from '@/hooks/useWechatJSAPI';
 import { getToken } from '@/lib/auth-token';
 import { buildWechatPaymentHrefForCurrentEnv } from '@/lib/wechat/payment-entry';
 import { formatServerDateTime } from '@/lib/time';
@@ -111,10 +112,21 @@ interface WithdrawalRecord {
   reviewTime?: string | null;
   reviewRemark?: string | null;
   failureReason?: string | null;
+  accountInfo?: {
+    transferPackageInfo?: string | null;
+    transferState?: string | null;
+  } | null;
 }
 
 export default function UserCenterPage() {
   const { user, loading, refreshUser } = useUser();
+  const {
+    isWechat,
+    isMobileWechat,
+    configWechatSDK,
+    checkJsApiSupport,
+    requestMerchantTransfer,
+  } = useWechatJSAPI();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
@@ -191,6 +203,7 @@ export default function UserCenterPage() {
   const [balance, setBalance] = useState<WalletSummary | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [confirmingWithdrawalId, setConfirmingWithdrawalId] = useState<string | null>(null);
   const [rechargeAmount, setRechargeAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
@@ -667,8 +680,12 @@ export default function UserCenterPage() {
     switch (status) {
       case 'pending':
         return <Badge variant="secondary">{'\u5f85\u5ba1\u6838'}</Badge>;
+      case 'processing':
+        return <Badge className="bg-blue-600">{'\u6253\u6b3e\u4e2d'}</Badge>;
       case 'approved':
-        return <Badge className="bg-green-500">{'\u5df2\u901a\u8fc7'}</Badge>;
+        return <Badge className="bg-green-500">{'\u5df2\u5230\u8d26'}</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">{'\u6253\u6b3e\u5931\u8d25'}</Badge>;
       case 'rejected':
         return <Badge variant="destructive">{'\u5df2\u62d2\u7edd'}</Badge>;
       default:
@@ -859,6 +876,89 @@ export default function UserCenterPage() {
     } catch (error) {
       console.error('提现失败:', error);
       toast.error('提现失败，请重试');
+    }
+  };
+
+  const handleConfirmWechatWithdrawal = async (withdrawalId: string) => {
+    if (!isWechat || !isMobileWechat) {
+      toast.error('请在手机微信内打开后确认收款');
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      toast.error('请先登录后再确认收款');
+      return;
+    }
+
+    try {
+      setConfirmingWithdrawalId(withdrawalId);
+
+      const confirmInfoResponse = await fetch(`/api/withdrawals/${withdrawalId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const confirmInfoResult = await confirmInfoResponse.json();
+
+      if (!confirmInfoResult.success) {
+        toast.error(confirmInfoResult.error || '获取收款确认信息失败');
+        await loadWalletData();
+        return;
+      }
+
+      if (confirmInfoResult.data?.status === 'approved') {
+        toast.success('这笔提现已经到账');
+        await loadWalletData();
+        return;
+      }
+
+      const { appId, mchId, packageInfo } = confirmInfoResult.data || {};
+      if (!appId || !mchId || !packageInfo) {
+        toast.error('当前提现还未进入待确认收款状态，请稍后刷新再试');
+        await loadWalletData();
+        return;
+      }
+
+      const signatureResponse = await fetch(`/api/wechat/jsapi-signature?url=${encodeURIComponent(window.location.href)}`, {
+        cache: 'no-store',
+      });
+      const signatureResult = await signatureResponse.json();
+      if (!signatureResult.success || !signatureResult.data) {
+        toast.error(signatureResult.error || '获取微信签名失败');
+        return;
+      }
+
+      await configWechatSDK(
+        signatureResult.data.appId,
+        signatureResult.data.timestamp,
+        signatureResult.data.nonceStr,
+        signatureResult.data.signature,
+        ['checkJsApi', 'requestMerchantTransfer'],
+      );
+
+      const jsApiSupport = await checkJsApiSupport(['requestMerchantTransfer']);
+      if (!jsApiSupport.requestMerchantTransfer || jsApiSupport.requestMerchantTransfer === 'false') {
+        toast.error('当前微信版本不支持商家转账收款确认，请升级微信后重试');
+        return;
+      }
+
+      await requestMerchantTransfer({
+        appId,
+        mchId,
+        packageInfo,
+      });
+
+      toast.success('已拉起微信收款确认，请按页面提示完成确认');
+      window.setTimeout(() => {
+        void loadWalletData();
+      }, 1200);
+    } catch (error: any) {
+      console.error('确认微信提现收款失败:', error);
+      toast.error(error?.message || '确认收款失败，请重试');
+    } finally {
+      setConfirmingWithdrawalId(null);
     }
   };
 
@@ -1970,6 +2070,25 @@ export default function UserCenterPage() {
                                   <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                                     <span className="font-medium">{'\u5931\u8d25\u539f\u56e0\uff1a'}</span>
                                     {withdrawal.failureReason}
+                                  </div>
+                                ) : null}
+                                {withdrawal.status === 'processing' && withdrawal.accountInfo?.transferPackageInfo ? (
+                                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="text-sm text-blue-800">
+                                        当前提现已进入微信零钱确认收款阶段，请在手机微信内完成确认。
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => void handleConfirmWechatWithdrawal(withdrawal.id)}
+                                        disabled={confirmingWithdrawalId === withdrawal.id}
+                                      >
+                                        {confirmingWithdrawalId === withdrawal.id ? (
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : null}
+                                        确认收款
+                                      </Button>
+                                    </div>
                                   </div>
                                 ) : null}
                               </div>

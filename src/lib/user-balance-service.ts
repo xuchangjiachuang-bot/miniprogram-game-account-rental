@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   balanceTransactions,
   db,
@@ -8,6 +8,7 @@ import {
   withdrawals,
 } from './db';
 import { safeLogFinanceAuditEvent } from './finance-audit-service';
+import { lockUserFinanceScope, lockWithdrawalFinanceScope } from './finance-lock-service';
 
 export interface UserBalance {
   userId: string;
@@ -32,6 +33,8 @@ export interface WithdrawalResult {
   amount?: number;
   fee?: number;
   actualAmount?: number;
+  status?: string;
+  thirdPartyTransactionId?: string;
 }
 
 function toNumber(value: unknown) {
@@ -365,20 +368,6 @@ export async function requestWithdrawal(
       };
     }
 
-    const balance = await ensureUserBalance(userId);
-    const withdrawableBalance = Math.max(
-      balance.availableBalance - balance.nonWithdrawableBalance,
-      0,
-    );
-    if (withdrawableBalance < amount) {
-      return {
-        success: false,
-        message: balance.availableBalance >= amount
-          ? 'NON_WITHDRAWABLE_BALANCE_LIMIT'
-          : 'INSUFFICIENT_AVAILABLE_BALANCE',
-      };
-    }
-
     const withdrawalId = randomUUID();
     const withdrawalNo = `WD${Date.now()}${Math.floor(Math.random() * 1000)
       .toString()
@@ -388,26 +377,80 @@ export async function requestWithdrawal(
       String(accountInfo.accountName || accountInfo.nickname || accountInfo.phone || userId).slice(0, 100);
 
     await db.transaction(async (tx) => {
+      await lockUserFinanceScope(
+        tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+        userId,
+      );
+
       await tx
-        .update(userBalances)
-        .set({
-          availableBalance: (balance.availableBalance - amount).toFixed(2),
-          frozenBalance: (balance.frozenBalance + amount).toFixed(2),
+        .insert(userBalances)
+        .values({
+          id: randomUUID(),
+          userId,
+          availableBalance: '0',
+          nonWithdrawableBalance: '0',
+          frozenBalance: '0',
+          totalWithdrawn: '0',
+          totalEarned: '0',
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(userBalances.userId, userId));
+        .onConflictDoNothing({ target: userBalances.userId });
 
-      await tx.insert(balanceTransactions).values({
-        id: randomUUID(),
-        userId,
-        withdrawalId,
-        transactionType: 'freeze',
-        amount: amount.toFixed(2),
-        balanceBefore: balance.availableBalance.toFixed(2),
-        balanceAfter: (balance.availableBalance - amount).toFixed(2),
-        description: 'Withdrawal requested',
-        createdAt: new Date().toISOString(),
-      });
+      const balanceRows = await tx
+        .select()
+        .from(userBalances)
+        .where(eq(userBalances.userId, userId))
+        .limit(1);
+
+      const balance = balanceRows[0];
+      if (!balance) {
+        throw new Error('USER_BALANCE_NOT_FOUND');
+      }
+
+      const availableBalance = toNumber(balance.availableBalance);
+      const nonWithdrawableBalance = toNumber(balance.nonWithdrawableBalance);
+      const withdrawableBalance = Math.max(availableBalance - nonWithdrawableBalance, 0);
+
+      if (withdrawableBalance < amount) {
+        throw new Error(
+          availableBalance >= amount
+            ? 'NON_WITHDRAWABLE_BALANCE_LIMIT'
+            : 'INSUFFICIENT_AVAILABLE_BALANCE',
+        );
+      }
+
+      const updatedBalances = await tx
+        .update(userBalances)
+        .set({
+          availableBalance: sql`${userBalances.availableBalance} - ${amount.toFixed(2)}`,
+          frozenBalance: sql`${userBalances.frozenBalance} + ${amount.toFixed(2)}`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(and(
+          eq(userBalances.userId, userId),
+          sql`${userBalances.availableBalance} >= ${amount.toFixed(2)}`,
+          sql`(${userBalances.availableBalance} - ${userBalances.nonWithdrawableBalance}) >= ${amount.toFixed(2)}`,
+        ))
+        .returning({ userId: userBalances.userId });
+
+      if (updatedBalances.length === 0) {
+        throw new Error('INSUFFICIENT_AVAILABLE_BALANCE');
+      }
+
+      await tx
+        .insert(balanceTransactions)
+        .values({
+          id: randomUUID(),
+          userId,
+          withdrawalId,
+          transactionType: 'freeze',
+          amount: amount.toFixed(2),
+          balanceBefore: availableBalance.toFixed(2),
+          balanceAfter: (availableBalance - amount).toFixed(2),
+          description: 'Withdrawal requested',
+          createdAt: new Date().toISOString(),
+        });
 
       await safeLogFinanceAuditEvent({
         eventType: 'withdrawal_requested',
@@ -415,8 +458,8 @@ export async function requestWithdrawal(
         userId,
         withdrawalId,
         amount,
-        balanceBefore: balance.availableBalance,
-        balanceAfter: balance.availableBalance - amount,
+        balanceBefore: availableBalance,
+        balanceAfter: availableBalance - amount,
         details: {
           fee,
           actualAmount,
@@ -436,19 +479,57 @@ export async function requestWithdrawal(
         actualAmount: actualAmount.toFixed(2),
         withdrawalType: 'wechat',
         accountInfo,
-        status: reviewRequired ? 'pending' : 'approved',
+        status: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
     });
 
+    if (!reviewRequired) {
+      try {
+        const { reviewWithdrawalRequest } = await import('./withdrawal-service');
+        const autoReviewResult = await reviewWithdrawalRequest({
+          withdrawalId,
+          status: 'approved',
+          reviewerId: 'system',
+          reviewComment: 'Auto transfer initiated',
+        });
+
+        if (autoReviewResult.success) {
+          return {
+            success: true,
+            message:
+              autoReviewResult.data?.status === 'approved'
+                ? 'WITHDRAWAL_APPROVED'
+                : autoReviewResult.data?.status === 'processing'
+                  ? 'WITHDRAWAL_PROCESSING'
+                  : autoReviewResult.data?.status === 'failed'
+                    ? 'WITHDRAWAL_FAILED'
+                    : 'WITHDRAWAL_CREATED',
+            withdrawalId,
+            amount,
+            fee,
+            actualAmount,
+            status: autoReviewResult.data?.status,
+            thirdPartyTransactionId:
+              autoReviewResult.data && 'thirdPartyTransactionId' in autoReviewResult.data
+                ? autoReviewResult.data.thirdPartyTransactionId
+                : undefined,
+          };
+        }
+      } catch (autoReviewError) {
+        console.error('[user-balance] auto review withdrawal failed:', autoReviewError);
+      }
+    }
+
     return {
       success: true,
-      message: reviewRequired ? 'WITHDRAWAL_CREATED' : 'WITHDRAWAL_APPROVED',
+      message: 'WITHDRAWAL_CREATED',
       withdrawalId,
       amount,
       fee,
       actualAmount,
+      status: 'pending',
     };
   } catch (error: any) {
     await safeLogFinanceAuditEvent({
@@ -476,33 +557,63 @@ export async function reviewWithdrawal(
   remark = '',
 ): Promise<WithdrawalResult> {
   try {
-    const withdrawalRows = await db
-      .select()
-      .from(withdrawals)
-      .where(eq(withdrawals.id, withdrawalId))
-      .limit(1);
-    const withdrawal = withdrawalRows[0];
-
-    if (!withdrawal) {
-      return {
-        success: false,
-        message: 'WITHDRAWAL_NOT_FOUND',
-      };
-    }
-
-    if (withdrawal.status !== 'pending') {
-      return {
-        success: false,
-        message: 'WITHDRAWAL_ALREADY_REVIEWED',
-      };
-    }
-
-    const amount = toNumber(withdrawal.amount);
-    const fee = toNumber(withdrawal.feeAmount);
-    const actualAmount = toNumber(withdrawal.actualAmount);
-    const balance = await ensureUserBalance(withdrawal.userId);
+    let amount = 0;
+    let fee = 0;
+    let actualAmount = 0;
 
     await db.transaction(async (tx) => {
+      await lockWithdrawalFinanceScope(
+        tx as unknown as { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+        withdrawalId,
+      );
+
+      const withdrawalRows = await tx
+        .select()
+        .from(withdrawals)
+        .where(eq(withdrawals.id, withdrawalId))
+        .limit(1);
+      const withdrawal = withdrawalRows[0];
+
+      if (!withdrawal) {
+        throw new Error('WITHDRAWAL_NOT_FOUND');
+      }
+
+      if (withdrawal.status !== 'pending') {
+        throw new Error('WITHDRAWAL_ALREADY_REVIEWED');
+      }
+
+      amount = toNumber(withdrawal.amount);
+      fee = toNumber(withdrawal.feeAmount);
+      actualAmount = toNumber(withdrawal.actualAmount);
+
+      await tx
+        .insert(userBalances)
+        .values({
+          id: randomUUID(),
+          userId: withdrawal.userId,
+          availableBalance: '0',
+          nonWithdrawableBalance: '0',
+          frozenBalance: '0',
+          totalWithdrawn: '0',
+          totalEarned: '0',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing({ target: userBalances.userId });
+
+      const balanceRows = await tx
+        .select()
+        .from(userBalances)
+        .where(eq(userBalances.userId, withdrawal.userId))
+        .limit(1);
+      const balance = balanceRows[0];
+
+      if (!balance) {
+        throw new Error('USER_BALANCE_NOT_FOUND');
+      }
+
+      const availableBalance = toNumber(balance.availableBalance);
+
       if (approved) {
         await tx
           .update(userBalances)
@@ -519,8 +630,8 @@ export async function reviewWithdrawal(
           withdrawalId: withdrawal.id,
           transactionType: 'withdrawal',
           amount: amount.toFixed(2),
-          balanceBefore: balance.availableBalance.toFixed(2),
-          balanceAfter: balance.availableBalance.toFixed(2),
+          balanceBefore: availableBalance.toFixed(2),
+          balanceAfter: availableBalance.toFixed(2),
           description: remark || 'Withdrawal approved',
           createdAt: new Date().toISOString(),
         });
@@ -531,8 +642,8 @@ export async function reviewWithdrawal(
           userId: withdrawal.userId,
           withdrawalId: withdrawal.id,
           amount,
-          balanceBefore: balance.availableBalance,
-          balanceAfter: balance.availableBalance,
+          balanceBefore: availableBalance,
+          balanceAfter: availableBalance,
           details: {
             fee,
             actualAmount,
@@ -570,8 +681,8 @@ export async function reviewWithdrawal(
         withdrawalId: withdrawal.id,
         transactionType: 'unfreeze',
         amount: amount.toFixed(2),
-        balanceBefore: balance.availableBalance.toFixed(2),
-        balanceAfter: (balance.availableBalance + amount).toFixed(2),
+        balanceBefore: availableBalance.toFixed(2),
+        balanceAfter: (availableBalance + amount).toFixed(2),
         description: remark || 'Withdrawal rejected',
         createdAt: new Date().toISOString(),
       });
@@ -582,8 +693,8 @@ export async function reviewWithdrawal(
         userId: withdrawal.userId,
         withdrawalId: withdrawal.id,
         amount,
-        balanceBefore: balance.availableBalance,
-        balanceAfter: balance.availableBalance + amount,
+        balanceBefore: availableBalance,
+        balanceAfter: availableBalance + amount,
         details: {
           fee,
           actualAmount,

@@ -55,8 +55,8 @@ function RefundContent() {
       const order = result.data;
 
       // 检查订单状态
-      if (order.status !== 'paid' && order.status !== 'refunding') {
-        setError('只有已支付的订单才能申请退款');
+      if (order.status !== 'active' && order.status !== 'refunding') {
+        setError('只有已支付并进入使用流程的订单才能申请退款');
         return;
       }
 

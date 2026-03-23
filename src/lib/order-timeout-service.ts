@@ -4,8 +4,9 @@
  */
 
 import { and, eq, lt } from 'drizzle-orm';
-import { db, orders, userBalances, balanceTransactions, platformSettings } from './db';
+import { db, orders, userBalances, balanceTransactions, paymentRecords, platformSettings } from './db';
 import { restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
+import { closeTransactionByOutTradeNo } from '@/lib/wechat/v3';
 
 const DEFAULT_PAYMENT_TIMEOUT_SECONDS = 180;
 
@@ -51,13 +52,35 @@ export async function checkAndCancelTimeoutOrders(): Promise<TimeoutCheckResult>
 
     await db.transaction(async (tx) => {
       for (const order of timeoutOrders) {
-        await tx
+        const cancelledRows = await tx
           .update(orders)
           .set({
             status: 'cancelled',
             updatedAt: new Date().toISOString(),
           })
-          .where(eq(orders.id, order.id));
+          .where(and(
+            eq(orders.id, order.id),
+            eq(orders.status, 'pending_payment'),
+          ))
+          .returning({ id: orders.id });
+
+        if (cancelledRows.length === 0) {
+          continue;
+        }
+
+        await tx
+          .update(paymentRecords)
+          .set({
+            status: 'failed',
+            failureReason: 'ORDER_TIMEOUT_CANCELLED',
+            updatedAt: new Date().toISOString(),
+          })
+          .where(and(
+            eq(paymentRecords.orderId, order.id),
+            eq(paymentRecords.type, 'payment'),
+            eq(paymentRecords.method, 'wechat'),
+            eq(paymentRecords.status, 'pending'),
+          ));
 
         const shouldRefundWallet = order.paymentMethod === 'wallet';
         const buyerBalances = shouldRefundWallet
@@ -105,6 +128,12 @@ export async function checkAndCancelTimeoutOrders(): Promise<TimeoutCheckResult>
     });
 
     for (const order of timeoutOrders) {
+      try {
+        await closeTransactionByOutTradeNo(order.id.replace(/-/g, ''));
+      } catch (error) {
+        console.warn('[Order Timeout] failed to close wechat transaction', order.id, error);
+      }
+
       await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
     }
 

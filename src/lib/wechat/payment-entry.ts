@@ -2,6 +2,7 @@ export type WechatWebPaymentChannel = 'jsapi' | 'h5' | 'native';
 
 interface PaymentIntent {
   orderId?: string;
+  payOrderId?: string;
   rechargeAmount?: string | number;
   rechargeId?: string;
 }
@@ -29,6 +30,10 @@ export function buildWechatPaymentHref(
 
   if (intent.orderId) {
     params.set('orderId', intent.orderId);
+  }
+
+  if (intent.payOrderId) {
+    params.set('payOrderId', intent.payOrderId);
   }
 
   if (intent.rechargeAmount !== undefined && intent.rechargeAmount !== null && intent.rechargeAmount !== '') {
