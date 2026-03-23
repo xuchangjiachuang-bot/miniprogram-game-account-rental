@@ -215,6 +215,9 @@ export default function UserCenterPage() {
   const withdrawAccountDisplayValue = hasBoundWechatWithdrawAccount
     ? '当前授权登录的微信账号（自动到账）'
     : withdrawAccount;
+  const pendingConfirmWithdrawals = withdrawals
+    .filter((withdrawal) => withdrawal.status === 'processing' && Boolean(withdrawal.accountInfo?.transferPackageInfo))
+    .slice(0, 3);
 
   // 个人资料表单
   const [profileForm, setProfileForm] = useState({
@@ -914,11 +917,15 @@ export default function UserCenterPage() {
         return;
       }
 
-      const { appId, mchId, packageInfo } = confirmInfoResult.data || {};
+      const { appId, mchId, packageInfo, warning } = confirmInfoResult.data || {};
       if (!appId || !mchId || !packageInfo) {
         toast.error('当前提现还未进入待确认收款状态，请稍后刷新再试');
         await loadWalletData();
         return;
+      }
+
+      if (warning) {
+        toast.warning(warning);
       }
 
       const signatureResponse = await fetch(`/api/wechat/jsapi-signature?url=${encodeURIComponent(window.location.href)}`, {
@@ -1956,6 +1963,56 @@ export default function UserCenterPage() {
                     </div>
                   </>
                 )}
+
+                {pendingConfirmWithdrawals.length > 0 ? (
+                  <Card className="border-blue-200 bg-blue-50/40">
+                    <CardHeader>
+                      <CardTitle>{'\u5f85\u786e\u8ba4\u6536\u6b3e'}</CardTitle>
+                      <CardDescription>
+                        {isMobileWechat
+                          ? '\u4ee5\u4e0b\u63d0\u73b0\u5df2\u8fdb\u5165\u5fae\u4fe1\u786e\u8ba4\u6536\u6b3e\u9636\u6bb5\uff0c\u8bf7\u76f4\u63a5\u70b9\u51fb\u786e\u8ba4\u3002'
+                          : '\u8bf7\u5728\u624b\u673a\u5fae\u4fe1\u5185\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3\uff0c\u518d\u5b8c\u6210\u5f85\u786e\u8ba4\u6536\u6b3e\u7684\u63d0\u73b0\u3002'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {pendingConfirmWithdrawals.map((withdrawal) => (
+                        <div
+                          key={`pending-confirm-${withdrawal.id}`}
+                          className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-white/90 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {getWithdrawalStatusBadge(withdrawal.status)}
+                              {withdrawal.withdrawalNo ? (
+                                <span className="text-xs text-gray-500">{withdrawal.withdrawalNo}</span>
+                              ) : null}
+                            </div>
+                            <div className="text-sm text-gray-700">
+                              {'\u5b9e\u9645\u5230\u8d26\uff1a'}
+                              <span className="ml-1 font-medium text-gray-900">
+                                {formatBalance(Number(withdrawal.actualAmount || 0))}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {'\u7533\u8bf7\u65f6\u95f4\uff1a'}
+                              {formatServerDateTime(withdrawal.createdAt)}
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => void handleConfirmWechatWithdrawal(withdrawal.id)}
+                            disabled={confirmingWithdrawalId === withdrawal.id}
+                            className="w-full sm:w-auto"
+                          >
+                            {confirmingWithdrawalId === withdrawal.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            {'\u786e\u8ba4\u6536\u6b3e'}
+                          </Button>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 {/* 交易记录 */}
                 <Card>

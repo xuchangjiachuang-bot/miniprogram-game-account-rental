@@ -19,6 +19,16 @@ async function requireUser(request: NextRequest) {
   return verifyToken(token);
 }
 
+function mapReconcileErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  if (/invalid ip/i.test(message) || /whitelist/i.test(message)) {
+    return '微信提现状态查询被商户号 IP 白名单拦截，已保留本次收款确认信息。请先在手机微信内继续确认收款，并把当前服务出口 IP 加入商户号白名单。';
+  }
+
+  return message || '获取提现确认信息失败';
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,7 +69,17 @@ export async function POST(
     }
 
     const { id } = await params;
-    await reconcileWithdrawalTransferStatus(id);
+    let reconcileWarning: string | null = null;
+
+    try {
+      await reconcileWithdrawalTransferStatus(id);
+    } catch (error) {
+      reconcileWarning = mapReconcileErrorMessage(error);
+      console.error('[withdrawals] reconcile before confirm failed:', {
+        withdrawalId: id,
+        error,
+      });
+    }
 
     const rows = await db
       .select()
@@ -111,6 +131,7 @@ export async function POST(
         mchId: config.mchid,
         packageInfo: accountInfo.transferPackageInfo,
         transferState: accountInfo.transferState || null,
+        warning: reconcileWarning,
       },
     });
   } catch (error: any) {
