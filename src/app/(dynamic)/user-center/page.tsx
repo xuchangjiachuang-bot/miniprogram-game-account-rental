@@ -2251,14 +2251,14 @@ export default function UserCenterPage() {
         open={verificationDialogOpen && canOpenVerificationDialog}
         onOpenChange={(open) => setVerificationDialogOpen(open && canOpenVerificationDialog)}
       >
-        <DialogContent className="w-[calc(100%-1rem)] max-w-[500px] max-h-[calc(100dvh-1rem)] overflow-hidden p-0">
+        <DialogContent className="flex w-[calc(100%-1rem)] max-w-[500px] max-h-[calc(100svh-1rem)] flex-col overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
           <DialogHeader className="border-b px-4 py-4 sm:px-6">
             <DialogTitle>实名认证</DialogTitle>
             <DialogDescription>
               请填写您的真实信息，所有信息将严格保密
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto px-4 py-4 sm:max-h-[calc(100dvh-12rem)] sm:px-6">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
             <div>
               <Label htmlFor="realName">真实姓名 *</Label>
               <Input
@@ -2370,7 +2370,7 @@ export default function UserCenterPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-3 border-t bg-background px-4 py-4 sm:flex-row sm:px-6 [padding-bottom:max(1rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0 flex flex-col gap-3 border-t bg-background px-4 pt-4 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] sm:flex-row sm:px-6 sm:pb-4">
             <Button
               variant="outline"
               onClick={() => setVerificationDialogOpen(false)}
