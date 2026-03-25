@@ -981,8 +981,9 @@ function NewAccountPage() {
   // 显示认证对话框
   if (showAuthDialog) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <Card className="w-full max-w-md mx-4">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-6 [padding-top:max(1.5rem,env(safe-area-inset-top))] [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="flex min-h-full items-center justify-center">
+        <Card className="mx-auto w-full max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserCheck className="w-5 h-5" />
@@ -1052,6 +1053,7 @@ function NewAccountPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
@@ -1072,7 +1074,7 @@ function NewAccountPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]">
         <div className="max-w-4xl mx-auto">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 mb-6">
@@ -1194,6 +1196,7 @@ function NewAccountPage() {
                             className="w-full h-full object-cover"
                           />
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRemoveImage(index);
@@ -1819,13 +1822,17 @@ function NewAccountPage() {
                             <div className="flex flex-wrap gap-1.5">
                               {group.skins.map((skin) => (
                                 <button
+                                  type="button"
                                   key={`${group.category}-${skin.name}`}
                                   onClick={() => toggleSkin(skin.name)}
                                   className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
                                     formData.selected_skins.includes(skin.name)
-                                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 hover:shadow-md'
+                                      ? 'text-white hover:shadow-md'
                                       : 'bg-white border hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300'
                                   }`}
+                                  style={formData.selected_skins.includes(skin.name)
+                                    ? { backgroundImage: 'linear-gradient(90deg, #2563eb 0%, #9333ea 100%)' }
+                                    : undefined}
                                 >
                                   {skin.name}
                                 </button>

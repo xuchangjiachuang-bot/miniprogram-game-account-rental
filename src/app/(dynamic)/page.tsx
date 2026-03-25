@@ -541,7 +541,7 @@ export default function Home() {
             </div>
 
             {/* 第一行：上架必填项 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 mb-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
               {/* 平台与上号方式 */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-sm font-medium">平台·上号方式</Label>
@@ -669,15 +669,16 @@ export default function Home() {
                        `${filters.province} ${filters.city}`}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0" align="start">
+                  <PopoverContent className="w-[min(90vw,400px)] p-0" align="start">
                     <div className="p-4 border-b">
                       <h4 className="font-medium">选择地区</h4>
                     </div>
-                    <div className="flex h-[400px]">
+                    <div className="flex h-[min(60vh,400px)]">
                       {/* 左侧：省份列表 */}
                       <ScrollArea className="w-1/2 border-r">
                         <div className="p-2">
                           <button
+                            type="button"
                             onClick={() => {
                               setFilters({...filters, province: 'all', city: 'all'});
                               setRegionPopoverOpen(false);
@@ -690,6 +691,7 @@ export default function Home() {
                           </button>
                           {Object.keys(provinceCityData).map((province) => (
                             <button
+                              type="button"
                               key={province}
                               onClick={() => setFilters({...filters, province, city: 'all'})}
                               className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
@@ -712,6 +714,7 @@ export default function Home() {
                           ) : (
                             <>
                               <button
+                                type="button"
                                 onClick={() => {
                                   setFilters({...filters, province: filters.province, city: 'all'});
                                   setRegionPopoverOpen(false);
@@ -724,6 +727,7 @@ export default function Home() {
                               </button>
                               {provinceCityData[filters.province]?.map((city) => (
                                 <button
+                                  type="button"
                                   key={city}
                                   onClick={() => {
                                     setFilters({...filters, province: filters.province, city});
@@ -747,7 +751,7 @@ export default function Home() {
             </div>
 
             {/* 第二行：价格相关 */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 mb-4 sm:grid-cols-2 lg:grid-cols-3">
               {/* 租金范围 */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-sm font-medium">租金(元)</Label>
@@ -816,9 +820,9 @@ export default function Home() {
             </div>
 
             {/* 第三行：搜索和操作按钮 */}
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
               {/* 搜索 */}
-              <div className="flex-1 min-w-[200px] flex flex-col gap-1.5">
+              <div className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
                 <Label className="text-sm font-medium">搜索账号</Label>
                 <Input
                   placeholder="输入账号名进行搜索..."
@@ -829,7 +833,7 @@ export default function Home() {
               </div>
 
               {/* 按钮组 */}
-              <div className="flex items-center gap-2 self-end mb-1.5">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:mb-1.5 sm:w-auto sm:self-end sm:justify-end">
                 <Button
                   variant={showMoreFilters ? "default" : "outline"}
                   onClick={() => setShowMoreFilters(!showMoreFilters)}
@@ -1033,8 +1037,9 @@ export default function Home() {
           animation: bounce-soft 0.5s ease-in-out;
         }
       `}</style>
-      <div className="fixed bottom-8 left-8 z-50">
+      <div className="fixed left-4 z-50 bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:left-8 sm:bottom-8">
         <button
+          type="button"
           onClick={() => setShowCustomerChat(!showCustomerChat)}
           className="customer-bounce group relative w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-2xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 flex items-center justify-center cursor-pointer"
           aria-label="在线客服"
@@ -1066,7 +1071,7 @@ export default function Home() {
 
       {/* 客服聊天窗口 */}
       {showCustomerChat && (
-        <div className="fixed bottom-24 left-8 w-[350px] h-[500px] bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col border border-gray-200">
+        <div className="fixed left-4 right-4 z-50 flex h-[min(70vh,500px)] w-auto flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:left-8 sm:right-auto sm:bottom-24 sm:w-[350px]">
           {/* 聊天窗口头部 */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1191,8 +1196,9 @@ export default function Home() {
 
       {/* 一键跳转最上位置按钮 */}
       <button
+        type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="fixed bottom-8 right-8 w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center cursor-pointer z-50 hover:-translate-y-1"
+        className="fixed right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:right-8 sm:bottom-8"
         aria-label="返回顶部"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
