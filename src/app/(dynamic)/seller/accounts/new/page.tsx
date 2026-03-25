@@ -109,6 +109,31 @@ const normalizeSkinCategory = (value?: string) => {
   return normalized;
 };
 
+const SKIN_RANKS = [
+  '\u9752\u94dc',
+  '\u767d\u94f6',
+  '\u9ec4\u91d1',
+  '\u94c2\u91d1',
+  '\u94bb\u77f3',
+  '\u5927\u5e08',
+  '\u738b\u8005',
+] as const;
+
+const summarizeSelectedSkins = (selectedSkins: string[]) => {
+  const matchedRank = selectedSkins.find((skin) =>
+    SKIN_RANKS.includes(skin as typeof SKIN_RANKS[number]),
+  );
+
+  if (matchedRank) {
+    return matchedRank;
+  }
+
+  if (selectedSkins.length > 0) {
+    return '\u7cbe\u9009\u76ae\u80a4';
+  }
+
+  return null;
+};
 const createDefaultFormData = () => ({
   product_type: '\u4e09\u89d2\u6d32\u884c\u52a8\u54c8\u592b\u5e01\u51fa\u79df',
   images: [] as File[],
@@ -906,7 +931,7 @@ function NewAccountPage() {
         energyValue: parseInt(formData.load_level || '0'),
         staminaValue: parseInt(formData.stamina_level || '0'),
         hasSkins: formData.selected_skins.length > 0,
-        skinTier: formData.selected_skins.length > 0 ? formData.selected_skins.join(',') : null,
+        skinTier: summarizeSelectedSkins(formData.selected_skins),
         skinCount: formData.selected_skins.length,
         hasBattlepass: formData.has_battlepass || false,
         battlepassLevel: parseInt(formData.battlepass_level || '0'),
