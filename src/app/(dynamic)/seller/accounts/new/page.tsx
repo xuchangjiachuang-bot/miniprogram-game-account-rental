@@ -149,6 +149,7 @@ const createDefaultFormData = () => ({
   end_hour: '23',
   coins_value: '',
   rental_ratio: '',
+  rental_speed: '10',
   deposit: '',
   safebox_type: '',
   stamina_level: '',
@@ -168,6 +169,7 @@ const createDefaultFormData = () => ({
 
 // 小时列表
 const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+const RENTAL_SPEED_OPTIONS = ['10', '20', '30', '40', '50'] as const;
 
 // 平台配置（后台可设置）
 const PLATFORM_CONFIG = {
@@ -205,10 +207,15 @@ const calculateSuggestedRatio = (safebox: string, stamina: string, coins: string
   return `${minRatio}-${maxRatio}`;
 };
 
-// 计算租期（10M = 1天）
-const calculateRentalPeriod = (coins: string): { days: number; hours: number; text: string } => {
+// 计算租期（可自定义 M/天）
+const calculateRentalPeriod = (
+  coins: string,
+  rentalSpeedMPerDay = '10',
+): { days: number; hours: number; text: string } => {
   const coinsValue = parseFloat(coins || '0');
-  const days = Math.ceil(coinsValue / 10);
+  const speedValue = parseFloat(rentalSpeedMPerDay || '10');
+  const safeSpeed = Number.isFinite(speedValue) && speedValue > 0 ? speedValue : 10;
+  const days = Math.ceil(coinsValue / safeSpeed);
   const totalHours = Math.max(1, days) * 24;
   return {
     days: Math.max(1, days),
@@ -318,6 +325,7 @@ function NewAccountPage() {
     // 哈夫币信息
     coins_value: '', // 单位M，1M=100万
     rental_ratio: '', // 出租比例
+    rental_speed: '10', // 租期速度（M/天）
     deposit: '', // 押金
 
     // 账号属性
@@ -441,6 +449,9 @@ function NewAccountPage() {
           qq_password: customAttributes.qqPassword || '',
           coins_value: account.coinsM || '',
           rental_ratio: account.rentalRatio || '',
+          rental_speed: RENTAL_SPEED_OPTIONS.includes(String(customAttributes.rentalSpeedMPerDay || '10') as typeof RENTAL_SPEED_OPTIONS[number])
+            ? String(customAttributes.rentalSpeedMPerDay || '10')
+            : '10',
           deposit: account.deposit || '',
           safebox_type: account.safeboxCount === 4 ? '2x2' : account.safeboxCount === 6 ? '2x3' : '3x3',
           stamina_level: account.staminaValue?.toString() || '',
@@ -918,6 +929,10 @@ function NewAccountPage() {
       }
 
       const generatedTitle = titleParts.join('  |  ') + '  |  ';
+      const rentalPeriodForSubmit = calculateRentalPeriod(
+        formData.coins_value,
+        formData.rental_speed,
+      );
 
       // 准备提交数据
       const submitData = {
@@ -950,7 +965,8 @@ function NewAccountPage() {
           rank: formData.rank,
           kd: formData.kd,
           startTime: formData.start_hour,
-          endTime: formData.end_hour
+          endTime: formData.end_hour,
+          rentalSpeedMPerDay: parseInt(formData.rental_speed || '10', 10),
         },
         tags: formData.selected_skins,
         accountValue: pricing.accountValue,
@@ -958,9 +974,9 @@ function NewAccountPage() {
         rentalRatio: parseFloat(formData.rental_ratio),
         deposit: pricing.deposit,
         totalPrice: pricing.totalPrice,
-        rentalDays: calculateRentalPeriod(formData.coins_value).days,
-        rentalHours: calculateRentalPeriod(formData.coins_value).hours,
-        rentalDescription: calculateRentalPeriod(formData.coins_value).text
+        rentalDays: rentalPeriodForSubmit.days,
+        rentalHours: rentalPeriodForSubmit.hours,
+        rentalDescription: rentalPeriodForSubmit.text
       };
 
       // 提交到后端
@@ -1083,7 +1099,7 @@ function NewAccountPage() {
     );
   }
 
-  const rentalPeriod = calculateRentalPeriod(formData.coins_value);
+  const rentalPeriod = calculateRentalPeriod(formData.coins_value, formData.rental_speed);
   const pricing = calculatePricing(formData.coins_value, formData.rental_ratio, formData.deposit, platformSettings, activeActivity);
 
   if (loading) {
@@ -1555,6 +1571,29 @@ function NewAccountPage() {
                   </div>
                 </div>
 
+                <div>
+                  <Label className="text-sm">租期自定义选项（M/天）</Label>
+                  <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {RENTAL_SPEED_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, rental_speed: option })}
+                        className={`h-9 rounded-md border text-sm font-medium transition-all ${
+                          formData.rental_speed === option
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-sm'
+                            : 'bg-background hover:bg-accent text-foreground'
+                        }`}
+                      >
+                        {option}M/天
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    建议选择更快租期的同时，提高出租比例，请根据自己需求合理设置。
+                  </p>
+                </div>
+
                 {/* 建议比例 */}
                 {false && (
                   <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-lg">
@@ -1596,7 +1635,7 @@ function NewAccountPage() {
                   </div>
                   <div className="flex flex-col justify-end">
                     <div className="p-3 bg-muted rounded-lg">
-                      <div className="text-xs text-muted-foreground">自动计算租期（10M = 1天）</div>
+                      <div className="text-xs text-muted-foreground">自动计算租期（{formData.rental_speed}M = 1天）</div>
                       <div className="text-sm font-bold text-purple-600 mt-1">{rentalPeriod.text}</div>
                     </div>
                   </div>
@@ -1647,7 +1686,7 @@ function NewAccountPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-xs text-muted-foreground mb-1">租期</div>
-                            <div className="text-sm font-semibold text-purple-600">{calculateRentalPeriod(formData.coins_value).text}</div>
+                            <div className="text-sm font-semibold text-purple-600">{calculateRentalPeriod(formData.coins_value, formData.rental_speed).text}</div>
                           </div>
                         </div>
 

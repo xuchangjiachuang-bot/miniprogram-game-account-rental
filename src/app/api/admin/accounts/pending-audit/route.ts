@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, admins } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { db, admins, users } from '@/lib/db';
+import { eq, inArray } from 'drizzle-orm';
 import { getPendingAuditAccounts } from '@/lib/account-audit-service';
 
 /**
@@ -38,7 +38,61 @@ export async function GET(request: NextRequest) {
 
     const result = await getPendingAuditAccounts(page, pageSize);
 
-    return NextResponse.json(result);
+    if (!result.success) {
+      return NextResponse.json(result);
+    }
+
+    const pendingAccounts = result.data?.accounts || [];
+    if (pendingAccounts.length === 0) {
+      return NextResponse.json(result);
+    }
+
+    const sellerIds = Array.from(
+      new Set(
+        pendingAccounts
+          .map((account: { sellerId?: string }) => account.sellerId)
+          .filter(Boolean) as string[],
+      ),
+    );
+
+    if (sellerIds.length === 0) {
+      return NextResponse.json(result);
+    }
+
+    const sellerRows = await db
+      .select({
+        id: users.id,
+        nickname: users.nickname,
+        phone: users.phone,
+      })
+      .from(users)
+      .where(inArray(users.id, sellerIds));
+
+    const sellerInfoMap = new Map(
+      sellerRows.map((seller) => [
+        seller.id,
+        {
+          sellerName: seller.nickname || '',
+          sellerPhone: seller.phone || '',
+        },
+      ]),
+    );
+
+    const mergedAccounts = pendingAccounts.map((account: any) => ({
+      ...account,
+      ...(sellerInfoMap.get(account.sellerId) || {
+        sellerName: '',
+        sellerPhone: '',
+      }),
+    }));
+
+    return NextResponse.json({
+      ...result,
+      data: {
+        ...result.data,
+        accounts: mergedAccounts,
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({
       success: false,

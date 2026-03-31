@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { requireAdmin } from '@/lib/admin-auth';
 import { submitForAudit } from '@/lib/account-audit-service';
 import { freezeListingDeposit } from '@/lib/account-deposit-service';
-import { db, accounts, ensureDatabaseInitialized } from '@/lib/db';
+import { db, accounts, ensureDatabaseInitialized, users } from '@/lib/db';
 import { getServerToken } from '@/lib/server-auth';
 import { verifyToken } from '@/lib/user-service';
 
@@ -296,9 +296,47 @@ export async function GET(request: NextRequest) {
       .orderBy(accounts.createdAt)
       .limit(limit);
 
+    let responseData: Array<Record<string, unknown>> = accountList as Array<Record<string, unknown>>;
+
+    // 仅管理员请求补充卖家信息，避免普通用户侧暴露额外字段。
+    if (!adminAuth.error && accountList.length > 0) {
+      const sellerIds = Array.from(
+        new Set(accountList.map((account) => account.sellerId).filter(Boolean)),
+      );
+
+      if (sellerIds.length > 0) {
+        const sellerRows = await db
+          .select({
+            id: users.id,
+            nickname: users.nickname,
+            phone: users.phone,
+          })
+          .from(users)
+          .where(inArray(users.id, sellerIds));
+
+        const sellerInfoMap = new Map(
+          sellerRows.map((seller) => [
+            seller.id,
+            {
+              sellerName: seller.nickname || '',
+              sellerPhone: seller.phone || '',
+            },
+          ]),
+        );
+
+        responseData = accountList.map((account) => ({
+          ...account,
+          ...(sellerInfoMap.get(account.sellerId) || {
+            sellerName: '',
+            sellerPhone: '',
+          }),
+        }));
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: accountList,
+      data: responseData,
     });
   } catch (error: any) {
     console.error('获取账号列表失败:', error);

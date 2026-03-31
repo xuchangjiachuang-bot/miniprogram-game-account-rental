@@ -34,6 +34,8 @@ interface Account {
   auditStatus: string;
   auditReason: string | null;
   sellerId: string;
+  sellerName?: string | null;
+  sellerPhone?: string | null;
   viewCount: number;
   tradeCount: number;
   createdAt: string;
@@ -113,8 +115,12 @@ export default function AdminAccounts() {
 
   const filteredAccounts = accounts.filter(account => {
     const matchesStatus = statusFilter === 'all' || account.auditStatus === statusFilter;
-    const matchesSearch = account.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         account.accountId.toLowerCase().includes(searchQuery.toLowerCase());
+    const normalizedQuery = searchQuery.toLowerCase();
+    const matchesSearch =
+      account.title.toLowerCase().includes(normalizedQuery)
+      || account.accountId.toLowerCase().includes(normalizedQuery)
+      || (account.sellerName || '').toLowerCase().includes(normalizedQuery)
+      || (account.sellerPhone || '').includes(searchQuery);
     return matchesStatus && matchesSearch;
   });
 
@@ -217,7 +223,7 @@ export default function AdminAccounts() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="搜索账号名称或ID..."
+                  placeholder="搜索账号名称、ID、卖家昵称或手机号..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -305,6 +311,12 @@ export default function AdminAccounts() {
 
                         {/* 额外信息 */}
                         <div className="space-y-1 text-sm text-gray-600 mb-4">
+                          <p>
+                            <span className="font-medium">卖家：</span>
+                            {account.sellerName || '-'}
+                            {account.sellerPhone ? ` (${account.sellerPhone})` : ''}
+                          </p>
+                          <p><span className="font-medium">卖家ID：</span>{account.sellerId}</p>
                           {account.description && (
                             <p><span className="font-medium">描述：</span>{account.description}</p>
                           )}
