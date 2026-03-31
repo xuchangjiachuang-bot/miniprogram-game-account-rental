@@ -26,14 +26,14 @@ export async function POST(request: NextRequest) {
       realName,
       phone,
       idCard,
-      idCardFrontUrl,
-      idCardBackUrl,
+      idCardFrontUrl = '',
+      idCardBackUrl = '',
       verificationService = 'manual',
     } = body;
 
-    if (!realName || !phone || !idCard || !idCardFrontUrl || !idCardBackUrl) {
+    if (!realName || !phone || !idCard) {
       return NextResponse.json(
-        { success: false, error: '请填写完整信息并上传身份证照片' },
+        { success: false, error: '请填写姓名、身份证号和手机号' },
         { status: 400 },
       );
     }

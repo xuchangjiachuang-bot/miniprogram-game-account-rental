@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { User, FileText, Wallet, Shield, Upload, CheckCircle, Camera, Loader2, AlertCircle, MessageSquare, Send, Clock, Users, RefreshCw, Bell, Check, CheckCheck } from 'lucide-react';
+import { User, FileText, Wallet, Shield, CheckCircle, Camera, Loader2, AlertCircle, MessageSquare, Send, Clock, Users, RefreshCw, Bell, Check, CheckCheck } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import { formatBalance } from '@/lib/balance-service';
 import { ImageUploader } from '@/components/ImageUploader';
@@ -131,8 +131,6 @@ export default function UserCenterPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [uploadingFront, setUploadingFront] = useState(false);
-  const [uploadingBack, setUploadingBack] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [currentUrl, setCurrentUrl] = useState('');
   const avatarUploaderInputId = 'user-center-avatar-upload';
@@ -232,25 +230,11 @@ export default function UserCenterPage() {
   const [verificationForm, setVerificationForm] = useState({
     realName: '',
     phone: '',
-    idCard: '',
-    idCardFront: '',
-    idCardBack: ''
-  });
-  const [verificationKeys, setVerificationKeys] = useState({
-    front: '',
-    back: ''
-  });
-  const [verificationPreview, setVerificationPreview] = useState({
-    front: '',
-    back: ''
+    idCard: ''
   });
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [verificationReviewComment, setVerificationReviewComment] = useState('');
   const hasSyncedApprovedVerificationRef = useRef(false);
-
-  // 文件上传输入框引用
-  const idCardFrontRef = useRef<HTMLInputElement>(null);
-  const idCardBackRef = useRef<HTMLInputElement>(null);
 
   // 通知状态
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -1162,101 +1146,15 @@ export default function UserCenterPage() {
     }
   };
 
-  // 处理身份证照片上传
-  const handleIdCardUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 验证文件大小（5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('文件大小不能超过5MB');
-      return;
-    }
-
-    // 验证文件类型
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('仅支持JPG、PNG格式的图片');
-      return;
-    }
-
-    // 设置对应的上传状态
-    if (side === 'front') {
-      setUploadingFront(true);
-    } else {
-      setUploadingBack(true);
-    }
-
-    try {
-      // 创建FormData
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'id_card');
-
-      // 获取 token
-      const token = getToken();
-
-      // 上传到Coze存储
-      const response = await fetch('/api/storage/upload', {
-        method: 'POST',
-        headers: token ? {
-          'Authorization': `Bearer ${token}`
-        } : {},
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || '上传失败');
-      }
-
-      toast.success('上传成功');
-
-      // 更新表单
-      const previewUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-        reader.onerror = () => reject(new Error('图片预览生成失败'));
-        reader.readAsDataURL(file);
-      });
-
-      if (side === 'front') {
-        setVerificationForm(prev => ({ ...prev, idCardFront: result.url }));
-        setVerificationKeys(prev => ({ ...prev, front: result.key || '' }));
-        setVerificationPreview(prev => ({ ...prev, front: previewUrl }));
-      } else {
-        setVerificationForm(prev => ({ ...prev, idCardBack: result.url }));
-        setVerificationKeys(prev => ({ ...prev, back: result.key || '' }));
-        setVerificationPreview(prev => ({ ...prev, back: previewUrl }));
-      }
-    } catch (error) {
-      console.error('上传失败:', error);
-      toast.error(error instanceof Error ? error.message : '上传失败，请重试');
-    } finally {
-      // 清除对应的上传状态
-      if (side === 'front') {
-        setUploadingFront(false);
-      } else {
-        setUploadingBack(false);
-      }
-    }
-  };
-
   // 提交实名认证
   const handleSubmitVerification = async () => {
     if (!verificationForm.realName || !verificationForm.phone || !verificationForm.idCard) {
-      toast.error('请填写完整信息');
+      toast.error('请填写姓名、身份证号和手机号');
       return;
     }
 
     if (!isValidMainlandMobile(verificationForm.phone)) {
       toast.error('请输入正确的手机号');
-      return;
-    }
-
-    if (!verificationForm.idCardFront || !verificationForm.idCardBack) {
-      toast.error('请上传身份证正反面照片');
       return;
     }
 
@@ -1276,8 +1174,6 @@ export default function UserCenterPage() {
           realName: verificationForm.realName,
           phone: verificationForm.phone,
           idCard: verificationForm.idCard,
-          idCardFrontUrl: verificationKeys.front || verificationForm.idCardFront,
-          idCardBackUrl: verificationKeys.back || verificationForm.idCardBack,
           verificationService: 'manual'
         })
       });
@@ -2297,78 +2193,6 @@ export default function UserCenterPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <Label>身份证正面 *</Label>
-                <div
-                  className={`mt-1.5 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                    uploadingFront ? 'bg-accent/50' : 'hover:bg-accent'
-                  }`}
-                  onClick={() => !uploadingFront && idCardFrontRef.current?.click()}
-                >
-                  {uploadingFront ? (
-                    <div className="flex flex-col items-center justify-center h-32">
-                      <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-2" />
-                      <p className="text-sm text-muted-foreground">上传中...</p>
-                    </div>
-                  ) : verificationForm.idCardFront ? (
-                    <img
-                      src={verificationPreview.front || verificationForm.idCardFront}
-                      alt="身份证正面"
-                      className="w-full h-32 object-contain"
-                    />
-                  ) : (
-                    <>
-                      <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">点击上传</p>
-                    </>
-                  )}
-                </div>
-                <input
-                  ref={idCardFrontRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/jpg"
-                  className="hidden"
-                  disabled={uploadingFront}
-                  onChange={(e) => handleIdCardUpload(e, 'front')}
-                />
-              </div>
-              <div>
-                <Label>身份证反面 *</Label>
-                <div
-                  className={`mt-1.5 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                    uploadingBack ? 'bg-accent/50' : 'hover:bg-accent'
-                  }`}
-                  onClick={() => !uploadingBack && idCardBackRef.current?.click()}
-                >
-                  {uploadingBack ? (
-                    <div className="flex flex-col items-center justify-center h-32">
-                      <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-2" />
-                      <p className="text-sm text-muted-foreground">上传中...</p>
-                    </div>
-                  ) : verificationForm.idCardBack ? (
-                    <img
-                      src={verificationPreview.back || verificationForm.idCardBack}
-                      alt="身份证反面"
-                      className="w-full h-32 object-contain"
-                    />
-                  ) : (
-                    <>
-                      <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">点击上传</p>
-                    </>
-                  )}
-                </div>
-                <input
-                  ref={idCardBackRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/jpg"
-                  className="hidden"
-                  disabled={uploadingBack}
-                  onChange={(e) => handleIdCardUpload(e, 'back')}
-                />
-              </div>
-            </div>
           </div>
           <div className="shrink-0 flex flex-col gap-3 border-t bg-background px-4 pt-4 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] sm:flex-row sm:px-6 sm:pb-4">
             <Button

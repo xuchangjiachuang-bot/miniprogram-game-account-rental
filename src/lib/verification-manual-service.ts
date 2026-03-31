@@ -3,8 +3,8 @@ import { db, users, verificationApplications } from '@/lib/db';
 import { classifyStoredFileReference } from '@/lib/storage-service';
 import { getVerificationManualReviewEnabled } from '@/lib/verification-review-config';
 
-function normalizeStoredFileValue(value: string) {
-  const trimmed = value.trim();
+function normalizeStoredFileValue(value?: string | null) {
+  const trimmed = (value || '').trim();
   if (!trimmed) {
     return '';
   }
@@ -39,8 +39,8 @@ export interface CreateVerificationParams {
   realName: string;
   phone: string;
   idCard: string;
-  idCardFrontUrl: string;
-  idCardBackUrl: string;
+  idCardFrontUrl?: string;
+  idCardBackUrl?: string;
   verificationService?: VerificationService;
 }
 
