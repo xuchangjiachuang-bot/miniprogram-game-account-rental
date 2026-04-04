@@ -1,17 +1,8 @@
-<!-- pages/index/index.wxml -->
+﻿<!-- pages/index/index.wxml -->
 <view class="page">
   <view class="hero-section">
     <view class="hero-container">
-      <swiper
-        wx:if="{{carousels.length > 0}}"
-        class="carousel"
-        indicator-dots
-        autoplay
-        interval="3000"
-        circular
-        indicator-color="rgba(255,255,255,0.5)"
-        indicator-active-color="#ffffff"
-      >
+      <swiper wx:if="{{carousels.length > 0}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff">
         <swiper-item wx:for="{{carousels}}" wx:key="id">
           <view class="carousel-item" bindtap="onCarouselTap" data-url="{{item.linkUrl || item.link}}">
             <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
@@ -25,9 +16,7 @@
       </swiper>
 
       <view wx:else class="fallback-hero">
-        <view class="badge">
-          <text>{{fallbackTitle.badgeText}}</text>
-        </view>
+        <view class="badge"><text>{{fallbackTitle.badgeText}}</text></view>
         <view class="main-title">{{fallbackTitle.mainTitle}}</view>
         <view class="sub-title">{{fallbackTitle.subTitle}}</view>
       </view>
@@ -48,19 +37,58 @@
         <text class="filter-title">筛选账号</text>
       </view>
 
-      <view class="filter-row filter-row-7">
-        <view class="filter-item filter-item-7">
+      <view class="search-row">
+        <view class="search-box">
+          <text class="search-icon">搜</text>
+          <input class="search-input" placeholder="输入关键字搜索账号" value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
+        </view>
+      </view>
+
+      <view class="filter-row">
+        <view class="filter-item">
           <view class="filter-label">登录方式</view>
           <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
             <view class="picker-box">
-              {{platformOptions[filters.platformIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
+              <text>{{platformOptions[filters.platformIndex]}}</text>
+              <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
 
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">哈夫币 (M)</view>
+        <view class="filter-item">
+          <view class="filter-label">段位</view>
+          <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
+            <view class="picker-box">
+              <text>{{rankOptions[filters.rankIndex]}}</text>
+              <text class="picker-arrow">v</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="filter-item">
+          <view class="filter-label">保险箱</view>
+          <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
+            <view class="picker-box">
+              <text>{{safeboxOptions[filters.safeboxIndex]}}</text>
+              <text class="picker-arrow">v</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="filter-item">
+          <view class="filter-label">地区</view>
+          <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
+            <view class="picker-box">
+              <text>{{provinceOptions[filters.provinceIndex]}}</text>
+              <text class="picker-arrow">v</text>
+            </view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="filter-row">
+        <view class="filter-item">
+          <view class="filter-label">哈夫币（M）</view>
           <view class="range-box">
             <input class="range-input" type="number" placeholder="最低" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
             <text class="range-separator">-</text>
@@ -68,108 +96,19 @@
           </view>
         </view>
 
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">段位</view>
-          <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
-            <view class="picker-box">
-              {{rankOptions[filters.rankIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">保险箱</view>
-          <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
-            <view class="picker-box">
-              {{safeboxOptions[filters.safeboxIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">体力等级</view>
-          <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
-            <view class="picker-box">
-              {{staminaOptions[filters.staminaIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">负重等级</view>
-          <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
-            <view class="picker-box">
-              {{loadOptions[filters.loadIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-
-        <view class="filter-item filter-item-7">
-          <view class="filter-label">地区</view>
-          <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
-            <view class="picker-box">
-              {{provinceOptions[filters.provinceIndex] || '全部'}}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-      </view>
-
-      <view class="filter-row filter-row-3">
-        <view class="filter-item filter-item-3">
-          <view class="filter-label">租金 (元)</view>
+        <view class="filter-item">
+          <view class="filter-label">租金（元）</view>
           <view class="range-box">
             <input class="range-input" type="number" placeholder="最低" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
             <text class="range-separator">-</text>
             <input class="range-input" type="number" placeholder="最高" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
           </view>
         </view>
-
-        <view class="filter-item filter-item-3">
-          <view class="filter-label">押金 (元)</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
-            <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
-          </view>
-        </view>
-
-        <view class="filter-item filter-item-3">
-          <view class="filter-label">总价 (元)</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
-            <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
-          </view>
-        </view>
-      </view>
-
-      <view class="search-row">
-        <view class="search-box">
-          <text class="search-icon">搜</text>
-          <input
-            class="search-input"
-            placeholder="输入关键词搜索账号"
-            value="{{searchQuery}}"
-            bindinput="onSearchInput"
-            bindconfirm="onSearchConfirm"
-            confirm-type="search"
-          />
-        </view>
       </view>
 
       <view class="action-row">
-        <view class="btn-toggle" bindtap="onShowMoreFilters">
-          <text>{{showMoreFilters ? '▲' : '▼'}}</text>
-          <text>{{showMoreFilters ? '收起皮肤筛选' : '展开皮肤筛选'}}</text>
-        </view>
-        <view class="btn-reset" bindtap="onResetFilters">
-          <text>重置</text>
-        </view>
+        <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{showMoreFilters ? '收起皮肤筛选' : '展开皮肤筛选'}}</text></view>
+        <view class="btn-reset" bindtap="onResetFilters"><text>重置</text></view>
       </view>
 
       <view class="skin-filter" wx:if="{{showMoreFilters}}">
@@ -178,15 +117,9 @@
           <text class="skin-count" wx:if="{{selectedSkins.length > 0}}">已选 {{selectedSkins.length}} 项</text>
         </view>
         <view class="skin-list">
-          <view
-            class="skin-tag {{selectedSkins.includes(item.name) ? 'active' : ''}}"
-            wx:for="{{skinOptions}}"
-            wx:key="id"
-            bindtap="onSkinTap"
-            data-name="{{item.name}}"
-          >
-            <text class="skin-check" wx:if="{{selectedSkins.includes(item.name)}}">√</text>
-            {{item.name}}
+          <view class="skin-tag {{item.selected ? 'active' : ''}}" wx:for="{{skinOptionsView}}" wx:key="id" bindtap="onSkinTap" data-name="{{item.name}}">
+            <text class="skin-check" wx:if="{{item.selected}}">√</text>
+            <text>{{item.name}}</text>
           </view>
         </view>
       </view>
@@ -195,18 +128,10 @@
 
   <view class="account-section">
     <view class="account-container">
-      <view class="list-header">
-        <text class="account-count">共 {{accounts.length}} 个账号</text>
-      </view>
+      <view class="list-header"><text class="account-count">共 {{displayAccounts.length}} 个账号</text></view>
 
       <view class="account-grid">
-        <view
-          class="account-card"
-          wx:for="{{displayAccounts}}"
-          wx:key="id"
-          bindtap="onAccountTap"
-          data-account="{{item}}"
-        >
+        <view class="account-card" wx:for="{{displayAccounts}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
           <view class="card-image">
             <image class="card-img" src="{{item.images[0] || '/images/default-account.png'}}" mode="aspectFill" />
             <view class="card-status {{item.status}}">{{item.statusText}}</view>
@@ -215,7 +140,6 @@
 
           <view class="card-content">
             <view class="card-title">{{item.fullTitle}}</view>
-
             <view class="info-row">
               <view class="info-box coins">
                 <text class="info-label">哈夫币</text>
@@ -237,23 +161,19 @@
                 <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
               </view>
               <view class="attribute">
-                <text class="attr-label">等级</text>
-                <text class="attr-value">Lv.{{item.account_level}}</text>
-              </view>
-              <view class="attribute">
                 <text class="attr-label">段位</text>
                 <text class="attr-value">{{item.rank_display}}</text>
               </view>
             </view>
 
-            <view class="kd-region-row" wx:if="{{item.kd > 0 || item.region.city}}">
+            <view class="kd-region-row" wx:if="{{item.kd > 0 || item.regionText}}">
               <text class="kd-text" wx:if="{{item.kd > 0}}">KD: {{item.kd}}</text>
-              <text class="region-text">{{item.region.city}}</text>
+              <text class="region-text">{{item.regionText}}</text>
             </view>
 
-            <view class="skins-row" wx:if="{{item.skins.length > 0}}">
-              <text class="skin-tag" wx:for="{{item.skins.slice(0, 3)}}" wx:for-item="skin" wx:key="index">{{skin}}</text>
-              <text class="skin-more" wx:if="{{item.skins.length > 3}}">+{{item.skins.length - 3}}</text>
+            <view class="skins-row" wx:if="{{item.tagPreview.length > 0}}">
+              <text class="skin-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+              <text class="skin-more" wx:if="{{item.moreTagCount > 0}}">+{{item.moreTagCount}}</text>
             </view>
 
             <view class="price-row">
@@ -279,33 +199,22 @@
         </view>
       </view>
 
-      <view class="load-more" wx:if="{{hasMore && !loading}}">
-        <view class="btn-load-more" bindtap="onLoadMore">加载更多</view>
-      </view>
+      <view class="load-more" wx:if="{{hasMore && !loading}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
 
       <view class="loading" wx:if="{{loading}}">
         <view class="loading-spinner"></view>
         <text>加载中...</text>
       </view>
 
-      <view class="empty" wx:if="{{!loading && accounts.length === 0}}">
+      <view class="empty" wx:if="{{!loading && displayAccounts.length === 0}}">
         <view class="empty-icon">空</view>
         <view class="empty-text">暂无账号</view>
-        <view class="empty-hint">调整筛选条件后再试试</view>
+        <view class="empty-hint">调整筛选条件后再试试。</view>
       </view>
     </view>
   </view>
 
   <view class="tabbar-placeholder"></view>
-
-  <customer-service-float
-    visible="{{showCustomerService}}"
-    bind:tap="onCustomerServiceTap"
-    bind:close="onCustomerServiceClose"
-  />
-
-  <login-modal
-    visible="{{showLoginModal}}"
-    bind:loginSuccess="onLoginSuccess"
-  />
+  <customer-service-float visible="{{showCustomerService}}" bind:tap="onCustomerServiceTap" bind:close="onCustomerServiceClose" />
+  <login-modal visible="{{showLoginModal}}" bind:loginSuccess="onLoginSuccess" />
 </view>

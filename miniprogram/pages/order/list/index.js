@@ -1,18 +1,9 @@
-// pages/order/list/index.js
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const orderTransformer = require('../../../utils/order-transformer.js');
 
-const TAB_KEYS = [
-  'all',
-  'pending_payment',
-  'active',
-  'pending_verification',
-  'completed',
-  'cancelled',
-  'disputed',
-];
+const TAB_KEYS = ['all', 'pending_payment', 'active', 'pending_verification', 'completed', 'cancelled', 'disputed'];
 
 Page({
   data: {
@@ -57,10 +48,7 @@ Page({
     if (this.data.loading) return Promise.resolve();
 
     this.setData({ loading: true });
-
-    return api.getOrders({
-      status: this.data.currentTab === 'all' ? undefined : this.data.currentTab,
-    })
+    return api.getOrders({ status: this.data.currentTab === 'all' ? undefined : this.data.currentTab })
       .then((res) => {
         const data = res?.data || {};
         const orders = data.list || data.orders || [];
@@ -71,19 +59,13 @@ Page({
 
         const tabs = this.data.tabs.map((tab) => ({
           ...tab,
-          count: tab.key === 'all'
-            ? totalCount
-            : Number(data?.counts?.[tab.key] || 0),
+          count: tab.key === 'all' ? totalCount : Number(data?.counts?.[tab.key] || 0),
         }));
 
-        this.setData({
-          orders: processedOrders,
-          tabs,
-          loading: false,
-        });
+        this.setData({ orders: processedOrders, tabs });
       })
       .catch((error) => {
-        this.setData({ loading: false });
+        console.error('加载订单失败:', error);
 
         if (config.useMockData) {
           const mockData = require('../../../utils/mock-data.js');
@@ -92,38 +74,36 @@ Page({
           return;
         }
 
-        wx.showToast({
-          title: error.error || '加载失败',
-          icon: 'none',
-        });
-      });
+        wx.showToast({ title: error.error || '加载失败', icon: 'none' });
+      })
+      .finally(() => this.setData({ loading: false }));
   },
 
   onTabChange(e) {
-    const { tab } = e.currentTarget.dataset;
+    const tab = e.currentTarget.dataset.tab;
     if (!tab || tab === this.data.currentTab) return;
-
     this.setData({ currentTab: tab });
     this.loadOrders();
   },
 
   onOrderTap(e) {
-    const { id } = e.currentTarget.dataset;
-    wx.navigateTo({ url: `/pages/order/detail/index?id=${id}` });
+    const id = e.currentTarget.dataset.id;
+    wx.navigateTo({ url: '/pages/order/detail/index?id=' + id });
   },
 
   onActionTap(e) {
-    const { action, id } = e.currentTarget.dataset;
+    const action = e.currentTarget.dataset.action;
+    const id = e.currentTarget.dataset.id;
 
     switch (action) {
       case 'pay':
-        this.payOrder(id);
+        wx.navigateTo({ url: '/pages/order/payment/index?id=' + id });
         break;
       case 'cancel':
         this.cancelOrder(id);
         break;
       case 'chat':
-        this.enterChat();
+        wx.switchTab({ url: '/pages/chat/list/index' });
         break;
       case 'complete':
         this.completeOrder(id);
@@ -133,18 +113,13 @@ Page({
     }
   },
 
-  payOrder(orderId) {
-    wx.navigateTo({ url: `/pages/order/payment/index?id=${orderId}` });
-  },
-
   cancelOrder(orderId) {
     wx.showModal({
       title: '确认取消',
-      content: '确定要取消这个订单吗？',
+      content: '确定要取消这笔订单吗？',
       success: (res) => {
         if (!res.confirm) return;
-
-        wx.showLoading({ title: '取消中...' });
+        wx.showLoading({ title: '处理中...' });
         api.cancelOrder(orderId)
           .then(() => {
             wx.showToast({ title: '订单已取消', icon: 'success' });
@@ -161,10 +136,9 @@ Page({
   completeOrder(orderId) {
     wx.showModal({
       title: '确认归还',
-      content: '确认已使用完毕并归还账号吗？',
+      content: '确认已使用完成并归还账号吗？',
       success: (res) => {
         if (!res.confirm) return;
-
         wx.showLoading({ title: '提交中...' });
         api.completeOrder(orderId)
           .then(() => {
@@ -177,10 +151,6 @@ Page({
           .finally(() => wx.hideLoading());
       },
     });
-  },
-
-  enterChat() {
-    wx.switchTab({ url: '/pages/chat/list/index' });
   },
 
   onGoHome() {

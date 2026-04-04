@@ -1,78 +1,53 @@
-// pages/auth/bind-phone/index.js
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 
 Page({
   data: {
-    loading: false
+    phone: '',
+    loading: false,
   },
 
-  onLoad(options) {
-    console.log('绑定手机号页面加载', options);
+  onPhoneInput(e) {
+    this.setData({ phone: e.detail.value });
   },
 
-  /**
-   * 获取手机号
-   */
-  onGetPhoneNumber(e) {
-    console.log('获取手机号', e);
-    
-    if (e.detail.errMsg !== 'getPhoneNumber:ok') {
-      wx.showToast({
-        title: '取消授权',
-        icon: 'none'
-      });
+  validatePhone(phone) {
+    return /^1[3-9]\d{9}$/.test(String(phone || '').trim());
+  },
+
+  onSubmit() {
+    const phone = String(this.data.phone || '').trim();
+    if (!this.validatePhone(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
       return;
     }
-    
-    const { code, encryptedData, iv } = e.detail;
-    const that = this;
-    that.setData({ loading: true });
-    
-    // 调用后端接口绑定手机号
-    api.bindPhone({
-      code,
-      encryptedData,
-      iv
-    })
-    .then(res => {
-      console.log('绑定手机号成功:', res);
-      
-      // 更新用户信息
-      const userInfo = storage.getUserInfo();
-      if (userInfo) {
-        userInfo.phone = res.phone || res.data?.phone || userInfo.phone;
+    if (this.data.loading) return;
+
+    this.setData({ loading: true });
+    wx.showLoading({ title: '绑定中...', mask: true });
+
+    const request = api.bindPhone({ phone }).catch(() => api.manualBindPhone({ phone }));
+    request
+      .then((res) => {
+        const userInfo = storage.getUserInfo() || {};
+        userInfo.phone = res.phone || res.data?.user?.phone || phone;
         storage.setUserInfo(userInfo);
-      }
-      
-      wx.showToast({
-        title: '绑定成功',
-        icon: 'success'
+        wx.hideLoading();
+        this.setData({ loading: false });
+        wx.showToast({ title: '绑定成功', icon: 'success' });
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/index/index' });
+        }, 1000);
+      })
+      .catch((error) => {
+        console.error('绑定手机号失败:', error);
+        wx.hideLoading();
+        this.setData({ loading: false });
+        wx.showToast({ title: error.error || '绑定失败，请稍后重试', icon: 'none' });
       });
-      
-      setTimeout(() => {
-        wx.switchTab({
-          url: '/pages/index/index'
-        });
-      }, 1500);
-    })
-    .catch(error => {
-      console.error('绑定手机号失败:', error);
-      that.setData({ loading: false });
-      
-      wx.showToast({
-        title: error.error || '绑定失败',
-        icon: 'none'
-      });
-    });
   },
 
-  /**
-   * 跳过
-   */
   onSkip() {
-    wx.switchTab({
-      url: '/pages/index/index'
-    });
-  }
+    wx.switchTab({ url: '/pages/index/index' });
+  },
 });

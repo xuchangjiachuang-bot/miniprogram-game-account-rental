@@ -1,176 +1,113 @@
-/* pages/auth/login/index.wxss */
-
-.login-container {
-  min-height: 100vh;
-  padding: 80rpx 40rpx;
+﻿page {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* Logo区域 */
+.login-container {
+  min-height: 100vh;
+  padding: 100rpx 40rpx 80rpx;
+}
+
 .logo-section {
   text-align: center;
   margin-bottom: 80rpx;
 }
 
 .logo-icon {
-  font-size: 120rpx;
-  margin-bottom: 24rpx;
+  width: 128rpx;
+  height: 128rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 40rpx;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64rpx;
+  font-weight: 700;
+  box-shadow: 0 12rpx 30rpx rgba(0, 0, 0, 0.14);
 }
 
 .app-name {
   font-size: 48rpx;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 12rpx;
+  margin-bottom: 14rpx;
 }
 
 .app-desc {
   font-size: 28rpx;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.82);
 }
 
-/* 表单区域 */
 .form-section {
   background: #ffffff;
   border-radius: 24rpx;
-  padding: 60rpx 40rpx;
+  padding: 48rpx 40rpx;
   margin-bottom: 40rpx;
+  box-shadow: 0 20rpx 40rpx rgba(31, 41, 55, 0.14);
+}
+
+.login-highlight {
+  font-size: 26rpx;
+  color: #5b6475;
+  line-height: 1.7;
+  margin-bottom: 32rpx;
 }
 
 .btn-wechat {
   width: 100%;
+  height: 96rpx;
+  border-radius: 16rpx;
+  border: none;
+  background: linear-gradient(90deg, #07c160 0%, #11a863 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  padding: 28rpx;
-  background: linear-gradient(to right, #07c160, #06ae56);
-  color: #ffffff;
-  border: none;
-  border-radius: 12rpx;
-  font-size: 32rpx;
-  font-weight: 600;
 }
 
 .btn-icon {
-  font-size: 40rpx;
+  font-size: 34rpx;
 }
 
-/* 分隔线 */
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 40rpx 0;
-}
-
-.divider-line {
-  flex: 1;
-  height: 1rpx;
-  background: #eeeeee;
-}
-
-.divider-text {
-  padding: 0 24rpx;
-  font-size: 26rpx;
-  color: #999999;
-}
-
-/* 表单项 */
-.form-item {
-  margin-bottom: 30rpx;
-}
-
-.input-wrapper {
-  display: flex;
-  align-items: center;
-  padding: 24rpx;
-  background: #f5f5f5;
-  border-radius: 12rpx;
-}
-
-.input-icon {
-  font-size: 36rpx;
-  margin-right: 16rpx;
-}
-
-.input-field {
-  flex: 1;
-  font-size: 28rpx;
-  color: #1a1a1a;
-}
-
-.input-field.code-field {
-  flex: 1;
-  margin-right: 20rpx;
-}
-
-.btn-code {
-  padding: 16rpx 32rpx;
-  background: transparent;
-  color: #667eea;
-  border: 2rpx solid #667eea;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  white-space: nowrap;
-}
-
-.btn-code.disabled {
-  opacity: 0.5;
-  color: #999999;
-  border-color: #e0e0e0;
-}
-
-/* 登录按钮 */
-.btn-login {
-  width: 100%;
-  padding: 28rpx;
-  background: linear-gradient(to right, #667eea, #764ba2);
-  color: #ffffff;
-  border: none;
-  border-radius: 12rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  margin-top: 40rpx;
-}
-
-.btn-login[disabled] {
-  opacity: 0.5;
-}
-
-/* 协议 */
 .agreement {
-  margin-top: 30rpx;
-  padding: 0 10rpx;
+  margin-top: 28rpx;
 }
 
 .agreement-label {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 6rpx;
   font-size: 24rpx;
-  color: #999999;
+  color: #6b7280;
+  line-height: 1.7;
 }
 
-agreement-label checkbox {
-  transform: scale(0.8);
-  margin-right: 8rpx;
+.agreement-label checkbox {
+  transform: scale(0.82);
+  margin-right: 4rpx;
 }
 
-.agreement-label .link {
-  color: #667eea;
-  margin: 0 4rpx;
+.link {
+  color: #5b6cf0;
 }
 
-/* 提示信息 */
 .tips {
   display: flex;
-  justify-content: space-around;
-  padding: 20rpx 0;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .tip-item {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  border-radius: 16rpx;
+  background: rgba(255,255,255,0.14);
+  color: #ffffff;
   font-size: 24rpx;
-  color: rgba(255,255,255,0.8);
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
 }

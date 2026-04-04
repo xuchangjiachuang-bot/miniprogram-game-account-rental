@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Order data transformer for mini program pages.
  */
 
@@ -22,16 +22,16 @@ const statusTextMap = {
 };
 
 const statusColorMap = {
-  pending_payment: '#ff9f43',
-  paid: '#54a0ff',
-  pending_verification: '#2ed573',
-  pending_consumption_confirm: '#20bf6b',
-  active: '#00d2d3',
-  completed: '#1dd1a1',
-  cancelled: '#8395a7',
-  disputed: '#ff6b6b',
-  refunding: '#ffa502',
-  refunded: '#a4b0be',
+  pending_payment: '#f59e0b',
+  paid: '#3b82f6',
+  pending_verification: '#16a34a',
+  pending_consumption_confirm: '#0f766e',
+  active: '#2563eb',
+  completed: '#059669',
+  cancelled: '#64748b',
+  disputed: '#ef4444',
+  refunding: '#f97316',
+  refunded: '#94a3b8',
 };
 
 function normalizeStatus(status) {
@@ -56,7 +56,7 @@ function getRentalPeriod(order) {
         const hours = Math.round(totalHours % 24);
         return hours > 0 ? `${days}天${hours}小时` : `${days}天`;
       }
-      return `${Math.round(totalHours)}小时`;
+      return `${Math.max(1, Math.round(totalHours))}小时`;
     }
   }
 
@@ -83,7 +83,7 @@ function buildActions(status) {
     case 'active':
       return [
         { key: 'chat', text: '进入聊天', type: 'primary' },
-        { key: 'complete', text: '归还账号', type: 'outline' },
+        { key: 'complete', text: '确认归还', type: 'outline' },
       ];
     case 'disputed':
       return [
@@ -99,6 +99,9 @@ function transformOrder(order) {
 
   const status = normalizeStatus(order.status);
   const actions = buildActions(status);
+  const rentalPrice = Number(order.rentalPrice || order.rent_amount || 0);
+  const deposit = Number(order.deposit || order.deposit_amount || 0);
+  const totalPrice = Number(order.totalPrice || order.total_price || (rentalPrice + deposit));
 
   const account = {
     id: order.accountId || order.account_id,
@@ -106,9 +109,9 @@ function transformOrder(order) {
     image: order.accountImage || order.account_image || '/images/default-account.png',
     coins: order.coinsM ? `${order.coinsM}M` : '-',
     ratio: order.rentalRatio ? `1:${Math.round(Number(order.rentalRatio))}` : '1:35',
-    safebox: order.safeboxCount ? `${order.safeboxCount}个保险箱` : '-',
-    stamina: order.staminaValue ? `${order.staminaValue}体力` : '-',
-    load: order.energyValue ? `${order.energyValue}负重` : '-',
+    safebox: order.safeboxCount ? `${order.safeboxCount} 格保险箱` : '-',
+    stamina: order.staminaValue ? `${order.staminaValue} 体力` : '-',
+    load: order.energyValue ? `${order.energyValue} 负重` : '-',
   };
 
   return {
@@ -118,14 +121,14 @@ function transformOrder(order) {
     statusText: statusTextMap[status] || status,
     statusColor: statusColorMap[status] || '#999999',
     account,
-    rental_price: Number(order.rentalPrice || order.rent_amount || 0).toFixed(2),
-    deposit: Number(order.deposit || order.deposit_amount || 0).toFixed(2),
-    total_price: Number(order.totalPrice || order.total_price || 0).toFixed(2),
+    rental_price: rentalPrice.toFixed(2),
+    deposit: deposit.toFixed(2),
+    total_price: totalPrice.toFixed(2),
     rental_period: getRentalPeriod(order),
-    rental_start: order.startTime ? formatTime(order.startTime) : '',
-    rental_end: order.endTime ? formatTime(order.endTime) : '',
+    rental_start: order.startTime ? formatTime(order.startTime) : '-',
+    rental_end: order.endTime ? formatTime(order.endTime) : '-',
     created_at: formatTime(order.createdAt),
-    payment_time: order.paymentTime ? formatTime(order.paymentTime) : '',
+    payment_time: order.paymentTime ? formatTime(order.paymentTime) : '-',
     seller_id: order.sellerId || order.seller_id,
     buyer_id: order.buyerId || order.buyer_id,
     showActions: actions.length > 0,
@@ -164,9 +167,7 @@ function getStatusColor(status) {
 
 function calculateProgress(order) {
   const status = normalizeStatus(order?.status);
-  if (!order?.startTime || !order?.endTime || status !== 'active') {
-    return 0;
-  }
+  if (!order?.startTime || !order?.endTime || status !== 'active') return 0;
 
   const start = new Date(order.startTime).getTime();
   const end = new Date(order.endTime).getTime();

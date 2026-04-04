@@ -1,5 +1,5 @@
-/**
- * 小程序前端统一数据转换工具
+﻿/**
+ * Mini program account data transformer.
  */
 
 const rankMap = {
@@ -21,8 +21,8 @@ const loginMethodMap = {
 };
 
 const statusMap = {
-  available: '可租',
-  rented: '已租',
+  available: '可出租',
+  rented: '已租出',
   renting: '租赁中',
   locked: '锁定中',
   deleted: '已删除',
@@ -39,21 +39,11 @@ function formatMoney(value) {
 function normalizeImages(account = {}) {
   const candidates = [];
 
-  if (Array.isArray(account.images)) {
-    candidates.push(...account.images);
-  }
-  if (Array.isArray(account.screenshots)) {
-    candidates.push(...account.screenshots);
-  }
-  if (account.coverImage) {
-    candidates.push(account.coverImage);
-  }
-  if (account.cover_image) {
-    candidates.push(account.cover_image);
-  }
-  if (account.imageUrl) {
-    candidates.push(account.imageUrl);
-  }
+  if (Array.isArray(account.images)) candidates.push(...account.images);
+  if (Array.isArray(account.screenshots)) candidates.push(...account.screenshots);
+  if (account.coverImage) candidates.push(account.coverImage);
+  if (account.cover_image) candidates.push(account.cover_image);
+  if (account.imageUrl) candidates.push(account.imageUrl);
 
   const deduped = candidates.filter(Boolean).filter((item, index, arr) => arr.indexOf(item) === index);
   return deduped.length > 0 ? deduped : ['/images/default-account.png'];
@@ -88,36 +78,20 @@ function buildFullTitle(account = {}, customAttributes = {}) {
   const parts = [];
 
   const coinsM = Number(account.coinsM || account.coins_million || 0);
-  if (coinsM > 0) {
-    parts.push(`${coinsM}M哈夫币`);
-  }
+  if (coinsM > 0) parts.push(`${coinsM}M 哈夫币`);
 
   const safeboxCount = Number(account.safeboxCount || account.safebox_count || 0);
-  if (safeboxCount > 0) {
-    parts.push(`${safeboxCount}个保险箱`);
-  }
+  if (safeboxCount > 0) parts.push(`${safeboxCount} 格保险箱`);
 
   const staminaValue = Number(account.staminaValue || account.stamina_value || 0);
-  if (staminaValue > 0) {
-    parts.push(`${staminaValue}体力`);
-  }
+  if (staminaValue > 0) parts.push(`${staminaValue} 体力`);
 
   const energyValue = Number(account.energyValue || account.energy_value || 0);
-  if (energyValue > 0) {
-    parts.push(`${energyValue}负重`);
-  }
+  if (energyValue > 0) parts.push(`${energyValue} 负重`);
 
-  if (customAttributes.rank) {
-    parts.push(getRankText(customAttributes.rank));
-  }
-
-  if (customAttributes.kd) {
-    parts.push(`KD ${customAttributes.kd}`);
-  }
-
-  if (Array.isArray(account.tags) && account.tags.length > 0) {
-    parts.push(account.tags[0]);
-  }
+  if (customAttributes.rank) parts.push(getRankText(customAttributes.rank));
+  if (customAttributes.kd) parts.push(`KD ${customAttributes.kd}`);
+  if (Array.isArray(account.tags) && account.tags.length > 0) parts.push(account.tags[0]);
 
   return parts.length > 0 ? parts.join(' | ') : (account.title || account.account_name || '游戏账号');
 }
@@ -136,6 +110,9 @@ function transformAccount(account) {
   const rentalPrice = Number(account.accountValue || account.recommendedRental || account.rentalPrice || account.rental_price || 0);
   const deposit = Number(account.deposit || account.deposit_amount || 0);
   const totalPrice = Number(account.totalPrice || account.total_price || (rentalPrice + deposit));
+  const tags = Array.isArray(account.tags) ? account.tags.filter(Boolean) : [];
+  const regionProvince = customAttributes.province || account.province || account.region?.province || '';
+  const regionCity = customAttributes.city || account.city || account.region?.city || '';
 
   return {
     id: account.id || account.accountId || account.account_id,
@@ -145,24 +122,24 @@ function transformAccount(account) {
     fullTitle: buildFullTitle(account, customAttributes),
     coins_display: coinsM > 0 ? `${coinsM}M` : '-',
     ratio_display: ratioValue > 0 ? `1:${Math.round(ratioValue)}` : '1:35',
-    safebox: safeboxCount > 0 ? `${safeboxCount}个` : '-',
+    safebox: safeboxCount > 0 ? `${safeboxCount} 格` : '-',
     stamina_level: staminaLevel || '-',
     load_level: loadLevel || '-',
     account_level: customAttributes.accountLevel || account.accountLevel || account.account_level || 0,
     rank: customAttributes.rank || account.rank || 'none',
     rank_display: getRankText(customAttributes.rank || account.rank),
     kd: customAttributes.kd || account.kd || 0,
-    awmBullets: customAttributes.awmBullets || customAttributes.awm_bullets || account.awmBullets || 0,
-    level6Armor: customAttributes.level6Armor || customAttributes.level_6_armor || account.level6Armor || 0,
-    level6Helmet: customAttributes.level6Helmet || customAttributes.level_6_helmet || account.level6Helmet || 0,
     login_method: getLoginMethodText(customAttributes.loginMethod || account.loginMethod || account.login_method),
     loginMethod: customAttributes.loginMethod || account.loginMethod || account.login_method || '',
     region: {
-      province: customAttributes.province || account.province || account.region?.province || '-',
-      city: customAttributes.city || account.city || account.region?.city || '-',
+      province: regionProvince || '-',
+      city: regionCity || '-',
     },
-    skins: Array.isArray(account.tags) ? account.tags : [],
-    tags: Array.isArray(account.tags) ? account.tags : [],
+    regionText: regionCity || regionProvince || '不限地区',
+    skins: tags,
+    tags,
+    tagPreview: tags.slice(0, 3),
+    moreTagCount: Math.max(0, tags.length - 3),
     images,
     screenshots: images,
     actual_rental: formatMoney(rentalPrice),

@@ -1,4 +1,4 @@
-const api = require('../../utils/api.js');
+﻿const api = require('../../utils/api.js');
 const storage = require('../../utils/storage.js');
 const config = require('../../utils/config.js');
 const mockData = require('../../utils/mock-data.js');
@@ -8,9 +8,9 @@ const fallbackHomepageConfig = {
   carousels: [],
   skinOptions: [],
   fallbackTitle: {
-    badgeText: '专业哈夫币出租平台',
+    badgeText: '哈夫币账号出租平台',
     mainTitle: '快速找到靠谱账号',
-    subTitle: '担保交易、押金保障、随时沟通，租号更安心。',
+    subTitle: '担保交易、押金保护、消息直连，让租号更安心。',
     buttonText: '发布账号',
   },
 };
@@ -26,23 +26,16 @@ Page({
       maxCoins: '',
       rankIndex: 0,
       safeboxIndex: 0,
-      staminaIndex: 0,
-      loadIndex: 0,
       provinceIndex: 0,
       minRental: '',
       maxRental: '',
-      minDeposit: '',
-      maxDeposit: '',
-      minTotal: '',
-      maxTotal: '',
     },
     platformOptions: ['全部', '微信扫码', 'QQ 账号密码', 'Steam 账号密码'],
     rankOptions: ['全部', '青铜', '白银', '黄金', '铂金', '钻石', '黑鹰', '巅峰'],
-    safeboxOptions: ['全部', '1个', '2个', '3个', '4个以上'],
-    staminaOptions: ['全部', '3级', '4级', '5级', '6级', '7级'],
-    loadOptions: ['全部', '3级', '4级', '5级', '6级', '7级'],
+    safeboxOptions: ['全部', '1 格', '2 格', '3 格', '4 格以上'],
     provinceOptions: ['全部', '北京', '上海', '广东', '浙江', '江苏', '四川', '湖北'],
     skinOptions: [],
+    skinOptionsView: [],
     selectedSkins: [],
     showMoreFilters: false,
     accounts: [],
@@ -50,7 +43,6 @@ Page({
     loading: false,
     hasMore: false,
     page: 1,
-    pageSize: 10,
     showLoginModal: false,
     showCustomerService: true,
   },
@@ -62,105 +54,80 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.setData({
-      page: 1,
-      accounts: [],
-      displayAccounts: [],
-    });
-
-    Promise.all([
-      this.loadHomepageConfig(),
-      this.loadAccounts(),
-    ]).finally(() => wx.stopPullDownRefresh());
+    this.setData({ page: 1, accounts: [], displayAccounts: [] });
+    Promise.all([this.loadHomepageConfig(), this.loadAccounts()]).finally(() => wx.stopPullDownRefresh());
   },
 
   onReachBottom() {
-    if (this.data.hasMore && !this.data.loading) {
-      this.loadMoreAccounts();
-    }
+    if (this.data.hasMore && !this.data.loading) this.loadMoreAccounts();
+  },
+
+  buildSkinOptionsView(options, selectedSkins) {
+    return (options || []).map((item) => ({
+      ...item,
+      selected: selectedSkins.includes(item.name),
+    }));
+  },
+
+  syncSkinOptionsView() {
+    this.setData({
+      skinOptionsView: this.buildSkinOptionsView(this.data.skinOptions, this.data.selectedSkins),
+    });
   },
 
   loadHomepageConfig() {
     return api.getHomepageConfig()
       .then((res) => {
         const data = res?.data || {};
+        const skinOptions = Array.isArray(data.skinOptions) ? data.skinOptions : [];
         this.setData({
           carousels: Array.isArray(data.carousels) ? data.carousels : [],
-          skinOptions: Array.isArray(data.skinOptions) ? data.skinOptions : [],
+          skinOptions,
+          skinOptionsView: this.buildSkinOptionsView(skinOptions, this.data.selectedSkins),
           fallbackTitle: data.fallbackTitle || fallbackHomepageConfig.fallbackTitle,
         });
       })
       .catch((error) => {
         console.error('加载首页配置失败:', error);
-
-        if (config.useMockData && mockData.homepageConfig) {
-          this.setData({
-            carousels: mockData.homepageConfig.carousels || [],
-            skinOptions: mockData.homepageConfig.skinOptions || [],
-            fallbackTitle: mockData.homepageConfig.fallbackTitle || fallbackHomepageConfig.fallbackTitle,
-          });
-          return;
-        }
-
+        const homepageConfig = config.useMockData && mockData.homepageConfig
+          ? mockData.homepageConfig
+          : fallbackHomepageConfig;
+        const skinOptions = homepageConfig.skinOptions || [];
         this.setData({
-          carousels: fallbackHomepageConfig.carousels,
-          skinOptions: fallbackHomepageConfig.skinOptions,
-          fallbackTitle: fallbackHomepageConfig.fallbackTitle,
+          carousels: homepageConfig.carousels || [],
+          skinOptions,
+          skinOptionsView: this.buildSkinOptionsView(skinOptions, this.data.selectedSkins),
+          fallbackTitle: homepageConfig.fallbackTitle || fallbackHomepageConfig.fallbackTitle,
         });
       });
   },
 
   loadAccounts() {
     this.setData({ loading: true });
-
     const params = this.buildFilterParams();
 
-    return api.getAccounts({
-      limit: 200,
-      ...params,
-    })
+    return api.getAccounts({ limit: 200, ...params })
       .then((res) => {
         const data = res?.data || {};
         const accounts = Array.isArray(data) ? data : (data.list || data.accounts || []);
         const transformedAccounts = dataTransformer.transformAccountList(accounts);
-
-        const nextAccounts = this.data.page === 1
-          ? transformedAccounts
-          : [...this.data.accounts, ...transformedAccounts];
-
-        this.setData({
-          accounts: nextAccounts,
-          displayAccounts: nextAccounts,
-          hasMore: false,
-        });
+        const nextAccounts = this.data.page === 1 ? transformedAccounts : this.data.accounts.concat(transformedAccounts);
+        this.setData({ accounts: nextAccounts, displayAccounts: nextAccounts, hasMore: false });
       })
       .catch((error) => {
         console.error('加载账号列表失败:', error);
-
         if (config.useMockData) {
           const accounts = dataTransformer.transformAccountList(mockData.accounts || []);
-          this.setData({
-            accounts,
-            displayAccounts: accounts,
-            hasMore: false,
-          });
+          this.setData({ accounts, displayAccounts: accounts, hasMore: false });
           return;
         }
-
-        wx.showToast({
-          title: error.error || '加载失败',
-          icon: 'none',
-        });
+        wx.showToast({ title: error.error || '加载失败', icon: 'none' });
       })
-      .finally(() => {
-        this.setData({ loading: false });
-      });
+      .finally(() => this.setData({ loading: false }));
   },
 
   loadMoreAccounts() {
-    this.setData({
-      page: this.data.page + 1,
-    });
+    this.setData({ page: this.data.page + 1 });
     this.loadAccounts();
   },
 
@@ -173,159 +140,58 @@ Page({
     if (filters.maxCoins) params.maxCoins = filters.maxCoins;
     if (filters.minRental) params.minRental = filters.minRental;
     if (filters.maxRental) params.maxRental = filters.maxRental;
-    if (filters.minDeposit) params.minDeposit = filters.minDeposit;
-    if (filters.maxDeposit) params.maxDeposit = filters.maxDeposit;
-    if (filters.minTotal) params.minTotal = filters.minTotal;
-    if (filters.maxTotal) params.maxTotal = filters.maxTotal;
 
     if (filters.platformIndex > 0) {
-      const platformMap = {
-        1: 'wechat',
-        2: 'qq',
-        3: 'steam',
-      };
+      const platformMap = { 1: 'wechat', 2: 'qq', 3: 'steam' };
       params.loginMethod = platformMap[filters.platformIndex];
     }
-
-    if (filters.rankIndex > 0) {
-      params.rank = this.data.rankOptions[filters.rankIndex];
-    }
-
-    if (filters.safeboxIndex > 0) {
-      params.safebox = this.data.safeboxOptions[filters.safeboxIndex];
-    }
-
-    if (filters.staminaIndex > 0) {
-      params.staminaLevel = this.data.staminaOptions[filters.staminaIndex].replace('级', '');
-    }
-
-    if (filters.loadIndex > 0) {
-      params.loadLevel = this.data.loadOptions[filters.loadIndex].replace('级', '');
-    }
-
-    if (filters.provinceIndex > 0) {
-      params.province = this.data.provinceOptions[filters.provinceIndex];
-    }
-
-    if (selectedSkins.length > 0) {
-      params.skins = selectedSkins.join(',');
-    }
+    if (filters.rankIndex > 0) params.rank = this.data.rankOptions[filters.rankIndex];
+    if (filters.safeboxIndex > 0) params.safebox = String(filters.safeboxIndex);
+    if (filters.provinceIndex > 0) params.province = this.data.provinceOptions[filters.provinceIndex];
+    if (selectedSkins.length > 0) params.skins = selectedSkins.join(',');
 
     return params;
   },
 
   resetAndLoad() {
-    this.setData({
-      page: 1,
-      accounts: [],
-      displayAccounts: [],
-    });
+    this.setData({ page: 1, accounts: [], displayAccounts: [] });
     this.loadAccounts();
   },
 
   onCarouselTap(e) {
-    const { url } = e.currentTarget.dataset;
+    const url = e.currentTarget.dataset.url;
     if (!url) return;
-
-    wx.navigateTo({
-      url: url.startsWith('/') ? url : `/${url}`,
-    });
+    wx.navigateTo({ url: url.startsWith('/') ? url : '/' + url });
   },
 
   onPublishTap() {
     const userInfo = storage.getUserInfo();
-
     if (!userInfo) {
       this.setData({ showLoginModal: true });
       return;
     }
-
-    if (!(userInfo.isVerified || userInfo.verifyStatus === 'approved')) {
-      wx.showToast({
-        title: '请先完成实名认证',
-        icon: 'none',
-      });
+    if (!(userInfo.isVerified || userInfo.isRealNameVerified || userInfo.verifyStatus === 'approved')) {
+      wx.showToast({ title: '请先完成实名认证', icon: 'none' });
       return;
     }
-
-    wx.navigateTo({
-      url: '/pages/account/publish/index',
-    });
+    wx.navigateTo({ url: '/pages/account/publish/index' });
   },
 
-  onPlatformChange(e) {
-    this.setData({ 'filters.platformIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
+  onCustomerServiceTap() {
+    wx.switchTab({ url: '/pages/chat/list/index' });
   },
 
-  onMinCoinsInput(e) {
-    this.setData({ 'filters.minCoins': e.detail.value });
-  },
-
-  onMaxCoinsInput(e) {
-    this.setData({ 'filters.maxCoins': e.detail.value });
-  },
-
-  onRankChange(e) {
-    this.setData({ 'filters.rankIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
-  },
-
-  onSafeboxChange(e) {
-    this.setData({ 'filters.safeboxIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
-  },
-
-  onStaminaChange(e) {
-    this.setData({ 'filters.staminaIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
-  },
-
-  onLoadChange(e) {
-    this.setData({ 'filters.loadIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
-  },
-
-  onProvinceChange(e) {
-    this.setData({ 'filters.provinceIndex': Number(e.detail.value) || 0 });
-    this.resetAndLoad();
-  },
-
-  onMinRentalInput(e) {
-    this.setData({ 'filters.minRental': e.detail.value });
-  },
-
-  onMaxRentalInput(e) {
-    this.setData({ 'filters.maxRental': e.detail.value });
-  },
-
-  onMinDepositInput(e) {
-    this.setData({ 'filters.minDeposit': e.detail.value });
-  },
-
-  onMaxDepositInput(e) {
-    this.setData({ 'filters.maxDeposit': e.detail.value });
-  },
-
-  onMinTotalInput(e) {
-    this.setData({ 'filters.minTotal': e.detail.value });
-  },
-
-  onMaxTotalInput(e) {
-    this.setData({ 'filters.maxTotal': e.detail.value });
-  },
-
-  onSearchInput(e) {
-    this.setData({ searchQuery: e.detail.value });
-  },
-
-  onSearchConfirm() {
-    this.resetAndLoad();
-  },
-
-  onShowMoreFilters() {
-    this.setData({ showMoreFilters: !this.data.showMoreFilters });
-  },
+  onPlatformChange(e) { this.setData({ 'filters.platformIndex': Number(e.detail.value) || 0 }); this.resetAndLoad(); },
+  onRankChange(e) { this.setData({ 'filters.rankIndex': Number(e.detail.value) || 0 }); this.resetAndLoad(); },
+  onSafeboxChange(e) { this.setData({ 'filters.safeboxIndex': Number(e.detail.value) || 0 }); this.resetAndLoad(); },
+  onProvinceChange(e) { this.setData({ 'filters.provinceIndex': Number(e.detail.value) || 0 }); this.resetAndLoad(); },
+  onMinCoinsInput(e) { this.setData({ 'filters.minCoins': e.detail.value }); },
+  onMaxCoinsInput(e) { this.setData({ 'filters.maxCoins': e.detail.value }); },
+  onMinRentalInput(e) { this.setData({ 'filters.minRental': e.detail.value }); },
+  onMaxRentalInput(e) { this.setData({ 'filters.maxRental': e.detail.value }); },
+  onSearchInput(e) { this.setData({ searchQuery: e.detail.value }); },
+  onSearchConfirm() { this.resetAndLoad(); },
+  onShowMoreFilters() { this.setData({ showMoreFilters: !this.data.showMoreFilters }); },
 
   onResetFilters() {
     this.setData({
@@ -336,55 +202,38 @@ Page({
         maxCoins: '',
         rankIndex: 0,
         safeboxIndex: 0,
-        staminaIndex: 0,
-        loadIndex: 0,
         provinceIndex: 0,
         minRental: '',
         maxRental: '',
-        minDeposit: '',
-        maxDeposit: '',
-        minTotal: '',
-        maxTotal: '',
       },
       selectedSkins: [],
     });
+    this.syncSkinOptionsView();
     this.resetAndLoad();
   },
 
   onSkinTap(e) {
-    const { name } = e.currentTarget.dataset;
-    const selectedSkins = [...this.data.selectedSkins];
+    const name = e.currentTarget.dataset.name;
+    const selectedSkins = this.data.selectedSkins.slice();
     const index = selectedSkins.indexOf(name);
-
-    if (index >= 0) {
-      selectedSkins.splice(index, 1);
-    } else {
-      selectedSkins.push(name);
-    }
-
-    this.setData({ selectedSkins });
+    if (index >= 0) selectedSkins.splice(index, 1);
+    else selectedSkins.push(name);
+    this.setData({ selectedSkins, skinOptionsView: this.buildSkinOptionsView(this.data.skinOptions, selectedSkins) });
     this.resetAndLoad();
   },
 
-  onLoadMore() {
-    this.loadMoreAccounts();
-  },
+  onLoadMore() { this.loadMoreAccounts(); },
 
   onAccountTap(e) {
-    const { account } = e.currentTarget.dataset;
-    if (!account?.id) return;
-
-    wx.navigateTo({
-      url: `/pages/account/detail/index?id=${account.id}`,
-    });
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    wx.navigateTo({ url: '/pages/account/detail/index?id=' + id });
   },
 
   onLoginSuccess() {
     this.setData({ showLoginModal: false });
     this.loadAccounts();
   },
-
-  onCustomerServiceTap() {},
 
   onCustomerServiceClose() {
     this.setData({ showCustomerService: false });
