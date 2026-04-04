@@ -24,7 +24,7 @@
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#6366f1",
-    "navigationBarTitleText": "哈夫币租赁",
+    "navigationBarTitleText": "?????",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f9fafb"
   },
@@ -36,19 +36,19 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "首页"
+        "text": "??"
       },
       {
         "pagePath": "pages/order/list/index",
-        "text": "订单"
+        "text": "??"
       },
       {
         "pagePath": "pages/chat/list/index",
-        "text": "消息"
+        "text": "??"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "我的"
+        "text": "??"
       }
     ]
   },

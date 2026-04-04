@@ -1,37 +1,29 @@
-<!-- pages/chat/list/index.wxml -->
+﻿<!-- pages/chat/list/index.wxml -->
 <view class="page">
-  <!-- 搜索栏 -->
   <view class="search-bar">
     <view class="search-input-wrapper">
-      <text class="search-icon">🔍</text>
-      <input 
+      <text class="search-icon">搜</text>
+      <input
         class="search-input"
         type="text"
-        placeholder="搜索聊天"
+        placeholder="搜索聊天、账号或消息"
         value="{{searchKeyword}}"
         bindinput="onSearchInput"
       />
     </view>
   </view>
 
-  <!-- 聊天列表 -->
   <view class="chat-list">
-    <view 
+    <view
       class="chat-item"
       wx:for="{{chatGroups}}"
       wx:key="id"
       bindtap="onChatTap"
-      data-group="{{item}}"
+      data-id="{{item.id}}"
     >
       <view class="chat-avatar">
-        <image 
-          class="avatar-image" 
-          src="{{item.avatar}}" 
-          mode="aspectFill" 
-        />
-        <view class="unread-badge" wx:if="{{item.unreadCount > 0}}">
-          {{item.unreadCount > 99 ? '99+' : item.unreadCount}}
-        </view>
+        <image class="avatar-image" src="{{item.avatar}}" mode="aspectFill" />
+        <view class="unread-badge" wx:if="{{item.unreadCount > 0}}">{{item.unreadCount > 99 ? '99+' : item.unreadCount}}</view>
       </view>
 
       <view class="chat-content">
@@ -40,30 +32,24 @@
           <view class="chat-time">{{item.lastTime}}</view>
         </view>
         <view class="chat-message">
-          <text class="message-text">{{item.lastMessage}}</text>
-          <text class="message-type" wx:if="{{item.lastMessageType === 'image'}}">[图片]</text>
-          <text class="message-type" wx:if="{{item.lastMessageType === 'system'}}">[系统消息]</text>
+          <text class="message-text">{{item.lastMessagePreview}}</text>
         </view>
       </view>
 
-      <view class="chat-status" wx:if="{{item.order}}">
-        <text class="status-tag">{{item.order.statusText}}</text>
+      <view class="chat-status" wx:if="{{item.statusText}}">
+        <text class="status-tag">{{item.statusText}}</text>
       </view>
     </view>
 
-    <!-- 加载中 -->
     <view class="loading" wx:if="{{loading}}">
       <text>加载中...</text>
     </view>
 
-    <!-- 空状态 -->
     <view class="empty" wx:if="{{!loading && chatGroups.length === 0}}">
-      <view class="empty-icon">💬</view>
       <view class="empty-text">暂无聊天</view>
-      <view class="empty-hint">去租赁账号，开始你的第一次对话吧</view>
+      <view class="empty-hint">上架后产生的新订单和客服会话会显示在这里。</view>
     </view>
   </view>
 
-  <!-- 底部占位 -->
   <view class="tabbar-placeholder"></view>
 </view>

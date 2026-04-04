@@ -85,7 +85,7 @@
       <!-- 订单操作 -->
       <view class="order-actions" wx:if="{{item.showActions}}">
         <button
-          class="btn-action {{item.type === 'primary' ? 'primary' : item.type === 'danger' ? 'danger' : 'outline'}}"
+          class="btn-action {{action.type === 'primary' ? 'primary' : action.type === 'danger' ? 'danger' : 'outline'}}"
           wx:for="{{item.actions}}"
           wx:for-item="action"
           wx:key="key"

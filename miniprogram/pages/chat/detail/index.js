@@ -1,37 +1,75 @@
-// pages/chat/detail/index.js
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const chat = require('../../../utils/chat.js');
 const storage = require('../../../utils/storage.js');
+const config = require('../../../utils/config.js');
+
+function formatMessageTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return month + '-' + day + ' ' + hour + ':' + minute;
+}
+
+function getCurrentUserId() {
+  const userInfo = storage.getUserInfo() || {};
+  return userInfo.id || userInfo.userId || '';
+}
+
+function normalizeMessage(message, previousMessage) {
+  const createdAt = message.createdAt || message.createTime || Date.now();
+  const type = message.type || message.messageType || 'text';
+  const senderId = message.senderId || message.sender_id || '';
+  return {
+    id: message.id || ('local-' + createdAt),
+    type,
+    content: message.content || '',
+    createdAt,
+    timeText: formatMessageTime(createdAt),
+    isSelf: senderId && senderId === getCurrentUserId(),
+    senderName: message.senderName || message.nickname || '用户',
+    avatar: message.avatar || '/images/default-avatar.png',
+    showTime: !previousMessage || (new Date(createdAt).getTime() - new Date(previousMessage.createdAt).getTime()) > 5 * 60 * 1000,
+  };
+}
+
+function normalizeMessageList(list) {
+  const normalized = [];
+  (Array.isArray(list) ? list : []).forEach((item) => {
+    const previous = normalized[normalized.length - 1];
+    normalized.push(normalizeMessage(item, previous));
+  });
+  return normalized;
+}
 
 Page({
   data: {
-    groupId: null,
-    group: {},
+    groupId: '',
+    group: {
+      name: '聊天会话',
+      avatar: '/images/default-avatar.png',
+      memberCount: 0,
+      memberText: '正在同步成员信息',
+    },
     order: null,
     messages: [],
     inputText: '',
     scrollIntoView: '',
     loadingMore: false,
-    page: 1,
-    pageSize: 20,
-    hasMore: true,
-    socketConnected: false
+    socketConnected: false,
   },
 
   onLoad(options) {
-    console.log('聊天详情页面加载', options);
-    
     if (!options.groupId) {
-      wx.showToast({
-        title: '群组ID不能为空',
-        icon: 'none'
-      });
-      setTimeout(() => {
-        wx.navigateBack();
-      }, 1500);
+      wx.showToast({ title: '缺少会话信息', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    
+
+    this.messageHandler = this.handleSocketMessage.bind(this);
     this.setData({ groupId: options.groupId });
     this.loadData();
   },
@@ -48,234 +86,169 @@ Page({
     this.disconnectSocket();
   },
 
-  /**
-   * 加载数据
-   */
   loadData() {
-    Promise.all([
+    return Promise.allSettled([
       this.loadGroupInfo(),
-      this.loadMessages()
-    ]).catch(error => {
-      console.error('加载数据失败:', error);
-    });
+      this.loadMessages(),
+    ]);
   },
 
-  /**
-   * 加载群组信息
-   */
   loadGroupInfo() {
-    const that = this;
-    
-    return api.getChatGroupDetail(that.data.groupId)
-      .then(res => {
-        that.setData({
-          group: res.data.group,
-          order: res.data.order || null
-        });
-        
-        // 设置导航栏标题
-        wx.setNavigationBarTitle({
-          title: res.data.group.name
-        });
-      });
-  },
-
-  /**
-   * 加载消息列表
-   */
-  loadMessages() {
-    const that = this;
-    
-    if (that.data.loadingMore || !that.data.hasMore) {
-      return Promise.resolve();
-    }
-    
-    that.setData({ loadingMore: true });
-    
-    return api.getChatMessages(that.data.groupId, {
-      page: that.data.page,
-      pageSize: that.data.pageSize
-    })
-    .then(res => {
-      const messages = res.data.list.map((msg, index) => {
-        return {
-          ...msg,
-          isSelf: msg.senderId === storage.getUserId(),
-          showTime: index === 0 || that.shouldShowTime(msg, res.data.list[index - 1])
+    return api.getChatGroupDetail(this.data.groupId)
+      .then((res) => {
+        const data = res && res.data ? res.data : {};
+        const group = data.group || {};
+        const memberCount = Number(group.memberCount || group.members || 0);
+        const groupData = {
+          id: group.id || this.data.groupId,
+          name: group.name || '聊天会话',
+          avatar: group.avatar || '/images/default-avatar.png',
+          memberCount,
+          memberText: memberCount ? memberCount + ' 人正在会话' : '实时沟通中',
         };
+        this.setData({
+          group: groupData,
+          order: data.order || null,
+        });
+        wx.setNavigationBarTitle({ title: groupData.name });
+      })
+      .catch((error) => {
+        console.error('加载群组信息失败:', error);
+        if (config.useMockData) {
+          this.setData({
+            group: {
+              id: this.data.groupId,
+              name: '聊天会话',
+              avatar: '/images/default-avatar.png',
+              memberCount: 2,
+              memberText: '2 人正在会话',
+            },
+          });
+        }
       });
-      
-      const hasMore = res.data.list.length >= that.data.pageSize;
-      
-      that.setData({
-        messages: messages,
-        hasMore,
-        loadingMore: false
-      });
-      
-      // 滚动到底部
-      that.scrollToBottom();
-    })
-    .catch(error => {
-      console.error('加载消息失败:', error);
-      that.setData({ loadingMore: false });
-    });
   },
 
-  /**
-   * 判断是否显示时间
-   */
-  shouldShowTime(current, prev) {
-    if (!prev) return true;
-    
-    const currentTime = new Date(current.createdAt).getTime();
-    const prevTime = new Date(prev.createdAt).getTime();
-    const diff = currentTime - prevTime;
-    
-    return diff > 5 * 60 * 1000; // 5分钟
+  loadMessages() {
+    this.setData({ loadingMore: true });
+    return api.getChatMessages(this.data.groupId, { page: 1, pageSize: 50 })
+      .then((res) => {
+        const list = res && res.data ? (res.data.list || []) : [];
+        const messages = normalizeMessageList(list);
+        this.setData({
+          messages,
+          loadingMore: false,
+        });
+        this.scrollToBottom();
+      })
+      .catch((error) => {
+        console.error('加载消息失败:', error);
+        if (config.useMockData) {
+          const mockMessages = [
+            { id: 'm1', senderId: 'seller', senderName: '卖家', content: '你好，账号已经准备好了。', createdAt: '2026-04-04 10:30:00' },
+            { id: 'm2', senderId: getCurrentUserId(), senderName: '我', content: '好的，我先确认一下。', createdAt: '2026-04-04 10:40:00' },
+          ];
+          this.setData({
+            messages: normalizeMessageList(mockMessages),
+            loadingMore: false,
+          });
+          this.scrollToBottom();
+          return;
+        }
+        this.setData({ loadingMore: false });
+      });
   },
 
-  /**
-   * 滚动到底部
-   */
+  connectSocket() {
+    if (this.data.socketConnected) return;
+    try {
+      chat.onMessage(this.messageHandler);
+      chat.connect();
+      chat.joinGroup(this.data.groupId);
+      this.setData({ socketConnected: true });
+    } catch (error) {
+      console.error('连接聊天服务失败:', error);
+    }
+  },
+
+  disconnectSocket() {
+    if (!this.data.socketConnected) return;
+    try {
+      chat.leaveGroup(this.data.groupId);
+      chat.offMessage(this.messageHandler);
+      chat.disconnect();
+    } catch (error) {
+      console.error('关闭聊天服务失败:', error);
+    }
+    this.setData({ socketConnected: false });
+  },
+
+  handleSocketMessage(data) {
+    if (!data || data.groupId !== this.data.groupId) return;
+    const messages = this.data.messages.slice();
+    const previous = messages[messages.length - 1];
+    const nextMessage = normalizeMessage(data, previous);
+    messages.push(nextMessage);
+    this.setData({ messages });
+    this.scrollToBottom();
+  },
+
   scrollToBottom() {
     const messages = this.data.messages;
-    
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      
-      this.setData({
-        scrollIntoView: `msg-${lastMessage.id}`
-      });
-    }
-  },
-
-  /**
-   * 连接Socket
-   */
-  connectSocket() {
-    const that = this;
-    
-    if (that.data.socketConnected) {
-      return;
-    }
-    
-    chat.connect()
-      .then(() => {
-        that.setData({ socketConnected: true });
-        
-        // 加入群组
-        chat.emit('join-group', {
-          groupId: that.data.groupId
-        });
-        
-        // 监听新消息
-        chat.on('new-message', that.handleNewMessage.bind(that));
-      })
-      .catch(error => {
-        console.error('Socket连接失败:', error);
-      });
-  },
-
-  /**
-   * 断开Socket
-   */
-  disconnectSocket() {
-    const that = this;
-    
-    if (!that.data.socketConnected) {
-      return;
-    }
-    
-    // 离开群组
-    chat.emit('leave-group', {
-      groupId: that.data.groupId
-    });
-    
-    // 移除监听
-    chat.off('new-message', that.handleNewMessage.bind(that));
-    
-    that.setData({ socketConnected: false });
-  },
-
-  /**
-   * 处理新消息
-   */
-  handleNewMessage(data) {
-    const that = this;
-    
-    if (data.groupId !== that.data.groupId) {
-      return;
-    }
-    
-    const messages = that.data.messages;
-    const lastMessage = messages[messages.length - 1];
-    
-    const newMessage = {
-      ...data,
-      isSelf: data.senderId === storage.getUserId(),
-      showTime: that.shouldShowTime(data, lastMessage)
-    };
-    
-    that.setData({
-      messages: [...messages, newMessage]
-    });
-    
-    // 滚动到底部
-    that.scrollToBottom();
-  },
-
-  /**
-   * 输入框输入
-   */
-  onInputInput(e) {
+    if (!messages.length) return;
     this.setData({
-      inputText: e.detail.value
+      scrollIntoView: 'msg-' + messages[messages.length - 1].id,
     });
   },
 
-  /**
-   * 发送消息
-   */
+  onInputInput(e) {
+    this.setData({ inputText: e.detail.value });
+  },
+
   onSend() {
-    const that = this;
-    
-    const content = that.data.inputText.trim();
-    
-    if (!content) {
+    const content = String(this.data.inputText || '').trim();
+    if (!content) return;
+
+    const optimisticMessage = normalizeMessage({
+      id: 'local-' + Date.now(),
+      senderId: getCurrentUserId(),
+      senderName: '我',
+      avatar: '/images/default-avatar.png',
+      type: 'text',
+      content,
+      createdAt: Date.now(),
+    }, this.data.messages[this.data.messages.length - 1]);
+
+    this.setData({
+      messages: this.data.messages.concat(optimisticMessage),
+      inputText: '',
+    });
+    this.scrollToBottom();
+
+    if (this.data.socketConnected) {
+      const sent = chat.sendTextMessage(this.data.groupId, content);
+      if (sent) return;
+    }
+
+    api.sendMessage(this.data.groupId, { type: 'text', content }).catch((error) => {
+      console.error('发送消息失败:', error);
+      wx.showToast({ title: '消息发送失败', icon: 'none' });
+    });
+  },
+
+  onViewOrder() {
+    if (!this.data.order || !this.data.order.id) {
+      wx.showToast({ title: '当前会话暂无关联订单', icon: 'none' });
       return;
     }
-    
-    // 发送消息
-    chat.emit('send-message', {
-      groupId: that.data.groupId,
-      type: 'text',
-      content
-    });
-    
-    that.setData({
-      inputText: ''
+    wx.navigateTo({
+      url: '/pages/order/detail/index?id=' + this.data.order.id,
     });
   },
 
-  /**
-   * 查看订单
-   */
-  onViewOrder() {
-    if (this.data.order) {
-      wx.navigateTo({
-        url: `/pages/order/detail/index?id=${this.data.order.id}`
-      });
-    }
-  },
-
-  /**
-   * 查看成员
-   */
   onViewMembers() {
     wx.showToast({
-      title: '成员列表开发中',
-      icon: 'none'
+      title: '成员管理入口整理中',
+      icon: 'none',
     });
-  }
+  },
 });

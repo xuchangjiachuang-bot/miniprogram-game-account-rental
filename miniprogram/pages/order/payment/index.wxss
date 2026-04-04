@@ -121,6 +121,10 @@
   background: var(--primary-light);
 }
 
+.payment-item.disabled {
+  opacity: 0.55;
+}
+
 .payment-icon {
   width: 60rpx;
   height: 60rpx;

@@ -98,9 +98,8 @@ Component({
 
                 console.log('[登录模态框] 登录成功:', res);
 
-                // 保存token和用户信息（注意：request.js 已经解包了 data）
-                const token = res.token;
-                const user = res.user;
+                const token = res.token || res.data?.token;
+                const user = res.user || res.data?.user;
 
                 if (!token || !user) {
                   throw new Error('登录返回数据格式错误');

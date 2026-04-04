@@ -1,12 +1,14 @@
-// pages/wallet/withdraw/index.js
-const api = require('../../../utils/api.js');
-const storage = require('../../../utils/storage.js');
+﻿const api = require('../../../utils/api.js');
+
+function formatMoney(amount) {
+  return Number(amount || 0).toFixed(2);
+}
 
 Page({
   data: {
     wallet: {
       availableBalance: '0.00',
-      frozenBalance: '0.00'
+      frozenBalance: '0.00',
     },
     accounts: [],
     selectedAccountId: null,
@@ -15,15 +17,15 @@ Page({
       minAmount: 1,
       maxAmount: 50000,
       monthlyLimit: 5,
-      feeRate: 0.001 // 0.1% 手续费
+      feeRate: 0.001,
     },
-    fee: 0,
-    actualAmount: 0,
-    withdrawing: false
+    fee: '0.00',
+    actualAmount: '0.00',
+    canWithdraw: false,
+    withdrawing: false,
   },
 
-  onLoad(options) {
-    console.log('钱包提现页面加载');
+  onLoad() {
     this.loadData();
   },
 
@@ -31,232 +33,158 @@ Page({
     this.loadData();
   },
 
-  /**
-   * 加载数据
-   */
   loadData() {
-    Promise.all([
+    return Promise.allSettled([
       this.loadWalletInfo(),
-      this.loadAccounts()
-    ]).catch(error => {
-      console.error('加载数据失败:', error);
+      this.loadAccounts(),
+    ]).then(() => {
+      this.updateWithdrawState(this.data.withdrawAmount);
     });
   },
 
-  /**
-   * 加载钱包信息
-   */
   loadWalletInfo() {
-    const that = this;
-    
-    return api.getWalletInfo()
-      .then(res => {
-        that.setData({
-          wallet: {
-            availableBalance: that.formatMoney(res.data.availableBalance),
-            frozenBalance: that.formatMoney(res.data.frozenBalance)
-          }
-        });
+    return api.getWalletInfo().then((res) => {
+      const data = res && res.data ? res.data : {};
+      this.setData({
+        wallet: {
+          availableBalance: formatMoney(data.availableBalance || data.available_balance || data.balance || 0),
+          frozenBalance: formatMoney(data.frozenBalance || data.frozen_balance || 0),
+        },
       });
+    });
   },
 
-  /**
-   * 加载提现账户
-   */
   loadAccounts() {
-    const that = this;
-    
-    return api.getWithdrawAccounts()
-      .then(res => {
-        const accounts = res.data.list || [];
-        
-        that.setData({
-          accounts,
-          selectedAccountId: accounts.length > 0 ? accounts[0].id : null
-        });
+    return api.getWithdrawAccounts().then((res) => {
+      const accounts = (res && res.data && Array.isArray(res.data.list)) ? res.data.list : [];
+      const normalized = accounts.map((item) => ({
+        id: item.id,
+        bankName: item.bankName || '微信零钱',
+        accountNumber: item.accountNumber || '已授权微信账号',
+        shortName: String((item.bankName || '微')).slice(0, 1),
+      }));
+      this.setData({
+        accounts: normalized,
+        selectedAccountId: normalized.length ? (this.data.selectedAccountId || normalized[0].id) : null,
       });
-  },
-
-  /**
-   * 格式化金额
-   */
-  formatMoney(amount) {
-    if (!amount) return '0.00';
-    return parseFloat(amount).toFixed(2);
-  },
-
-  /**
-   * 金额输入
-   */
-  onAmountInput(e) {
-    const value = parseFloat(e.detail.value) || 0;
-    
-    this.setData({
-      withdrawAmount: e.detail.value,
-      fee: this.calculateFee(value),
-      actualAmount: this.calculateActualAmount(value)
     });
   },
 
-  /**
-   * 计算手续费
-   */
   calculateFee(amount) {
-    const feeRate = this.data.config.feeRate;
-    const fee = amount * feeRate;
-    return parseFloat(fee.toFixed(2));
+    const fee = Number(amount || 0) * Number(this.data.config.feeRate || 0);
+    return Number(fee.toFixed(2));
   },
 
-  /**
-   * 计算实际到账金额
-   */
-  calculateActualAmount(amount) {
-    const fee = this.data.fee;
-    return Math.max(0, amount - fee);
-  },
+  updateWithdrawState(rawValue) {
+    const amount = Number(rawValue || 0);
+    const fee = this.calculateFee(amount);
+    const actualAmount = Math.max(0, amount - fee);
+    const availableBalance = Number(this.data.wallet.availableBalance || 0);
+    const canWithdraw = Boolean(
+      amount >= Number(this.data.config.minAmount || 0)
+      && amount <= Number(this.data.config.maxAmount || 0)
+      && amount <= availableBalance
+      && this.data.selectedAccountId
+    );
 
-  /**
-   * 全部提现
-   */
-  onWithdrawAll() {
-    const availableBalance = parseFloat(this.data.wallet.availableBalance);
-    
     this.setData({
-      withdrawAmount: availableBalance.toString(),
-      fee: this.calculateFee(availableBalance),
-      actualAmount: this.calculateActualAmount(availableBalance)
+      withdrawAmount: rawValue,
+      fee: formatMoney(fee),
+      actualAmount: formatMoney(actualAmount),
+      canWithdraw,
     });
   },
 
-  /**
-   * 选择账户
-   */
+  onAmountInput(e) {
+    this.updateWithdrawState(e.detail.value);
+  },
+
+  onWithdrawAll() {
+    this.updateWithdrawState(formatMoney(this.data.wallet.availableBalance));
+  },
+
   onAccountTap(e) {
     this.setData({
-      selectedAccountId: e.currentTarget.dataset.id
+      selectedAccountId: e.currentTarget.dataset.id,
     });
+    this.updateWithdrawState(this.data.withdrawAmount);
   },
 
-  /**
-   * 添加提现账户
-   */
   onAddAccount() {
-    wx.navigateTo({
-      url: '/pages/wallet/add-account/index'
+    wx.showToast({
+      title: '当前版本先使用默认微信零钱提现',
+      icon: 'none',
     });
   },
 
-  /**
-   * 是否可以提现
-   */
-  get canWithdraw() {
-    const { withdrawAmount, wallet, config, selectedAccountId } = this.data;
-    const amount = parseFloat(withdrawAmount);
-    const availableBalance = parseFloat(wallet.availableBalance);
-    
-    return (
-      amount > 0 &&
-      amount >= config.minAmount &&
-      amount <= config.maxAmount &&
-      amount <= availableBalance &&
-      selectedAccountId
-    );
+  getSelectedAccountName() {
+    const account = this.data.accounts.find((item) => item.id === this.data.selectedAccountId);
+    return account ? (account.bankName + ' ' + account.accountNumber) : '未选择账户';
   },
 
-  /**
-   * 确认提现
-   */
   onWithdraw() {
-    const that = this;
-    
-    if (!that.data.canWithdraw) {
+    const amount = Number(this.data.withdrawAmount || 0);
+    const availableBalance = Number(this.data.wallet.availableBalance || 0);
+
+    if (!this.data.canWithdraw) {
+      if (amount < Number(this.data.config.minAmount || 0)) {
+        wx.showToast({ title: '提现金额低于最低限制', icon: 'none' });
+        return;
+      }
+      if (amount > Number(this.data.config.maxAmount || 0)) {
+        wx.showToast({ title: '提现金额超过单笔上限', icon: 'none' });
+        return;
+      }
+      if (amount > availableBalance) {
+        wx.showToast({ title: '可提现余额不足', icon: 'none' });
+        return;
+      }
+      wx.showToast({ title: '请先选择提现账户', icon: 'none' });
       return;
     }
-    
-    const { withdrawAmount, selectedAccountId, config } = that.data;
-    const amount = parseFloat(withdrawAmount);
-    const availableBalance = parseFloat(that.data.wallet.availableBalance);
-    
-    // 验证金额
-    if (amount < config.minAmount) {
-      wx.showToast({
-        title: `最低提现金额为${config.minAmount}元`,
-        icon: 'none'
-      });
-      return;
-    }
-    
-    if (amount > config.maxAmount) {
-      wx.showToast({
-        title: `单笔提现不能超过${config.maxAmount}元`,
-        icon: 'none'
-      });
-      return;
-    }
-    
-    if (amount > availableBalance) {
-      wx.showToast({
-        title: '余额不足',
-        icon: 'none'
-      });
-      return;
-    }
-    
+
     wx.showModal({
       title: '确认提现',
-      content: `提现金额：¥${withdrawAmount}\n手续费：¥${that.data.fee}\n实际到账：¥${that.data.actualAmount}\n\n确认提现到：${that.getAccountName()}`,
-      success(res) {
+      content: '提现金额：¥' + formatMoney(amount)
+        + '\n手续费：¥' + this.data.fee
+        + '\n实际到账：¥' + this.data.actualAmount
+        + '\n到账账户：' + this.getSelectedAccountName(),
+      success: (res) => {
         if (res.confirm) {
-          that.submitWithdraw();
+          this.submitWithdraw();
         }
-      }
+      },
     });
   },
 
-  /**
-   * 获取账户名称
-   */
-  getAccountName() {
-    const { accounts, selectedAccountId } = this.data;
-    const account = accounts.find(a => a.id === selectedAccountId);
-    return account ? `${account.bankName} ${account.accountNumber}` : '';
-  },
-
-  /**
-   * 提交提现申请
-   */
   submitWithdraw() {
-    const that = this;
-    
-    that.setData({ withdrawing: true });
-    
+    this.setData({ withdrawing: true });
+
     api.createWithdrawal({
-      amount: parseFloat(that.data.withdrawAmount),
-      accountId: that.data.selectedAccountId
+      amount: Number(this.data.withdrawAmount || 0),
+      accountId: this.data.selectedAccountId,
     })
-    .then(res => {
-      that.setData({ withdrawing: false });
-      
-      wx.showToast({
-        title: '提现申请已提交',
-        icon: 'success'
-      });
-      
-      // 跳转到提现详情页
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/wallet/withdraw-detail/index?id=${res.data.id}`
+      .then((res) => {
+        const withdrawalId = res && res.data ? res.data.id : '';
+        this.setData({ withdrawing: false });
+        wx.showToast({ title: '提现申请已提交', icon: 'success' });
+        setTimeout(() => {
+          if (withdrawalId) {
+            wx.redirectTo({
+              url: '/pages/wallet/withdraw-detail/index?id=' + withdrawalId,
+            });
+            return;
+          }
+          wx.navigateBack();
+        }, 1200);
+      })
+      .catch((error) => {
+        console.error('提现失败:', error);
+        this.setData({ withdrawing: false });
+        wx.showToast({
+          title: error && error.error ? error.error : '提现失败，请稍后再试',
+          icon: 'none',
         });
-      }, 1500);
-    })
-    .catch(error => {
-      console.error('提现失败:', error);
-      that.setData({ withdrawing: false });
-      
-      wx.showToast({
-        title: error.error || '提现失败',
-        icon: 'none'
       });
-    });
-  }
+  },
 });

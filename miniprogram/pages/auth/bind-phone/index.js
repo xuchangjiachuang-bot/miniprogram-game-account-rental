@@ -39,12 +39,11 @@ Page({
       console.log('绑定手机号成功:', res);
       
       // 更新用户信息
-      storage.getUserInfo().then(userInfo => {
-        if (userInfo) {
-          userInfo.phone = res.phone;
-          storage.setUserInfo(userInfo);
-        }
-      });
+      const userInfo = storage.getUserInfo();
+      if (userInfo) {
+        userInfo.phone = res.phone || res.data?.phone || userInfo.phone;
+        storage.setUserInfo(userInfo);
+      }
       
       wx.showToast({
         title: '绑定成功',

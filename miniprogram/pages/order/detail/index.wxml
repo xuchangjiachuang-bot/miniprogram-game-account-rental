@@ -1,34 +1,32 @@
 <!-- pages/order/detail/index.wxml -->
 <view class="page">
-  <!-- 状态栏 -->
   <view class="status-header status-{{orderStatusKey}}">
     <view class="status-content">
       <view class="status-icon">{{statusIcon}}</view>
       <view class="status-info">
-        <view class="status-text">{{order.statusText}}</view>
+        <view class="status-text">{{order.statusText || '订单详情'}}</view>
         <view class="status-desc">{{statusDesc}}</view>
       </view>
     </view>
   </view>
 
-  <!-- 账号信息 -->
   <view class="section">
     <view class="section-header">
-      <text class="section-icon">🎮</text>
+      <text class="section-icon">号</text>
       <text class="section-title">账号信息</text>
     </view>
 
     <view class="account-card" bindtap="onAccountTap">
-      <image class="account-image" src="{{account.avatar}}" mode="aspectFill" />
+      <image class="account-image" src="{{account.avatar || '/images/default-account.png'}}" mode="aspectFill" />
       <view class="account-details">
-        <view class="account-title">{{account.title}}</view>
+        <view class="account-title">{{account.title || '游戏账号'}}</view>
         <view class="account-metas">
-          <text class="meta-item">哈夫币{{account.coinsM}}M</text>
-          <text class="meta-item">{{account.safeboxCount}}格安全箱</text>
-          <text class="meta-item">{{account.staminaValue}}体力</text>
-          <text class="meta-item">{{account.energyValue}}负重</text>
+          <text class="meta-item" wx:if="{{account.coinsM}}">{{account.coinsM}}M</text>
+          <text class="meta-item" wx:if="{{account.safeboxCount}}">{{account.safeboxCount}}个保险箱</text>
+          <text class="meta-item" wx:if="{{account.staminaValue}}">{{account.staminaValue}}体力</text>
+          <text class="meta-item" wx:if="{{account.energyValue}}">{{account.energyValue}}负重</text>
         </view>
-        <view class="account-tags" wx:if="{{account.tags.length > 0}}">
+        <view class="account-tags" wx:if="{{account.tags && account.tags.length > 0}}">
           <text class="tag" wx:for="{{account.tags}}" wx:key="*this">{{item}}</text>
         </view>
       </view>
@@ -36,10 +34,9 @@
     </view>
   </view>
 
-  <!-- 订单信息 -->
   <view class="section">
     <view class="section-header">
-      <text class="section-icon">📋</text>
+      <text class="section-icon">单</text>
       <text class="section-title">订单信息</text>
     </view>
 
@@ -52,28 +49,27 @@
         </view>
       </view>
       <view class="info-item">
-        <text class="info-label">下单时间</text>
+        <text class="info-label">创建时间</text>
         <text class="info-value">{{order.created_at}}</text>
       </view>
       <view class="info-item">
-        <text class="info-label">租赁时长</text>
+        <text class="info-label">租期</text>
         <text class="info-value">{{order.rental_period}}</text>
       </view>
       <view class="info-item price">
-        <text class="info-label">订单总价</text>
+        <text class="info-label">订单总额</text>
         <text class="info-value price-value">¥{{order.total_price}}</text>
       </view>
       <view class="info-item price-breakdown">
         <text class="info-label">费用明细</text>
-        <text class="info-value">租金¥{{order.rental_price}} + 押金¥{{order.deposit}}</text>
+        <text class="info-value">租金 ¥{{order.rental_price}} + 押金 ¥{{order.deposit}}</text>
       </view>
     </view>
   </view>
 
-  <!-- 时间信息 -->
   <view class="section" wx:if="{{order.rental_start}}">
     <view class="section-header">
-      <text class="section-icon">⏰</text>
+      <text class="section-icon">时</text>
       <text class="section-title">租赁时间</text>
     </view>
 
@@ -82,7 +78,7 @@
         <text class="time-label">开始时间</text>
         <text class="time-value">{{order.rental_start}}</text>
       </view>
-      <view class="time-divider">›</view>
+      <view class="time-divider">↓</view>
       <view class="time-row">
         <text class="time-label">结束时间</text>
         <text class="time-value">{{order.rental_end}}</text>
@@ -90,25 +86,24 @@
     </view>
   </view>
 
-  <!-- 游戏账号 -->
   <view class="section" wx:if="{{showGameAccount}}">
     <view class="section-header">
-      <text class="section-icon">🔐</text>
-      <text class="section-title">游戏账号</text>
+      <text class="section-icon">账</text>
+      <text class="section-title">游戏账号信息</text>
     </view>
 
     <view class="game-account-card">
       <view class="account-row">
         <text class="row-label">账号</text>
         <view class="row-value-wrapper">
-          <text class="row-value">{{account.gameAccount}}</text>
+          <text class="row-value">{{account.gameAccount || '-'}}</text>
           <text class="btn-copy-small" bindtap="onCopyAccount" data-account="{{account.gameAccount}}">复制</text>
         </view>
       </view>
       <view class="account-row">
         <text class="row-label">密码</text>
         <view class="row-value-wrapper">
-          <text class="row-value masked">{{account.gamePassword}}</text>
+          <text class="row-value masked">{{account.gamePassword || '-'}}</text>
           <text class="btn-copy-small" bindtap="onCopyPassword" data-password="{{account.gamePassword}}">复制</text>
         </view>
       </view>
@@ -119,10 +114,9 @@
     </view>
   </view>
 
-  <!-- 支付信息 -->
   <view class="section" wx:if="{{order.payment_time}}">
     <view class="section-header">
-      <text class="section-icon">💳</text>
+      <text class="section-icon">付</text>
       <text class="section-title">支付信息</text>
     </view>
 
@@ -134,7 +128,6 @@
     </view>
   </view>
 
-  <!-- 操作按钮 -->
   <view class="action-bar" wx:if="{{actions.length > 0}}">
     <view class="action-list">
       <button
@@ -149,12 +142,10 @@
     </view>
   </view>
 
-  <!-- 聊天入口 -->
   <view class="chat-float" wx:if="{{canChat}}" bindtap="onChat">
-    <view class="chat-icon">💬</view>
-    <view class="chat-badge" wx:if="{{order.status === 'renting'}}">1</view>
+    <view class="chat-icon">聊</view>
+    <view class="chat-badge" wx:if="{{order.status === 'active'}}">1</view>
   </view>
 
-  <!-- 底部占位 -->
   <view class="bottom-placeholder"></view>
 </view>

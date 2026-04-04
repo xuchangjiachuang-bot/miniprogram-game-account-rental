@@ -1,7 +1,133 @@
-// pages/wallet/index.js
-const api = require('../../utils/api.js');
-const storage = require('../../utils/storage.js');
+﻿const api = require('../../utils/api.js');
 const config = require('../../utils/config.js');
+
+const PERIOD_LIST = [
+  { value: 'week', label: '本周' },
+  { value: 'month', label: '本月' },
+  { value: 'year', label: '本年' },
+];
+
+const MOCK_WALLET = {
+  balance: 520.0,
+  totalRecharge: 1000.0,
+  totalWithdraw: 480.0,
+  availableBalance: 520.0,
+};
+
+const MOCK_STATISTICS = {
+  summary: {
+    totalIncome: 500.0,
+    totalExpense: 200.0,
+    netIncome: 300.0,
+  },
+  dailyStats: [
+    { date: '2026-04-01', income: 120.0, expense: 20.0 },
+    { date: '2026-04-02', income: 80.0, expense: 60.0 },
+    { date: '2026-04-03', income: 180.0, expense: 40.0 },
+    { date: '2026-04-04', income: 120.0, expense: 80.0 },
+  ],
+};
+
+const MOCK_TRANSACTIONS = [
+  {
+    id: 'TXN_001',
+    transactionType: 'order_payment',
+    amount: -10.0,
+    title: '账号租赁支付',
+    createdAt: '2026-04-04 14:20:00',
+  },
+  {
+    id: 'TXN_002',
+    transactionType: 'recharge',
+    amount: 100.0,
+    title: '微信充值',
+    createdAt: '2026-04-03 09:30:00',
+  },
+];
+
+function formatMoney(amount) {
+  const value = Number(amount || 0);
+  return value.toFixed(2);
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return month + '-' + day + ' ' + hour + ':' + minute;
+}
+
+function mapTransactionTitle(type, fallback) {
+  const typeMap = {
+    recharge: '余额充值',
+    withdraw: '提现申请',
+    order_payment: '账号租赁支付',
+    order_refund: '订单退款',
+    income: '收入到账',
+    expense: '支出扣款',
+  };
+  return fallback || typeMap[type] || '余额变动';
+}
+
+function mapTransactionIcon(type) {
+  const iconMap = {
+    recharge: '/images/icons/recharge.png',
+    withdraw: '/images/icons/withdraw.png',
+    order_payment: '/images/icons/order.png',
+    order_refund: '/images/icons/refund.png',
+    income: '/images/icons/income.png',
+    expense: '/images/icons/expense.png',
+  };
+  return iconMap[type] || '/images/icons/default.png';
+}
+
+function normalizeStatistics(data) {
+  const source = data || MOCK_STATISTICS;
+  const summary = source.summary || {};
+  const dailyStats = Array.isArray(source.dailyStats) ? source.dailyStats : [];
+  const maxAmount = dailyStats.reduce((max, item) => {
+    return Math.max(max, Number(item.income || 0), Number(item.expense || 0));
+  }, 0) || 1;
+
+  return {
+    summary: {
+      totalIncome: formatMoney(summary.totalIncome),
+      totalExpense: formatMoney(summary.totalExpense),
+      netIncome: formatMoney(summary.netIncome),
+      netIncomeValue: Number(summary.netIncome || 0),
+    },
+    dailyStats: dailyStats.map((item) => ({
+      date: item.date,
+      label: String(item.date || '').slice(5),
+      incomeDisplay: formatMoney(item.income),
+      expenseDisplay: formatMoney(item.expense),
+      incomeHeight: Math.max(8, Math.round((Number(item.income || 0) / maxAmount) * 100)),
+      expenseHeight: Math.max(8, Math.round((Number(item.expense || 0) / maxAmount) * 100)),
+    })),
+  };
+}
+
+function normalizeTransactions(list) {
+  return (Array.isArray(list) ? list : []).map((item) => {
+    const rawType = item.transaction_type || item.transactionType || item.type;
+    const amount = Number(item.amount || 0);
+    const isIncome = amount >= 0;
+    return {
+      id: item.id,
+      icon: mapTransactionIcon(rawType),
+      title: mapTransactionTitle(rawType, item.title || item.description),
+      createdAtText: formatDateTime(item.createdAt || item.createTime),
+      amountText: (isIncome ? '+' : '-') + '¥' + formatMoney(Math.abs(amount)),
+      amountClass: isIncome ? 'income' : 'expense',
+    };
+  });
+}
 
 Page({
   data: {
@@ -9,275 +135,148 @@ Page({
       balance: '0.00',
       totalRecharge: '0.00',
       totalWithdraw: '0.00',
-      availableBalance: '0.00'
+      availableBalance: '0.00',
     },
-    statistics: null,
-    currentPeriod: 'month',
-    periodList: [
-      { value: 'week', label: '本周' },
-      { value: 'month', label: '本月' },
-      { value: 'year', label: '本年' }
-    ],
-    transactions: []
+    statistics: normalizeStatistics(MOCK_STATISTICS),
+    periodList: PERIOD_LIST,
+    currentPeriodIndex: 1,
+    transactions: [],
   },
 
   onLoad() {
-    console.log('钱包页面加载');
-    this.loadWalletInfo();
-    this.loadStatistics();
-    this.loadTransactions();
+    this.refreshPage();
   },
 
   onShow() {
-    // 页面显示时刷新数据
-    this.loadWalletInfo();
-    this.loadStatistics();
+    this.refreshPage();
   },
 
   onPullDownRefresh() {
-    Promise.all([
-      this.loadWalletInfo(),
-      this.loadStatistics(),
-      this.loadTransactions()
-    ]).then(() => {
+    this.refreshPage().finally(() => {
       wx.stopPullDownRefresh();
     });
   },
 
-  /**
-   * 加载钱包信息
-   */
+  refreshPage() {
+    return Promise.allSettled([
+      this.loadWalletInfo(),
+      this.loadStatistics(),
+      this.loadTransactions(),
+    ]);
+  },
+
   loadWalletInfo() {
-    const that = this;
-    
-    api.getWalletInfo()
-      .then(res => {
-        const { data } = res;
-        
-        that.setData({
+    return api.getWalletInfo()
+      .then((res) => {
+        const data = res && res.data ? res.data : {};
+        const availableBalance = data.available_balance ?? data.availableBalance ?? data.balance ?? 0;
+        const totalRecharged = data.total_recharged ?? data.totalRecharge ?? data.totalEarned ?? 0;
+        const totalWithdrawn = data.total_withdrawn ?? data.totalWithdraw ?? data.totalWithdrawn ?? 0;
+
+        this.setData({
           wallet: {
-            balance: that.formatMoney(data.balance || data.availableBalance),
-            totalRecharge: that.formatMoney(data.totalRecharge || data.totalEarned),
-            totalWithdraw: that.formatMoney(data.totalWithdraw || data.totalWithdrawn),
-            availableBalance: that.formatMoney(data.availableBalance)
-          }
+            balance: formatMoney(availableBalance),
+            totalRecharge: formatMoney(totalRecharged),
+            totalWithdraw: formatMoney(totalWithdrawn),
+            availableBalance: formatMoney(availableBalance),
+          },
         });
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('加载钱包信息失败:', error);
-        
-        // 使用Mock数据
         if (config.useMockData) {
-          const mockData = require('../../utils/mock-data.js');
-          const wallet = mockData.wallet || {
-            balance: 520.00,
-            totalRecharge: 1000.00,
-            totalWithdraw: 480.00,
-            availableBalance: 520.00
-          };
-          
-          that.setData({
+          this.setData({
             wallet: {
-              balance: that.formatMoney(wallet.balance),
-              totalRecharge: that.formatMoney(wallet.totalRecharge),
-              totalWithdraw: that.formatMoney(wallet.totalWithdraw),
-              availableBalance: that.formatMoney(wallet.availableBalance)
-            }
+              balance: formatMoney(MOCK_WALLET.balance),
+              totalRecharge: formatMoney(MOCK_WALLET.totalRecharge),
+              totalWithdraw: formatMoney(MOCK_WALLET.totalWithdraw),
+              availableBalance: formatMoney(MOCK_WALLET.availableBalance),
+            },
           });
         }
       });
   },
 
-  /**
-   * 加载统计数据
-   */
   loadStatistics() {
-    const that = this;
-    const { currentPeriod } = this.data;
-    
-    api.getWalletStatistics(currentPeriod)
-      .then(res => {
-        const { data } = res;
-        
-        that.setData({
-          statistics: data
+    const currentPeriod = this.data.periodList[this.data.currentPeriodIndex].value;
+    return api.getWalletStatistics(currentPeriod)
+      .then((res) => {
+        this.setData({
+          statistics: normalizeStatistics(res && res.data ? res.data : null),
         });
       })
-      .catch(error => {
-        console.error('加载统计数据失败:', error);
-        
-        // 使用Mock数据
+      .catch((error) => {
+        console.error('加载钱包统计失败:', error);
         if (config.useMockData) {
-          const mockData = require('../../utils/mock-data.js');
-          const statistics = mockData.statistics || {
-            summary: {
-              totalIncome: 500.00,
-              totalExpense: 200.00,
-              netIncome: 300.00,
-              incomeCount: 5,
-              expenseCount: 8
-            },
-            dailyStats: [
-              { date: '2026-02-01', income: 100.00, expense: 50.00 },
-              { date: '2026-02-02', income: 0.00, expense: 30.00 },
-              { date: '2026-02-03', income: 200.00, expense: 80.00 }
-            ]
-          };
-          
-          that.setData({
-            statistics: statistics
+          this.setData({
+            statistics: normalizeStatistics(MOCK_STATISTICS),
           });
         }
       });
   },
 
-  /**
-   * 切换统计周期
-   */
+  loadTransactions() {
+    return api.getTransactions({ limit: 10 })
+      .then((res) => {
+        const list = res && res.data ? (res.data.list || []) : [];
+        this.setData({
+          transactions: normalizeTransactions(list),
+        });
+      })
+      .catch((error) => {
+        console.error('加载交易记录失败:', error);
+        if (config.useMockData) {
+          this.setData({
+            transactions: normalizeTransactions(MOCK_TRANSACTIONS),
+          });
+        }
+      });
+  },
+
   onPeriodChange(e) {
-    const index = e.detail.value;
-    const periodList = this.data.periodList;
-    const currentPeriod = periodList[index].value;
-    
+    const index = Number(e.detail.value || 0);
     this.setData({
-      currentPeriod
+      currentPeriodIndex: index,
     });
-    
     this.loadStatistics();
   },
 
-  /**
-   * 加载交易记录
-   */
-  loadTransactions() {
-    const that = this;
-    
-    api.getTransactions({
-      limit: 10
-    })
-    .then(res => {
-      const { data } = res;
-      const transactions = data.list || [];
-      
-      // 处理交易记录
-      const processedTransactions = transactions.map(item => {
-        return {
-          ...item,
-          icon: that.getTransactionIcon(item.type),
-          type: item.amount >= 0 ? 'income' : 'expense',
-          amount_display: that.formatMoney(Math.abs(item.amount))
-        };
-      });
-      
-      that.setData({
-        transactions: processedTransactions
-      });
-    })
-    .catch(error => {
-      console.error('加载交易记录失败:', error);
-      
-      // 使用Mock数据
-      if (config.useMockData) {
-        const mockData = require('../../utils/mock-data.js');
-        const transactions = mockData.transactions || [
-          {
-            id: 'TXN_001',
-            type: 'order_payment',
-            amount: -10.00,
-            title: '账号租赁',
-            createTime: new Date().getTime() - 7200000
-          },
-          {
-            id: 'TXN_002',
-            type: 'recharge',
-            amount: 100.00,
-            title: '微信充值',
-            createTime: new Date().getTime() - 86400000
-          }
-        ];
-        
-        const processedTransactions = transactions.map(item => {
-          return {
-            ...item,
-            icon: that.getTransactionIcon(item.type),
-            type: item.amount >= 0 ? 'income' : 'expense',
-            amount_display: that.formatMoney(Math.abs(item.amount))
-          };
-        });
-        
-        that.setData({
-          transactions: processedTransactions
-        });
-      }
-    });
-  },
-
-  /**
-   * 获取交易图标
-   */
-  getTransactionIcon(type) {
-    const iconMap = {
-      'recharge': '/images/icons/recharge.png',
-      'withdraw': '/images/icons/withdraw.png',
-      'order_payment': '/images/icons/order.png',
-      'order_refund': '/images/icons/refund.png',
-      'income': '/images/icons/income.png',
-      'expense': '/images/icons/expense.png'
-    };
-    return iconMap[type] || '/images/icons/default.png';
-  },
-
-  /**
-   * 格式化金额
-   */
-  formatMoney(amount) {
-    if (!amount) return '0.00';
-    return parseFloat(amount).toFixed(2);
-  },
-
-  /**
-   * 查看月度账单
-   */
   onMonthlyBillTap() {
     const now = new Date();
     wx.navigateTo({
-      url: `/pages/wallet/bill/index?year=${now.getFullYear()}&month=${now.getMonth() + 1}`
+      url: '/pages/wallet/bill/index?year=' + now.getFullYear() + '&month=' + (now.getMonth() + 1),
     });
   },
 
-  /**
-   * 充值
-   */
   onRechargeTap() {
     wx.navigateTo({
-      url: '/pages/wallet/recharge/index'
+      url: '/pages/wallet/recharge/index',
     });
   },
 
-  /**
-   * 提现
-   */
   onWithdrawTap() {
     wx.navigateTo({
-      url: '/pages/wallet/withdraw/index'
+      url: '/pages/wallet/withdraw/index',
     });
   },
 
-  /**
-   * 全部交易
-   */
   onTransactionsTap() {
     wx.navigateTo({
-      url: '/pages/wallet/transactions/index'
+      url: '/pages/wallet/bill/index',
     });
   },
 
-  /**
-   * 查看统计详情
-   */
   onStatisticsTap() {
-    wx.navigateTo({
-      url: '/pages/wallet/statistics/index'
+    wx.showToast({
+      title: '更多统计能力整理中',
+      icon: 'none',
     });
-  }
+  },
+
+  onTransactionTap() {
+    wx.showToast({
+      title: '请在月度账单中查看完整明细',
+      icon: 'none',
+    });
+  },
 });

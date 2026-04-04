@@ -1,4 +1,3 @@
-// pages/profile/index.js
 const api = require('../../utils/api.js');
 const storage = require('../../utils/storage.js');
 const chat = require('../../utils/chat.js');
@@ -11,28 +10,25 @@ Page({
       nickname: '',
       id: '',
       isVerified: false,
-      tags: []
+      verifyStatus: 'none',
+      tags: [],
     },
     stats: {
       orderCount: 0,
       collectCount: 0,
       balance: '0.00',
-      creditScore: 0
+      creditScore: 0,
     },
     menuBadges: {
       order: 0,
-      collect: 0
+      collect: 0,
     },
-    showLoginModal: false
+    showLoginModal: false,
   },
 
   onLoad() {
-    console.log('个人中心页面加载');
-
-    // 检查登录状态
     const userInfo = storage.getUserInfo();
     if (!userInfo) {
-      // 未登录，显示登录弹窗
       this.setData({ showLoginModal: true });
       return;
     }
@@ -41,274 +37,196 @@ Page({
   },
 
   onShow() {
-    // 页面显示时刷新数据（仅当已登录时）
     if (storage.getUserInfo()) {
       this.loadUserInfo();
     }
   },
 
   onPullDownRefresh() {
-    this.loadUserInfo().then(() => {
-      wx.stopPullDownRefresh();
-    });
+    this.loadUserInfo().finally(() => wx.stopPullDownRefresh());
   },
 
-  /**
-   * 显示登录弹窗
-   */
-  showLoginModal() {
-    this.setData({ showLoginModal: true });
-  },
-
-  /**
-   * 登录成功回调
-   */
   onLoginSuccess(e) {
-    console.log('个人中心收到登录成功事件:', e.detail);
+    const detail = e?.detail || {};
+    if (detail.user) {
+      storage.setUserInfo(detail.user);
+    }
     this.setData({ showLoginModal: false });
-    // 重新加载用户信息
     this.loadUserInfo();
   },
 
-  /**
-   * 加载用户信息
-   */
-  loadUserInfo() {
-    const that = this;
-    
-    // 从本地获取用户信息
-    const localUserInfo = storage.getUserInfo();
-    if (localUserInfo) {
-      that.setData({
-        userInfo: localUserInfo
-      });
-    }
-    
-    // 从服务器获取最新信息
-    Promise.all([
-      api.getUserInfo(),
-      api.getUserStats()
-    ])
-    .then(([userRes, statsRes]) => {
-      const userInfo = {
-        ...userRes.data,
-        tags: that.buildUserTags(userRes.data)
-      };
-      
-      const stats = {
-        orderCount: statsRes.data.orderCount || 0,
-        collectCount: statsRes.data.collectCount || 0,
-        balance: that.formatMoney(statsRes.data.balance),
-        creditScore: statsRes.data.creditScore || 0
-      };
-      
-      that.setData({
-        userInfo,
-        stats
-      });
-      
-      // 更新本地缓存
-      storage.setUserInfo(userInfo);
-    })
-    .catch(error => {
-      console.error('加载用户信息失败:', error);
-      
-      // 使用Mock数据
-      if (config.useMockData) {
-        const mockData = require('../../utils/mock-data.js');
-        const userInfo = mockData.userInfo || {
-          id: 'MOCK_USER_001',
-          nickname: '测试用户',
-          avatar: '/images/default-avatar.png',
-          isVerified: true,
-          tags: ['已实名', '高信用']
-        };
-        
-        const stats = mockData.userStats || {
-          orderCount: 12,
-          collectCount: 5,
-          balance: '520.00',
-          creditScore: 750
-        };
-        
-        that.setData({
-          userInfo,
-          stats
-        });
-      }
+  showComingSoon(message = '该功能正在建设中') {
+    wx.showToast({
+      title: message,
+      icon: 'none',
     });
   },
 
-  /**
-   * 构建用户标签
-   */
-  buildUserTags(userInfo) {
+  loadUserInfo() {
+    const localUserInfo = storage.getUserInfo();
+    if (localUserInfo) {
+      this.setData({
+        userInfo: {
+          ...this.data.userInfo,
+          ...localUserInfo,
+          avatar: localUserInfo.avatar || '/images/default-avatar.png',
+          tags: this.buildUserTags(localUserInfo),
+          isVerified: localUserInfo.isVerified || localUserInfo.verifyStatus === 'approved',
+          verifyStatus: localUserInfo.verifyStatus || 'none',
+        },
+      });
+    }
+
+    return Promise.all([
+      api.getUserInfo(),
+      api.getUserStats(),
+    ])
+      .then(([userRes, statsRes]) => {
+        const rawUser = userRes?.data || {};
+        const userInfo = {
+          ...rawUser,
+          avatar: rawUser.avatar || '/images/default-avatar.png',
+          isVerified: rawUser.isVerified || rawUser.verifyStatus === 'approved',
+          verifyStatus: rawUser.verifyStatus || 'none',
+          tags: this.buildUserTags(rawUser),
+        };
+
+        const stats = {
+          orderCount: Number(statsRes?.data?.orderCount || 0),
+          collectCount: Number(statsRes?.data?.collectCount || 0),
+          balance: this.formatMoney(statsRes?.data?.balance),
+          creditScore: Number(statsRes?.data?.creditScore || 0),
+        };
+
+        this.setData({
+          userInfo,
+          stats,
+        });
+
+        storage.setUserInfo(userInfo);
+      })
+      .catch((error) => {
+        console.error('加载个人中心数据失败:', error);
+
+        if (config.useMockData) {
+          const mockData = require('../../utils/mock-data.js');
+          const userInfo = mockData.userInfo || {
+            id: 'MOCK_USER_001',
+            nickname: '测试用户',
+            avatar: '/images/default-avatar.png',
+            isVerified: true,
+            verifyStatus: 'approved',
+            tags: ['已实名', '高信用'],
+          };
+
+          const stats = mockData.userStats || {
+            orderCount: 12,
+            collectCount: 5,
+            balance: '520.00',
+            creditScore: 750,
+          };
+
+          this.setData({ userInfo, stats });
+        }
+      });
+  },
+
+  buildUserTags(userInfo = {}) {
     const tags = [];
-    
-    if (userInfo.isVerified) {
+
+    if (userInfo.isVerified || userInfo.verifyStatus === 'approved') {
       tags.push('已实名');
     }
-    
-    if (userInfo.creditScore >= 700) {
+    if (Number(userInfo.creditScore || 0) >= 700) {
       tags.push('高信用');
     }
-    
-    if (userInfo.rentCount > 100) {
+    if (Number(userInfo.rentCount || 0) > 100) {
       tags.push('资深租户');
     }
-    
+
     return tags;
   },
 
-  /**
-   * 格式化金额
-   */
   formatMoney(amount) {
-    if (!amount) return '0.00';
-    return parseFloat(amount).toFixed(2);
+    const value = Number(amount || 0);
+    if (Number.isNaN(value)) return '0.00';
+    return value.toFixed(2);
   },
 
-  /**
-   * 编辑资料
-   */
   onEditProfile() {
-    wx.navigateTo({
-      url: '/pages/profile/edit/index'
-    });
+    wx.navigateTo({ url: '/pages/profile/edit/index' });
   },
 
-  /**
-   * 去认证
-   */
   onVerifyTap() {
-    wx.navigateTo({
-      url: '/pages/profile/verification/index'
-    });
+    wx.navigateTo({ url: '/pages/profile/verify/index' });
   },
 
-  /**
-   * 我的订单
-   */
   onOrdersTap() {
-    wx.navigateTo({
-      url: '/pages/order/list/index'
-    });
+    wx.navigateTo({ url: '/pages/order/list/index' });
   },
 
-  /**
-   * 我的账号
-   */
   onAccountTap() {
-    wx.navigateTo({
-      url: '/pages/account/my/index'
-    });
+    wx.navigateTo({ url: '/pages/account/publish/index' });
   },
 
-  /**
-   * 我的收藏
-   */
   onCollectTap() {
-    wx.navigateTo({
-      url: '/pages/collect/list/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 我的钱包
-   */
   onWalletTap() {
-    wx.switchTab({
-      url: '/pages/wallet/index'
-    });
+    wx.navigateTo({ url: '/pages/wallet/index' });
   },
 
-  /**
-   * 收货地址
-   */
   onAddressTap() {
-    wx.navigateTo({
-      url: '/pages/address/list/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 账户安全
-   */
   onSecurityTap() {
-    wx.navigateTo({
-      url: '/pages/profile/security/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 帮助中心
-   */
   onHelpTap() {
-    wx.navigateTo({
-      url: '/pages/help/index/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 意见反馈
-   */
   onFeedbackTap() {
-    wx.navigateTo({
-      url: '/pages/feedback/index/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 关于我们
-   */
   onAboutTap() {
-    wx.navigateTo({
-      url: '/pages/about/index/index'
-    });
+    this.showComingSoon();
   },
 
-  /**
-   * 信用分
-   */
   onCreditTap() {
     wx.showModal({
       title: '信用分说明',
-      content: '信用分根据您的租赁行为、履约记录等综合评定。高分用户可享受更多优惠和特权。',
-      showCancel: false
+      content: '信用分会结合租号行为、履约记录和历史表现综合计算，分数越高可享受更多权益。',
+      showCancel: false,
     });
   },
 
-  /**
-   * 退出登录
-   */
   onLogout() {
-    const that = this;
-    
     wx.showModal({
       title: '确认退出',
-      content: '确定要退出登录吗？',
-      success(res) {
-        if (res.confirm) {
-          // 清除登录信息
-          storage.removeToken();
-          storage.removeUserInfo();
-          
-          // 断开聊天连接
+      content: '确定要退出当前登录状态吗？',
+      success: (res) => {
+        if (!res.confirm) return;
+
+        storage.removeToken();
+        storage.removeUserInfo();
+        if (chat && typeof chat.disconnect === 'function') {
           chat.disconnect();
-          
-          wx.showToast({
-            title: '已退出登录',
-            icon: 'success'
-          });
-          
-          // 跳转到登录页
-          setTimeout(() => {
-            wx.reLaunch({
-              url: '/pages/auth/login/index'
-            });
-          }, 1500);
         }
-      }
+
+        wx.showToast({
+          title: '已退出登录',
+          icon: 'success',
+        });
+
+        setTimeout(() => {
+          wx.reLaunch({ url: '/pages/auth/login/index' });
+        }, 1200);
+      },
     });
-  }
+  },
 });

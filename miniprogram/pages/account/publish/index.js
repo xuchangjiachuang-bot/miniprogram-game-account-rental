@@ -1,7 +1,30 @@
-// pages/account/publish/index.js
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
+
+const RENTAL_SPEED_OPTIONS = [10, 20, 30, 40, 50];
+
+function formatMoney(amount) {
+  return Number(amount || 0).toFixed(2);
+}
+
+function calculateSuggestedRental(coinsM, rentalRatio) {
+  const coins = Number(coinsM || 0);
+  const ratio = Number(rentalRatio || 0);
+  if (!coins || !ratio) return 0;
+  return (coins * 100) / ratio;
+}
+
+function calculateRentalPeriod(coinsM, rentalSpeed) {
+  const coins = Number(coinsM || 0);
+  const speed = Number(rentalSpeed || 10) || 10;
+  const days = Math.max(1, Math.ceil(coins / speed || 1));
+  return {
+    days,
+    hours: days * 24,
+    text: speed + 'M/天，预计 ' + days + ' 天完成',
+  };
+}
 
 Page({
   data: {
@@ -23,21 +46,22 @@ Page({
       hasBattlepass: false,
       battlepassLevel: '',
       description: '',
-      rentalPrice: '',
+      rentalRatio: '35',
+      rentalSpeed: 10,
       deposit: '',
-      rentalType: 'hour',
-      rentalDuration: '',
-      totalPrice: 0
+      suggestedRental: '0.00',
+      totalPrice: '0.00',
+      rentalPeriodText: '10M/天，预计 1 天完成',
     },
     loginMethodOptions: [
       { label: '微信扫码登录', value: 'wechat' },
-      { label: 'QQ账号密码登录', value: 'qq' },
-      { label: 'Steam账号密码登录', value: 'password' }
+      { label: 'QQ 账号密码登录', value: 'qq' },
+      { label: 'Steam 账号密码登录', value: 'password' },
     ],
     safeboxOptions: [
-      { label: '2×2（4格）', value: 4 },
-      { label: '2×3（6格）', value: 6 },
-      { label: '3×3（9格）', value: 9 }
+      { label: '2x2（4 格）', value: 4 },
+      { label: '2x3（6 格）', value: 6 },
+      { label: '3x3（9 格）', value: 9 },
     ],
     levelOptions: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
     rankOptions: [
@@ -48,429 +72,197 @@ Page({
       { label: '铂金', value: 'platinum' },
       { label: '钻石', value: 'diamond' },
       { label: '黑鹰', value: 'blackeagle' },
-      { label: '巅峰', value: 'peak' }
+      { label: '巅峰', value: 'peak' },
     ],
     skinTierOptions: ['普通', '稀有', '史诗', '传说', '至尊'],
-    submitting: false
+    rentalSpeedOptions: RENTAL_SPEED_OPTIONS,
+    submitting: false,
   },
 
-  onLoad(options) {
-    console.log('账号发布页面加载');
-    this.updateTotalPrice();
+  onLoad() {
+    this.updatePricing();
   },
 
-  /**
-   * 更新总价
-   */
-  updateTotalPrice() {
-    const { rentalPrice, deposit } = this.data.form;
-    const price = parseFloat(rentalPrice || 0);
-    const dep = parseFloat(deposit || 0);
+  updatePricing() {
+    const form = this.data.form;
+    const suggestedRental = calculateSuggestedRental(form.coinsM, form.rentalRatio);
+    const deposit = Number(form.deposit || 0);
+    const period = calculateRentalPeriod(form.coinsM, form.rentalSpeed);
+
     this.setData({
-      'form.totalPrice': (price + dep).toFixed(2)
+      'form.suggestedRental': formatMoney(suggestedRental),
+      'form.totalPrice': formatMoney(suggestedRental + deposit),
+      'form.rentalPeriodText': period.text,
     });
   },
 
-  /**
-   * 选择图片
-   */
   onChooseImage() {
-    const { form } = this.data;
+    const form = this.data.form;
     const maxCount = 5;
-
     wx.chooseMedia({
       count: maxCount - form.images.length,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: (res) => {
-        const tempFiles = res.tempFiles.map(file => file.tempFilePath);
+        const tempFiles = res.tempFiles.map((file) => file.tempFilePath);
         this.setData({
-          'form.images': [...form.images, ...tempFiles]
+          'form.images': form.images.concat(tempFiles),
         });
-      }
+      },
     });
   },
 
-  /**
-   * 预览图片
-   */
   onImagePreview(e) {
     const url = e.currentTarget.dataset.url;
-    const { images } = this.data.form;
     wx.previewImage({
-      urls: images,
-      current: url
+      urls: this.data.form.images,
+      current: url,
     });
   },
 
-  /**
-   * 删除图片
-   */
   onImageDelete(e) {
-    const index = e.currentTarget.dataset.index;
-    const { images } = this.data.form;
+    const index = Number(e.currentTarget.dataset.index || 0);
+    const images = this.data.form.images.slice();
     images.splice(index, 1);
-    this.setData({
-      'form.images': images
-    });
+    this.setData({ 'form.images': images });
   },
 
-  /**
-   * 游戏账号输入
-   */
-  onAccountIdInput(e) {
-    this.setData({
-      'form.accountId': e.detail.value
-    });
-  },
+  onAccountIdInput(e) { this.setData({ 'form.accountId': e.detail.value }); },
+  onPasswordInput(e) { this.setData({ 'form.password': e.detail.value }); },
+  onVerifyCodeInput(e) { this.setData({ 'form.verifyCode': e.detail.value }); },
+  onLoginMethodChange(e) { this.setData({ 'form.loginMethodIndex': Number(e.detail.value || 0) }); },
+  onSafeboxChange(e) { this.setData({ 'form.safeboxIndex': Number(e.detail.value || 0) }); },
+  onStaminaLevelChange(e) { this.setData({ 'form.staminaLevel': Number(e.detail.value || 0) }); },
+  onEnergyLevelChange(e) { this.setData({ 'form.energyLevel': Number(e.detail.value || 0) }); },
+  onRankChange(e) { this.setData({ 'form.rankIndex': Number(e.detail.value || 0) }); },
+  onKdInput(e) { this.setData({ 'form.kd': e.detail.value }); },
+  onHasSkinsChange(e) { this.setData({ 'form.hasSkins': e.detail.value }); },
+  onSkinTierChange(e) { this.setData({ 'form.skinTierIndex': Number(e.detail.value || 0) }); },
+  onSkinCountInput(e) { this.setData({ 'form.skinCount': e.detail.value }); },
+  onHasBattlepassChange(e) { this.setData({ 'form.hasBattlepass': e.detail.value }); },
+  onBattlepassLevelInput(e) { this.setData({ 'form.battlepassLevel': e.detail.value }); },
+  onDescriptionInput(e) { this.setData({ 'form.description': e.detail.value }); },
 
-  /**
-   * 密码输入
-   */
-  onPasswordInput(e) {
-    this.setData({
-      'form.password': e.detail.value
-    });
-  },
-
-  /**
-   * 验证码输入
-   */
-  onVerifyCodeInput(e) {
-    this.setData({
-      'form.verifyCode': e.detail.value
-    });
-  },
-
-  /**
-   * 登录方式选择
-   */
-  onLoginMethodChange(e) {
-    this.setData({
-      'form.loginMethodIndex': parseInt(e.detail.value)
-    });
-  },
-
-  /**
-   * 哈夫币输入
-   */
   onCoinsMInput(e) {
-    this.setData({
-      'form.coinsM': e.detail.value
-    });
+    this.setData({ 'form.coinsM': e.detail.value }, () => this.updatePricing());
   },
 
-  /**
-   * 安全箱选择
-   */
-  onSafeboxChange(e) {
-    this.setData({
-      'form.safeboxIndex': parseInt(e.detail.value)
-    });
+  onRentalRatioInput(e) {
+    this.setData({ 'form.rentalRatio': e.detail.value }, () => this.updatePricing());
   },
 
-  /**
-   * 体力等级选择
-   */
-  onStaminaLevelChange(e) {
-    this.setData({
-      'form.staminaLevel': parseInt(e.detail.value)
-    });
+  onRentalSpeedTap(e) {
+    this.setData({ 'form.rentalSpeed': Number(e.currentTarget.dataset.speed || 10) }, () => this.updatePricing());
   },
 
-  /**
-   * 负重等级选择
-   */
-  onEnergyLevelChange(e) {
-    this.setData({
-      'form.energyLevel': parseInt(e.detail.value)
-    });
-  },
-
-  /**
-   * 段位选择
-   */
-  onRankChange(e) {
-    this.setData({
-      'form.rankIndex': parseInt(e.detail.value)
-    });
-  },
-
-  /**
-   * KD值输入
-   */
-  onKdInput(e) {
-    this.setData({
-      'form.kd': e.detail.value
-    });
-  },
-
-  /**
-   * 是否有皮肤切换
-   */
-  onHasSkinsChange(e) {
-    this.setData({
-      'form.hasSkins': e.detail.value
-    });
-  },
-
-  /**
-   * 皮肤等级选择
-   */
-  onSkinTierChange(e) {
-    this.setData({
-      'form.skinTierIndex': parseInt(e.detail.value)
-    });
-  },
-
-  /**
-   * 皮肤数量输入
-   */
-  onSkinCountInput(e) {
-    this.setData({
-      'form.skinCount': e.detail.value
-    });
-  },
-
-  /**
-   * 是否有战斗通行证切换
-   */
-  onHasBattlepassChange(e) {
-    this.setData({
-      'form.hasBattlepass': e.detail.value
-    });
-  },
-
-  /**
-   * 战斗通行证等级输入
-   */
-  onBattlepassLevelInput(e) {
-    this.setData({
-      'form.battlepassLevel': e.detail.value
-    });
-  },
-
-  /**
-   * 描述输入
-   */
-  onDescriptionInput(e) {
-    this.setData({
-      'form.description': e.detail.value
-    });
-  },
-
-  /**
-   * 租金输入
-   */
-  onRentalPriceInput(e) {
-    this.setData({
-      'form.rentalPrice': e.detail.value
-    }, () => {
-      this.updateTotalPrice();
-    });
-  },
-
-  /**
-   * 押金输入
-   */
   onDepositInput(e) {
-    this.setData({
-      'form.deposit': e.detail.value
-    }, () => {
-      this.updateTotalPrice();
-    });
+    this.setData({ 'form.deposit': e.detail.value }, () => this.updatePricing());
   },
 
-  /**
-   * 租期类型切换
-   */
-  onRentalTypeTap(e) {
-    const type = e.currentTarget.dataset.type;
-    this.setData({
-      'form.rentalType': type,
-      'form.rentalDuration': ''
-    });
-  },
-
-  /**
-   * 租赁时长输入
-   */
-  onRentalDurationInput(e) {
-    this.setData({
-      'form.rentalDuration': e.detail.value
-    });
-  },
-
-  /**
-   * 表单验证
-   */
   validateForm() {
     const form = this.data.form;
-
     if (form.images.length === 0) {
-      wx.showToast({
-        title: '请至少上传一张截图',
-        icon: 'none'
-      });
+      wx.showToast({ title: '请至少上传一张账号截图', icon: 'none' });
       return false;
     }
-
     if (!form.accountId) {
-      wx.showToast({
-        title: '请输入游戏账号',
-        icon: 'none'
-      });
+      wx.showToast({ title: '请输入游戏账号', icon: 'none' });
       return false;
     }
-
     if (!form.password) {
-      wx.showToast({
-        title: '请输入游戏密码',
-        icon: 'none'
-      });
+      wx.showToast({ title: '请输入游戏密码', icon: 'none' });
       return false;
     }
-
-    if (!form.coinsM || parseFloat(form.coinsM) <= 0) {
-      wx.showToast({
-        title: '请输入哈夫币数量',
-        icon: 'none'
-      });
+    if (!form.coinsM || Number(form.coinsM) <= 0) {
+      wx.showToast({ title: '请输入哈夫币数量', icon: 'none' });
       return false;
     }
-
-    if (!form.rentalPrice || parseFloat(form.rentalPrice) <= 0) {
-      wx.showToast({
-        title: '请输入租金金额',
-        icon: 'none'
-      });
+    if (!form.rentalRatio || Number(form.rentalRatio) < 30 || Number(form.rentalRatio) > 50) {
+      wx.showToast({ title: '出租比例需在 30 到 50 之间', icon: 'none' });
       return false;
     }
-
-    if (!form.deposit || parseFloat(form.deposit) < 0) {
-      wx.showToast({
-        title: '请输入押金金额',
-        icon: 'none'
-      });
+    if (!form.deposit || Number(form.deposit) < 0) {
+      wx.showToast({ title: '请输入押金金额', icon: 'none' });
       return false;
     }
-
-    if (!form.rentalDuration || parseFloat(form.rentalDuration) <= 0) {
-      wx.showToast({
-        title: form.rentalType === 'hour' ? '请输入租赁小时数' : '请输入租赁天数',
-        icon: 'none'
-      });
-      return false;
-    }
-
     return true;
   },
 
-  /**
-   * 提交表单
-   */
-  onSubmit(e) {
-    const that = this;
-
-    if (!that.validateForm()) {
-      return;
-    }
-
-    if (that.data.submitting) {
-      return;
-    }
+  onSubmit() {
+    if (!this.validateForm() || this.data.submitting) return;
 
     wx.showModal({
-      title: '确认发布',
-      content: '确认发布此账号吗？发布后将进入审核流程。',
-      success(res) {
+      title: '确认上架',
+      content: '确认提交该账号吗？提交后会进入审核流程。',
+      success: (res) => {
         if (res.confirm) {
-          that.publishAccount();
+          this.publishAccount();
         }
-      }
+      },
     });
   },
 
-  /**
-   * 发布账号
-   */
   publishAccount() {
-    const that = this;
-    const form = that.data.form;
-    const userInfo = storage.getUserInfo();
+    const form = this.data.form;
+    const userInfo = storage.getUserInfo() || {};
+    const period = calculateRentalPeriod(form.coinsM, form.rentalSpeed);
+    const recommendedRental = Number(form.suggestedRental || 0);
 
-    // 构建请求参数
     const params = {
-      sellerId: userInfo?.id || '',
+      sellerId: userInfo.id || '',
       accountId: form.accountId,
-      title: '', // 后端会自动生成
+      title: '',
       description: form.description,
       screenshots: form.images,
-      coinsM: parseFloat(form.coinsM),
-      safeboxCount: that.data.safeboxOptions[form.safeboxIndex].value,
-      energyValue: parseInt(form.energyLevel),
-      staminaValue: parseInt(form.staminaLevel),
+      coinsM: Number(form.coinsM || 0),
+      safeboxCount: this.data.safeboxOptions[form.safeboxIndex].value,
+      energyValue: Number(form.energyLevel),
+      staminaValue: Number(form.staminaLevel),
       hasSkins: form.hasSkins,
-      skinTier: form.hasSkins ? that.data.skinTierOptions[form.skinTierIndex] : null,
-      skinCount: form.hasSkins ? parseInt(form.skinCount || 0) : 0,
+      skinTier: form.hasSkins ? this.data.skinTierOptions[form.skinTierIndex] : null,
+      skinCount: form.hasSkins ? Number(form.skinCount || 0) : 0,
       hasBattlepass: form.hasBattlepass,
-      battlepassLevel: form.hasBattlepass ? parseInt(form.battlepassLevel || 0) : 0,
+      battlepassLevel: form.hasBattlepass ? Number(form.battlepassLevel || 0) : 0,
       customAttributes: {
-        loginMethod: that.data.loginMethodOptions[form.loginMethodIndex].value,
-        rank: that.data.rankOptions[form.rankIndex].value,
-        kd: form.kd ? parseFloat(form.kd) : 0
+        loginMethod: this.data.loginMethodOptions[form.loginMethodIndex].value,
+        rank: this.data.rankOptions[form.rankIndex].value,
+        kd: form.kd ? Number(form.kd) : 0,
+        rentalSpeed: form.rentalSpeed,
       },
       tags: [],
-      accountValue: parseFloat(form.rentalPrice),
-      recommendedRental: parseFloat(form.rentalPrice),
-      rentalRatio: 35, // 默认比例
-      deposit: parseFloat(form.deposit),
-      totalPrice: parseFloat(form.totalPrice),
-      rentalDays: form.rentalType === 'day' ? parseFloat(form.rentalDuration) : null,
-      rentalHours: form.rentalType === 'hour' ? parseFloat(form.rentalDuration) : null,
-      rentalDescription: form.rentalType === 'hour'
-        ? `${form.rentalDuration}小时`
-        : `${form.rentalDuration}天`,
+      accountValue: recommendedRental,
+      recommendedRental,
+      rentalRatio: Number(form.rentalRatio || 0),
+      deposit: Number(form.deposit || 0),
+      totalPrice: Number(form.totalPrice || 0),
+      rentalDays: period.days,
+      rentalHours: period.hours,
+      rentalDescription: form.rentalPeriodText,
       username: form.accountId,
       password: form.password,
-      verifyCode: form.verifyCode
+      verifyCode: form.verifyCode,
     };
 
-    that.setData({ submitting: true });
+    this.setData({ submitting: true });
 
     api.createAccount(params)
-      .then(res => {
-        that.setData({ submitting: false });
-
-        wx.showToast({
-          title: '发布成功，等待审核',
-          icon: 'success'
-        });
-
-        setTimeout(() => {
-          wx.navigateBack();
-        }, 1500);
+      .then(() => {
+        this.setData({ submitting: false });
+        wx.showToast({ title: '发布成功，等待审核', icon: 'success' });
+        setTimeout(() => wx.navigateBack(), 1200);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('发布失败:', error);
-        that.setData({ submitting: false });
-
-        // 使用Mock数据模拟发布成功
+        this.setData({ submitting: false });
         if (config.useMockData) {
-          wx.showToast({
-            title: '发布成功（Mock）',
-            icon: 'success'
-          });
-
-          setTimeout(() => {
-            wx.navigateBack();
-          }, 1500);
-        } else {
-          wx.showToast({
-            title: error.error || '发布失败',
-            icon: 'none'
-          });
+          wx.showToast({ title: '发布成功（Mock）', icon: 'success' });
+          setTimeout(() => wx.navigateBack(), 1200);
+          return;
         }
+        wx.showToast({
+          title: error && error.error ? error.error : '发布失败，请稍后再试',
+          icon: 'none',
+        });
       });
-  }
+  },
 });

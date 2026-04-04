@@ -10,7 +10,7 @@ Component({
         text: "首页"
       },
       {
-        pagePath: "/pages/orders/list/index",
+        pagePath: "/pages/order/list/index",
         iconPath: "/images/icons/order.png",
         selectedIconPath: "/images/icons/order-active.png",
         text: "订单"
@@ -22,7 +22,7 @@ Component({
         text: "消息"
       },
       {
-        pagePath: "/pages/profile/index/index",
+        pagePath: "/pages/profile/index",
         iconPath: "/images/icons/profile.png",
         selectedIconPath: "/images/icons/profile-active.png",
         text: "我的"

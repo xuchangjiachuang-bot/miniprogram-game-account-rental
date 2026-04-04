@@ -154,8 +154,12 @@ Page({
         })
         .then(res => {
           console.log('[微信登录] 后端登录成功:', res);
-          
-          const { token, user } = res.data;
+          const token = res.token || res.data?.token;
+          const user = res.user || res.data?.user;
+
+          if (!token || !user) {
+            throw new Error('登录返回数据不完整');
+          }
           
           // 保存登录信息
           storage.setToken(token);

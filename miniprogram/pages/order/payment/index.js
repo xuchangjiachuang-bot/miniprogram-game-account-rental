@@ -1,295 +1,186 @@
-// pages/order/payment/index.js
 const api = require('../../../utils/api.js');
+
+function formatMoney(amount) {
+  const value = Number(amount || 0);
+  if (Number.isNaN(value)) return '0.00';
+  return value.toFixed(2);
+}
 
 Page({
   data: {
     orderId: null,
-    order: {},
+    order: {
+      status: '',
+      total_price: '0.00',
+      totalPrice: '0.00',
+      rental_period: '-',
+      paymentTimeoutSeconds: 900,
+    },
     account: {},
     wallet: {
-      availableBalance: '0.00'
+      availableBalance: '0.00',
     },
-    selectedPayment: 'wechat',
+    selectedPayment: 'balance',
     paying: false,
     countdown: '15:00',
     countdownTimer: null,
     insufficient: false,
-    insufficientAmount: 0
+    insufficientAmount: '0.00',
   },
 
   onLoad(options) {
-    console.log('订单支付页面加载', options);
-    
     if (!options.id) {
-      wx.showToast({
-        title: '订单ID不能为空',
-        icon: 'none'
-      });
-      setTimeout(() => {
-        wx.navigateBack();
-      }, 1500);
+      wx.showToast({ title: '订单 ID 不能为空', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    
+
     this.setData({ orderId: options.id });
     this.loadData();
-    this.startCountdown();
   },
 
   onUnload() {
+    this.clearCountdown();
+  },
+
+  clearCountdown() {
     if (this.data.countdownTimer) {
       clearInterval(this.data.countdownTimer);
+      this.setData({ countdownTimer: null });
     }
   },
 
-  /**
-   * 加载数据
-   */
   loadData() {
-    const that = this;
-    
-    Promise.all([
-      that.loadOrderDetail(),
-      that.loadWalletInfo()
-    ]).catch(error => {
-      console.error('加载数据失败:', error);
+    return Promise.all([
+      this.loadOrderDetail(),
+      this.loadWalletInfo(),
+    ]).catch((error) => {
+      console.error('加载支付页数据失败:', error);
     });
   },
 
-  /**
-   * 加载订单详情
-   */
   loadOrderDetail() {
-    const that = this;
-    
-    return api.getOrderDetail(that.data.orderId)
-      .then(res => {
-        that.setData({
-          order: res.data.order,
-          account: res.data.account
-        });
-        
-        // 如果订单已支付或已取消，跳转到订单详情
-        if (res.data.order.status !== 'pending') {
-          wx.redirectTo({
-            url: `/pages/order/detail/index?id=${that.data.orderId}`
-          });
+    return api.getOrderDetail(this.data.orderId)
+      .then((res) => {
+        const source = res?.data || {};
+        const order = source.order || source;
+        const account = source.account || {};
+
+        if (order.status && order.status !== 'pending_payment') {
+          wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
+          return;
         }
+
+        const normalizedOrder = {
+          ...order,
+          totalPrice: formatMoney(order.totalPrice || order.total_price || 0),
+          total_price: formatMoney(order.total_price || order.totalPrice || 0),
+          rental_period: order.rental_period || '-',
+          paymentTimeoutSeconds: Number(order.paymentTimeoutSeconds || 900),
+        };
+
+        this.setData({ order: normalizedOrder, account });
+        this.startCountdown(normalizedOrder.paymentTimeoutSeconds);
+        this.checkBalance();
       });
   },
 
-  /**
-   * 加载钱包信息
-   */
   loadWalletInfo() {
-    const that = this;
-    
     return api.getWalletInfo()
-      .then(res => {
-        that.setData({
+      .then((res) => {
+        const wallet = res?.data || {};
+        this.setData({
           wallet: {
-            availableBalance: that.formatMoney(res.data.availableBalance)
-          }
+            availableBalance: formatMoney(wallet.availableBalance || wallet.available_balance || 0),
+          },
         });
-        
-        that.checkBalance();
+        this.checkBalance();
       });
   },
 
-  /**
-   * 格式化金额
-   */
-  formatMoney(amount) {
-    if (!amount) return '0.00';
-    return parseFloat(amount).toFixed(2);
-  },
-
-  /**
-   * 检查余额是否充足
-   */
   checkBalance() {
-    const { wallet, order, selectedPayment } = this.data;
-    
-    if (selectedPayment === 'balance') {
-      const balance = parseFloat(wallet.availableBalance);
-      const amount = parseFloat(order.totalPrice);
-      const insufficient = amount > balance;
-      
-      this.setData({
-        insufficient,
-        insufficientAmount: insufficient ? (amount - balance).toFixed(2) : '0.00'
-      });
-    }
+    const balance = Number(this.data.wallet.availableBalance || 0);
+    const amount = Number(this.data.order.totalPrice || this.data.order.total_price || 0);
+    const insufficient = amount > balance;
+
+    this.setData({
+      insufficient,
+      insufficientAmount: insufficient ? formatMoney(amount - balance) : '0.00',
+    });
   },
 
-  /**
-   * 倒计时
-   */
-  startCountdown() {
-    const that = this;
-    let seconds = 900; // 15分钟
-    
-    const timer = setInterval(() => {
-      seconds--;
-      
+  startCountdown(totalSeconds) {
+    this.clearCountdown();
+
+    let seconds = Number(totalSeconds || 900);
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      seconds = 900;
+    }
+
+    const updateCountdown = () => {
       if (seconds <= 0) {
-        clearInterval(timer);
-        that.setData({
-          countdown: '00:00'
-        });
-        
-        wx.showToast({
-          title: '订单已超时',
-          icon: 'none'
-        });
-        
+        this.clearCountdown();
+        this.setData({ countdown: '00:00' });
+        wx.showToast({ title: '订单已超时', icon: 'none' });
         setTimeout(() => {
-          wx.redirectTo({
-            url: `/pages/order/detail/index?id=${that.data.orderId}`
-          });
-        }, 1500);
+          wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
+        }, 1200);
         return;
       }
-      
+
       const minutes = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      
-      that.setData({
-        countdown: `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      const remainSeconds = seconds % 60;
+      this.setData({
+        countdown: `${String(minutes).padStart(2, '0')}:${String(remainSeconds).padStart(2, '0')}`,
       });
-    }, 1000);
-    
-    that.setData({ countdownTimer: timer });
+      seconds -= 1;
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    this.setData({ countdownTimer: timer });
   },
 
-  /**
-   * 选择支付方式
-   */
   onPaymentTap(e) {
     const payment = e.currentTarget.dataset.payment;
-    
-    this.setData({ selectedPayment: payment }, () => {
-      this.checkBalance();
-    });
+    if (payment === 'wechat') {
+      wx.showToast({ title: '当前订单暂不支持微信直接支付', icon: 'none' });
+      return;
+    }
+
+    this.setData({ selectedPayment: 'balance' }, () => this.checkBalance());
   },
 
-  /**
-   * 去充值
-   */
   onRecharge() {
-    wx.navigateTo({
-      url: '/pages/wallet/recharge/index'
-    });
+    wx.navigateTo({ url: '/pages/wallet/recharge/index' });
   },
 
-  /**
-   * 支付
-   */
   onPay() {
-    const that = this;
-    
-    if (that.data.paying) {
+    if (this.data.paying) return;
+
+    if (this.data.insufficient) {
+      wx.showToast({ title: '余额不足，请先充值', icon: 'none' });
       return;
     }
-    
-    if (that.data.selectedPayment === 'balance' && that.data.insufficient) {
-      return;
-    }
-    
-    if (that.data.selectedPayment === 'wechat') {
-      that.handleWechatPay();
-    } else {
-      that.handleBalancePay();
-    }
+
+    this.handleBalancePay();
   },
 
-  /**
-   * 微信支付
-   */
-  handleWechatPay() {
-    const that = this;
-    
-    that.setData({ paying: true });
-    
-    api.wechatPay(that.data.orderId)
-      .then(res => {
-        that.setData({ paying: false });
-        
-        const payData = res.data;
-        
-        // 调起微信支付
-        wx.requestPayment({
-          timeStamp: payData.timeStamp,
-          nonceStr: payData.nonceStr,
-          package: payData.package,
-          signType: payData.signType,
-          paySign: payData.paySign,
-          success() {
-            wx.showToast({
-              title: '支付成功',
-              icon: 'success'
-            });
-            
-            setTimeout(() => {
-              wx.redirectTo({
-                url: `/pages/order/detail/index?id=${that.data.orderId}`
-              });
-            }, 1500);
-          },
-          fail(error) {
-            console.error('支付失败:', error);
-            
-            if (error.errMsg !== 'requestPayment:fail cancel') {
-              wx.showToast({
-                title: '支付失败',
-                icon: 'none'
-              });
-            }
-          }
-        });
-      })
-      .catch(error => {
-        console.error('创建支付订单失败:', error);
-        that.setData({ paying: false });
-        
-        wx.showToast({
-          title: error.error || '支付失败',
-          icon: 'none'
-        });
-      });
-  },
-
-  /**
-   * 余额支付
-   */
   handleBalancePay() {
-    const that = this;
-    
-    that.setData({ paying: true });
-    
-    api.balancePay(that.data.orderId)
-      .then(res => {
-        that.setData({ paying: false });
-        
-        wx.showToast({
-          title: '支付成功',
-          icon: 'success'
-        });
-        
+    this.setData({ paying: true });
+
+    api.balancePay(this.data.orderId)
+      .then(() => {
+        wx.showToast({ title: '支付成功', icon: 'success' });
         setTimeout(() => {
-          wx.redirectTo({
-            url: `/pages/order/detail/index?id=${that.data.orderId}`
-          });
-        }, 1500);
+          wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
+        }, 1200);
       })
-      .catch(error => {
-        console.error('余额支付失败:', error);
-        that.setData({ paying: false });
-        
-        wx.showToast({
-          title: error.error || '支付失败',
-          icon: 'none'
-        });
+      .catch((error) => {
+        wx.showToast({ title: error.error || '支付失败', icon: 'none' });
+      })
+      .finally(() => {
+        this.setData({ paying: false });
       });
-  }
+  },
 });

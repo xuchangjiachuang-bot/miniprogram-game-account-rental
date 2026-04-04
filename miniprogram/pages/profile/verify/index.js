@@ -1,28 +1,25 @@
-// pages/profile/verify/index.js
 const api = require('../../../utils/api.js');
 
 Page({
   data: {
     userInfo: {},
-    verifyStatus: 'none', // none, pending, approved, rejected
-    statusKey: '',
-    statusIcon: '',
-    statusText: '',
-    statusDesc: '',
+    verifyStatus: 'none',
+    statusKey: 'none',
+    statusIcon: '未',
+    statusText: '未认证',
+    statusDesc: '完成实名认证后可开启提现等能力',
     canSubmit: true,
     form: {
       realName: '',
       idCard: '',
-      idCardFront: '',
-      idCardBack: '',
-      phone: ''
+      phone: '',
     },
     submitting: false,
-    history: []
+    history: [],
+    maskedIdCard: '',
   },
 
-  onLoad(options) {
-    console.log('实名认证页面加载');
+  onLoad() {
     this.loadUserInfo();
   },
 
@@ -31,324 +28,187 @@ Page({
     this.loadHistory();
   },
 
-  /**
-   * 加载用户信息
-   */
   loadUserInfo() {
-    const that = this;
-    
     api.getUserInfo()
-      .then(res => {
-        const userInfo = res.data;
-        let statusKey = '';
-        let statusIcon = '';
-        let statusText = '';
-        let statusDesc = '';
-        let canSubmit = true;
-        
-        switch (userInfo.verifyStatus) {
-          case 'none':
-            statusKey = 'none';
-            statusIcon = '📝';
-            statusText = '未认证';
-            statusDesc = '完成实名认证后，即可提现账号资金';
-            canSubmit = true;
-            break;
-            
-          case 'pending':
-            statusKey = 'pending';
-            statusIcon = '⏳';
-            statusText = '审核中';
-            statusDesc = '您的实名认证信息正在审核中，请耐心等待';
-            canSubmit = false;
-            break;
-            
-          case 'approved':
-            statusKey = 'approved';
-            statusIcon = '✅';
-            statusText = '已认证';
-            statusDesc = '您已完成实名认证';
-            canSubmit = false;
-            break;
-            
-          case 'rejected':
-            statusKey = 'rejected';
-            statusIcon = '❌';
-            statusText = '认证失败';
-            statusDesc = userInfo.verifyRejectReason || '认证未通过，请重新提交';
-            canSubmit = true;
-            break;
-        }
-        
-        that.setData({
+      .then((res) => {
+        const userInfo = res?.data || {};
+        const status = this.resolveStatus(userInfo.verifyStatus || (userInfo.isVerified ? 'approved' : 'none'), userInfo.verifyRejectReason);
+
+        this.setData({
           userInfo,
-          verifyStatus: userInfo.verifyStatus,
-          statusKey,
-          statusIcon,
-          statusText,
-          statusDesc,
-          canSubmit,
-          maskedIdCard: that.maskIdCard(userInfo.idCard)
+          verifyStatus: status.verifyStatus,
+          statusKey: status.statusKey,
+          statusIcon: status.statusIcon,
+          statusText: status.statusText,
+          statusDesc: status.statusDesc,
+          canSubmit: status.canSubmit,
+          maskedIdCard: this.maskIdCard(userInfo.idCard),
+          form: {
+            realName: userInfo.realName || this.data.form.realName,
+            idCard: userInfo.idCard || this.data.form.idCard,
+            phone: userInfo.phone || this.data.form.phone,
+          },
         });
-      });
-  },
-
-  /**
-   * 脱敏身份证号
-   */
-  maskIdCard(idCard) {
-    if (!idCard || idCard.length < 18) return '';
-    return idCard.substring(0, 6) + '********' + idCard.substring(14);
-  },
-
-  /**
-   * 姓名输入
-   */
-  onNameInput(e) {
-    this.setData({
-      'form.realName': e.detail.value
-    });
-  },
-
-  /**
-   * 身份证号输入
-   */
-  onIdCardInput(e) {
-    this.setData({
-      'form.idCard': e.detail.value
-    });
-  },
-
-  /**
-   * 手机号输入
-   */
-  onPhoneInput(e) {
-    this.setData({
-      'form.phone': e.detail.value
-    });
-  },
-
-  /**
-   * 上传身份证正面
-   */
-  onIdCardFrontTap() {
-    const that = this;
-    
-    wx.chooseImage({
-      count: 1,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
-      success(res) {
-        that.uploadImage(res.tempFilePaths[0], 'front');
-      }
-    });
-  },
-
-  /**
-   * 上传身份证背面
-   */
-  onIdCardBackTap() {
-    const that = this;
-    
-    wx.chooseImage({
-      count: 1,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
-      success(res) {
-        that.uploadImage(res.tempFilePaths[0], 'back');
-      }
-    });
-  },
-
-  /**
-   * 上传图片
-   */
-  uploadImage(filePath, type) {
-    const that = this;
-    
-    wx.showLoading({
-      title: '上传中...'
-    });
-    
-    api.uploadImage(filePath)
-      .then(res => {
-        wx.hideLoading();
-        
-        const imageUrl = res.data.url;
-        
-        if (type === 'front') {
-          that.setData({
-            'form.idCardFront': imageUrl
-          });
-        } else {
-          that.setData({
-            'form.idCardBack': imageUrl
-          });
-        }
       })
-      .catch(error => {
-        wx.hideLoading();
-        
-        wx.showToast({
-          title: error.error || '上传失败',
-          icon: 'none'
-        });
+      .catch((error) => {
+        console.error('加载实名认证信息失败:', error);
       });
   },
 
-  /**
-   * 表单验证
-   */
+  resolveStatus(verifyStatus, rejectReason) {
+    switch (verifyStatus) {
+      case 'pending':
+        return {
+          verifyStatus,
+          statusKey: 'pending',
+          statusIcon: '审',
+          statusText: '审核中',
+          statusDesc: '您的实名认证信息正在审核，请耐心等待。',
+          canSubmit: false,
+        };
+      case 'approved':
+        return {
+          verifyStatus,
+          statusKey: 'approved',
+          statusIcon: '已',
+          statusText: '已认证',
+          statusDesc: '您已完成实名认证。',
+          canSubmit: false,
+        };
+      case 'rejected':
+        return {
+          verifyStatus,
+          statusKey: 'rejected',
+          statusIcon: '退',
+          statusText: '认证未通过',
+          statusDesc: rejectReason || '请核对信息后重新提交。',
+          canSubmit: true,
+        };
+      default:
+        return {
+          verifyStatus: 'none',
+          statusKey: 'none',
+          statusIcon: '未',
+          statusText: '未认证',
+          statusDesc: '请填写真实姓名、身份证号和手机号完成认证。',
+          canSubmit: true,
+        };
+    }
+  },
+
+  maskIdCard(idCard) {
+    if (!idCard || idCard.length < 8) return '';
+    return `${idCard.slice(0, 4)}********${idCard.slice(-4)}`;
+  },
+
+  onNameInput(e) {
+    this.setData({ 'form.realName': e.detail.value });
+  },
+
+  onIdCardInput(e) {
+    this.setData({ 'form.idCard': e.detail.value.trim() });
+  },
+
+  onPhoneInput(e) {
+    this.setData({ 'form.phone': e.detail.value.trim() });
+  },
+
   validateForm() {
-    const form = this.data.form;
-    
-    if (!form.realName) {
-      wx.showToast({
-        title: '请输入真实姓名',
-        icon: 'none'
-      });
+    const { realName, idCard, phone } = this.data.form;
+
+    if (!realName.trim()) {
+      wx.showToast({ title: '请输入真实姓名', icon: 'none' });
       return false;
     }
-    
-    if (!this.validateIdCard(form.idCard)) {
-      wx.showToast({
-        title: '身份证号格式不正确',
-        icon: 'none'
-      });
+
+    if (!this.validateIdCard(idCard)) {
+      wx.showToast({ title: '请输入正确的身份证号', icon: 'none' });
       return false;
     }
-    
-    if (!form.idCardFront) {
-      wx.showToast({
-        title: '请上传身份证正面照片',
-        icon: 'none'
-      });
+
+    if (!this.validatePhone(phone)) {
+      wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
       return false;
     }
-    
-    if (!form.idCardBack) {
-      wx.showToast({
-        title: '请上传身份证背面照片',
-        icon: 'none'
-      });
-      return false;
-    }
-    
-    if (form.phone && !this.validatePhone(form.phone)) {
-      wx.showToast({
-        title: '手机号格式不正确',
-        icon: 'none'
-      });
-      return false;
-    }
-    
+
     return true;
   },
 
-  /**
-   * 验证身份证号
-   */
   validateIdCard(idCard) {
-    const reg = /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/;
-    return reg.test(idCard);
+    return /(^\d{15}$)|(^\d{17}(\d|X|x)$)/.test(idCard || '');
   },
 
-  /**
-   * 验证手机号
-   */
   validatePhone(phone) {
-    const reg = /^1[3-9]\d{9}$/;
-    return reg.test(phone);
+    return /^1[3-9]\d{9}$/.test(phone || '');
   },
 
-  /**
-   * 表单提交
-   */
-  onSubmit(e) {
-    const that = this;
-    
-    if (!that.validateForm()) {
+  onSubmit() {
+    if (!this.validateForm() || this.data.submitting) {
       return;
     }
-    
-    if (that.data.submitting) {
-      return;
-    }
-    
+
     wx.showModal({
       title: '确认提交',
-      content: '提交后信息将无法修改，请确认信息无误',
-      success(res) {
+      content: '提交后将进入审核流程，请确认姓名、身份证号和手机号填写无误。',
+      success: (res) => {
         if (res.confirm) {
-          that.submitVerify();
+          this.submitVerify();
         }
-      }
+      },
     });
   },
 
-  /**
-   * 提交认证
-   */
   submitVerify() {
-    const that = this;
-    const form = that.data.form;
-    
-    that.setData({ submitting: true });
-    
-    api.submitRealNameVerify({
-      realName: form.realName,
-      idCard: form.idCard,
-      idCardFront: form.idCardFront,
-      idCardBack: form.idCardBack,
-      phone: form.phone || null
-    })
-    .then(res => {
-      that.setData({ submitting: false });
-      
-      wx.showToast({
-        title: '提交成功',
-        icon: 'success'
-      });
-      
-      setTimeout(() => {
-        that.loadUserInfo();
-      }, 1500);
-    })
-    .catch(error => {
-      console.error('提交失败:', error);
-      that.setData({ submitting: false });
-      
-      wx.showToast({
-        title: error.error || '提交失败',
-        icon: 'none'
-      });
-    });
-  },
+    const form = this.data.form;
+    this.setData({ submitting: true });
 
-  /**
-   * 加载历史记录
-   */
-  loadHistory() {
-    const that = this;
-    
-    api.getVerifyHistory()
-      .then(res => {
-        that.setData({
-          history: res.data.list || []
+    api.submitRealNameVerify({
+      realName: form.realName.trim(),
+      idCard: form.idCard.trim(),
+      phone: form.phone.trim(),
+    })
+      .then(() => {
+        wx.showToast({
+          title: '提交成功',
+          icon: 'success',
+        });
+
+        setTimeout(() => {
+          this.loadUserInfo();
+          this.loadHistory();
+        }, 1200);
+      })
+      .catch((error) => {
+        console.error('提交实名认证失败:', error);
+        wx.showToast({
+          title: error.error || '提交失败',
+          icon: 'none',
         });
       })
-      .catch(error => {
-        console.error('加载历史记录失败:', error);
+      .finally(() => {
+        this.setData({ submitting: false });
       });
   },
 
-  /**
-   * 查看历史记录详情
-   */
+  loadHistory() {
+    api.getVerifyHistory()
+      .then((res) => {
+        const list = res?.data?.list || res?.data || [];
+        this.setData({
+          history: Array.isArray(list) ? list : [],
+        });
+      })
+      .catch((error) => {
+        console.error('加载认证记录失败:', error);
+      });
+  },
+
   onHistoryItemTap(e) {
     const { id } = e.currentTarget.dataset;
+    if (!id) return;
+
     wx.navigateTo({
-      url: `/pages/profile/verify-detail/index?id=${id}`
+      url: `/pages/profile/verify-detail/index?id=${id}`,
     });
-  }
+  },
 });

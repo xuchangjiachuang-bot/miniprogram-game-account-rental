@@ -1,180 +1,170 @@
-// pages/wallet/withdraw-detail/index.js
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const config = require('../../../utils/config.js');
+
+function formatMoney(amount) {
+  return Number(amount || 0).toFixed(2);
+}
+
+function getStatusMeta(status) {
+  const meta = {
+    pending: { text: '待审核', color: '#f59e0b', icon: '审' },
+    approved: { text: '已通过', color: '#3b82f6', icon: '过' },
+    processing: { text: '处理中', color: '#0f766e', icon: '中' },
+    completed: { text: '提现成功', color: '#16a34a', icon: '成' },
+    rejected: { text: '已拒绝', color: '#dc2626', icon: '拒' },
+    cancelled: { text: '已取消', color: '#6b7280', icon: '停' },
+  };
+  return meta[status] || { text: '处理中', color: '#6b7280', icon: '查' };
+}
+
+function getWithdrawalTypeText(type) {
+  const typeMap = {
+    wechat: '微信零钱',
+    alipay: '支付宝',
+    bank: '银行卡',
+  };
+  return typeMap[type] || '提现账户';
+}
+
+function buildTimeline(detail) {
+  const status = detail.status;
+  const reviewTime = detail.reviewTime || '待处理';
+  return [
+    {
+      key: 'submit',
+      title: '提交申请',
+      time: detail.createdAt || '刚刚',
+      active: true,
+      rejected: false,
+    },
+    {
+      key: 'review',
+      title: status === 'rejected' ? '审核未通过' : '审核完成',
+      time: ['approved', 'processing', 'completed', 'rejected'].includes(status) ? reviewTime : '待审核',
+      active: ['approved', 'processing', 'completed', 'rejected'].includes(status),
+      rejected: status === 'rejected',
+    },
+    {
+      key: 'pay',
+      title: '打款处理中',
+      time: ['processing', 'completed'].includes(status) ? reviewTime : '待处理',
+      active: ['processing', 'completed'].includes(status),
+      rejected: false,
+    },
+    {
+      key: 'done',
+      title: '提现成功',
+      time: status === 'completed' ? reviewTime : '待完成',
+      active: status === 'completed',
+      rejected: false,
+    },
+  ];
+}
+
+function normalizeWithdrawal(raw, id) {
+  const source = raw || {};
+  const statusMeta = getStatusMeta(source.status || 'pending');
+  const accountInfo = source.accountInfo || {};
+  const amount = Number(source.amount || 0);
+  const feeAmount = Number(source.feeAmount || source.withdrawalFee || 0);
+  const actualAmount = Number(source.actualAmount || amount - feeAmount || 0);
+
+  const detail = {
+    id: source.id || id,
+    withdrawalNo: source.withdrawalNo || id,
+    status: source.status || 'pending',
+    statusText: statusMeta.text,
+    statusColor: statusMeta.color,
+    statusIcon: statusMeta.icon,
+    amountText: formatMoney(amount),
+    feeText: formatMoney(feeAmount),
+    actualAmountText: formatMoney(actualAmount),
+    withdrawalTypeText: getWithdrawalTypeText(source.withdrawalType),
+    accountName: accountInfo.name || '默认账户',
+    accountNumber: accountInfo.account || accountInfo.accountNumber || '已授权微信账户',
+    createdAt: source.createdAt || '刚刚',
+    reviewTime: source.reviewTime || '',
+    reviewRemark: source.reviewRemark || '',
+  };
+
+  detail.timeline = buildTimeline({
+    status: detail.status,
+    createdAt: detail.createdAt,
+    reviewTime: detail.reviewTime,
+  });
+  return detail;
+}
 
 Page({
   data: {
     id: '',
     withdrawal: null,
-    statusSteps: [
-      { key: 'pending', label: '待审核', icon: '⏳' },
-      { key: 'approved', label: '已通过', icon: '✅' },
-      { key: 'processing', label: '处理中', icon: '💸' },
-      { key: 'completed', label: '已完成', icon: '🎉' },
-      { key: 'rejected', label: '已拒绝', icon: '❌' },
-      { key: 'cancelled', label: '已取消', icon: '🚫' }
-    ]
   },
 
   onLoad(options) {
-    console.log('提现详情页面加载', options);
-    
-    const { id } = options;
+    const id = options.id || '';
     if (!id) {
-      wx.showToast({
-        title: '参数错误',
-        icon: 'none'
-      });
-      setTimeout(() => {
-        wx.navigateBack();
-      }, 1500);
+      wx.showToast({ title: '缺少提现单号', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    
     this.setData({ id });
     this.loadWithdrawalDetail();
   },
 
-  /**
-   * 加载提现详情
-   */
   loadWithdrawalDetail() {
-    const that = this;
-    const { id } = this.data;
-    
-    api.getWithdrawalDetail(id)
-      .then(res => {
-        const { data } = res;
-        
-        that.setData({
-          withdrawal: data
+    return api.getWithdrawalDetail(this.data.id)
+      .then((res) => {
+        const raw = res && res.data ? res.data : null;
+        this.setData({
+          withdrawal: normalizeWithdrawal(raw, this.data.id),
         });
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('加载提现详情失败:', error);
-        
-        // 使用Mock数据
         if (config.useMockData) {
-          const withdrawal = {
-            id: id,
-            withdrawalNo: 'WD2026022600001',
-            userId: 'user_001',
-            username: '张三',
-            amount: '100.00',
-            withdrawalFee: '1.00',
-            feeAmount: '1.00',
-            actualAmount: '99.00',
-            withdrawalType: 'wechat',
-            accountInfo: {
-              type: 'wechat',
-              name: '张三',
-              account: 'wx_abc123'
-            },
-            status: 'pending',
-            createdAt: '2026-02-26 10:30:00',
-            reviewTime: null,
-            reviewRemark: null
-          };
-          
-          that.setData({
-            withdrawal
+          this.setData({
+            withdrawal: normalizeWithdrawal({
+              id: this.data.id,
+              withdrawalNo: 'WD202604040001',
+              amount: 100,
+              feeAmount: 1,
+              actualAmount: 99,
+              withdrawalType: 'wechat',
+              accountInfo: {
+                name: '张三',
+                account: '138****8888',
+              },
+              status: 'pending',
+              createdAt: '2026-04-04 10:30:00',
+            }, this.data.id),
           });
         }
       });
   },
 
-  /**
-   * 格式化金额
-   */
-  formatMoney(amount) {
-    if (!amount) return '0.00';
-    return parseFloat(amount).toFixed(2);
-  },
-
-  /**
-   * 获取状态文本
-   */
-  getStatusText(status) {
-    const statusMap = {
-      'pending': '待审核',
-      'approved': '已通过',
-      'processing': '处理中',
-      'completed': '已完成',
-      'rejected': '已拒绝',
-      'cancelled': '已取消'
-    };
-    return statusMap[status] || status;
-  },
-
-  /**
-   * 获取状态颜色
-   */
-  getStatusColor(status) {
-    const colorMap = {
-      'pending': '#ff9800',
-      'approved': '#2196f3',
-      'processing': '#9c27b0',
-      'completed': '#4caf50',
-      'rejected': '#f44336',
-      'cancelled': '#9e9e9e'
-    };
-    return colorMap[status] || '#999';
-  },
-
-  /**
-   * 获取提现方式文本
-   */
-  getWithdrawalTypeText(type) {
-    const typeMap = {
-      'wechat': '微信',
-      'alipay': '支付宝',
-      'bank': '银行卡'
-    };
-    return typeMap[type] || type;
-  },
-
-  /**
-   * 复制提现单号
-   */
   onCopyNo() {
-    const { withdrawal } = this.data;
-    if (!withdrawal) return;
-    
+    if (!this.data.withdrawal) return;
     wx.setClipboardData({
-      data: withdrawal.withdrawalNo,
+      data: this.data.withdrawal.withdrawalNo,
       success() {
-        wx.showToast({
-          title: '已复制',
-          icon: 'success'
-        });
-      }
+        wx.showToast({ title: '已复制', icon: 'success' });
+      },
     });
   },
 
-  /**
-   * 联系客服
-   */
   onContactService() {
-    wx.showModal({
-      title: '联系客服',
-      content: '确定要联系客服吗？',
-      success(res) {
-        if (res.confirm) {
-          // TODO: 跳转到客服页面
-          wx.showToast({
-            title: '功能开发中',
-            icon: 'none'
-          });
-        }
-      }
+    wx.showToast({
+      title: '客服入口整理中，请先在消息页联系平台',
+      icon: 'none',
     });
   },
 
-  /**
-   * 刷新状态
-   */
   onRefresh() {
     this.loadWithdrawalDetail();
-    wx.stopPullDownRefresh();
-  }
+  },
+
+  onBack() {
+    wx.navigateBack();
+  },
 });

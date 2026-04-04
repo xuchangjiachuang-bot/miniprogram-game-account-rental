@@ -1,6 +1,3 @@
 {
-  "navigationBarTitleText": "发布账号",
-  "usingComponents": {
-    "image-uploader": "/components/image-uploader/index"
-  }
+  "navigationBarTitleText": "发布账号"
 }

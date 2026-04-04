@@ -1,16 +1,14 @@
-<!-- pages/wallet/recharge/index.wxml -->
+﻿<!-- pages/wallet/recharge/index.wxml -->
 <view class="page">
-  <!-- 余额展示 -->
   <view class="balance-section">
     <view class="balance-label">当前余额</view>
     <view class="balance-amount">¥{{wallet.balance}}</view>
   </view>
 
-  <!-- 充值金额 -->
   <view class="section">
     <view class="section-title">选择充值金额</view>
     <view class="amount-grid">
-      <view 
+      <view
         class="amount-item {{selectedAmount === item.value ? 'active' : ''}}"
         wx:for="{{amountOptions}}"
         wx:key="value"
@@ -18,15 +16,14 @@
         data-value="{{item.value}}"
       >
         <text class="amount-value">¥{{item.value}}</text>
-        <text class="amount-desc" wx:if="{{item.gift > 0}}">赠送¥{{item.gift}}</text>
+        <text class="amount-desc" wx:if="{{item.gift > 0}}">赠送 ¥{{item.gift}}</text>
       </view>
     </view>
 
-    <!-- 自定义金额 -->
     <view class="custom-amount">
       <text class="custom-label">自定义金额</text>
-      <input 
-        class="custom-input" 
+      <input
+        class="custom-input"
         type="digit"
         placeholder="请输入充值金额"
         value="{{customAmount}}"
@@ -36,11 +33,10 @@
     </view>
   </view>
 
-  <!-- 支付方式 -->
   <view class="section">
     <view class="section-title">支付方式</view>
     <view class="payment-methods">
-      <view 
+      <view
         class="payment-item {{paymentMethod === 'wechat' ? 'active' : ''}}"
         bindtap="onPaymentMethodTap"
         data-method="wechat"
@@ -48,28 +44,26 @@
         <image class="payment-icon" src="/images/icons/wechat-pay.png" mode="aspectFit" />
         <view class="payment-info">
           <text class="payment-name">微信支付</text>
-          <text class="payment-desc">推荐使用</text>
+          <text class="payment-desc">推荐使用，到账更快</text>
         </view>
         <view class="payment-check">
-          <text wx:if="{{paymentMethod === 'wechat'}}">✓</text>
+          <text wx:if="{{paymentMethod === 'wechat'}}">√</text>
         </view>
       </view>
     </view>
   </view>
 
-  <!-- 充值说明 -->
   <view class="tips">
-    <view class="tip-item">• 充值金额实时到账</view>
-    <view class="tip-item">• 充值成功后不可退款</view>
-    <view class="tip-item">• 如有疑问请联系客服</view>
+    <view class="tip-item">1. 充值成功后余额会实时到账。</view>
+    <view class="tip-item">2. 充值完成后暂不支持退款，请确认金额后支付。</view>
+    <view class="tip-item">3. 若支付异常，请联系平台客服处理。</view>
   </view>
 
-  <!-- 底部操作栏 -->
   <view class="bottom-bar">
     <view class="total-info">
-      <text class="total-label">充值金额：</text>
+      <text class="total-label">应付</text>
       <text class="total-amount">¥{{finalAmount}}</text>
-      <text class="total-gift" wx:if="{{giftAmount > 0}}">+ 赠送¥{{giftAmount}}</text>
+      <text class="total-gift" wx:if="{{giftAmount > 0}}">+ 赠送 ¥{{giftAmount}}</text>
     </view>
     <button class="btn-pay" bindtap="onPay" disabled="{{!finalAmount || paying}}">
       {{paying ? '支付中...' : '立即充值'}}

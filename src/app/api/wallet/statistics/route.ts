@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, balanceTransactions, userBalances } from '@/lib/db';
 import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
+import { getServerToken } from '@/lib/server-auth';
+import { verifyToken } from '@/lib/user-service';
 
 /**
  * 获取钱包统计数据
@@ -8,17 +10,23 @@ import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
  */
 export async function GET(request: NextRequest) {
   try {
-    // 验证用户登录
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getServerToken(request);
+    if (!token) {
       return NextResponse.json({
         success: false,
         error: '请先登录',
       }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const userId = token; // 临时方案
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.json({
+        success: false,
+        error: '登录状态已失效，请重新登录',
+      }, { status: 401 });
+    }
+
+    const userId = user.id;
 
     // 获取分页参数
     const { searchParams } = new URL(request.url);
