@@ -77,7 +77,7 @@
           bindtap="onActionTap"
           data-action="{{action.key}}"
           data-id="{{item.id}}"
-          catchtap="true"
+          catchtap="onActionTapCatch"
         >
           {{action.text}}
         </button>

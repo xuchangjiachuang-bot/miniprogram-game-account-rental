@@ -117,6 +117,8 @@ Page({
     }
   },
 
+  onActionTapCatch() {},
+
   cancelOrder(orderId) {
     wx.showModal({
       title: '确认取消',
