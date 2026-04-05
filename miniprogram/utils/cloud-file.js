@@ -1,6 +1,7 @@
 const config = require('./config.js');
 
 const tempUrlCache = new Map();
+let cloudReady = false;
 
 function isCloudFileId(value) {
   return typeof value === 'string' && value.trim().startsWith('cloud://');
@@ -17,6 +18,10 @@ function chunk(list, size) {
 async function fetchTempUrls(fileIds) {
   if (!Array.isArray(fileIds) || fileIds.length === 0) {
     return new Map();
+  }
+
+  if (!cloudReady) {
+    cloudReady = initCloud();
   }
 
   if (!wx.cloud || typeof wx.cloud.getTempFileURL !== 'function') {
@@ -107,6 +112,10 @@ async function resolveCarouselImages(carousels) {
 }
 
 function initCloud() {
+  if (cloudReady && wx.cloud && typeof wx.cloud.getTempFileURL === 'function') {
+    return true;
+  }
+
   if (!wx.cloud || typeof wx.cloud.init !== 'function') {
     return false;
   }
@@ -116,9 +125,11 @@ function initCloud() {
       env: config.cloudEnvId,
       traceUser: true,
     });
+    cloudReady = true;
     return true;
   } catch (error) {
     console.error('init cloud failed:', error);
+    cloudReady = false;
     return false;
   }
 }

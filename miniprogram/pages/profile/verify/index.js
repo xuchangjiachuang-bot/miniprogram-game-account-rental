@@ -7,7 +7,7 @@ Page({
     statusKey: 'none',
     statusIcon: '未',
     statusText: '未认证',
-    statusDesc: '完成实名认证后可开启提现等能力',
+    statusDesc: '请填写真实姓名、身份证号和手机号完成认证。',
     canSubmit: true,
     form: {
       realName: '',
@@ -32,7 +32,10 @@ Page({
     api.getUserInfo()
       .then((res) => {
         const userInfo = res?.data || {};
-        const status = this.resolveStatus(userInfo.verifyStatus || (userInfo.isVerified ? 'approved' : 'none'), userInfo.verifyRejectReason);
+        const status = this.resolveStatus(
+          userInfo.verifyStatus || (userInfo.isVerified ? 'approved' : 'none'),
+          userInfo.verifyRejectReason,
+        );
 
         this.setData({
           userInfo,
@@ -63,7 +66,7 @@ Page({
           statusKey: 'pending',
           statusIcon: '审',
           statusText: '审核中',
-          statusDesc: '您的实名认证信息正在审核，请耐心等待。',
+          statusDesc: '实名认证信息已提交，正在审核中，请耐心等待。',
           canSubmit: false,
         };
       case 'approved':
@@ -72,7 +75,7 @@ Page({
           statusKey: 'approved',
           statusIcon: '已',
           statusText: '已认证',
-          statusDesc: '您已完成实名认证。',
+          statusDesc: '当前账号已完成实名认证，可以正常发布和交易。',
           canSubmit: false,
         };
       case 'rejected':
@@ -81,7 +84,7 @@ Page({
           statusKey: 'rejected',
           statusIcon: '退',
           statusText: '认证未通过',
-          statusDesc: rejectReason || '请核对信息后重新提交。',
+          statusDesc: rejectReason || '请核对姓名、身份证号和手机号后重新提交。',
           canSubmit: true,
         };
       default:

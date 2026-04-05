@@ -1,133 +1,185 @@
-/* pages/profile/verify/index.wxss */
-@import "../../../styles/variables.wxss";
+page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
 
 .page {
-  min-height: 100vh;
-  background: var(--page-bg);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+  padding: 96rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
-/* 认证状态 */
-.verify-status {
-  padding: 60rpx 40rpx;
-  text-align: center;
-}
-
-.verify-status.status-none {
-  background: linear-gradient(135deg, #8c8c8c 0%, #595959 100%);
-}
-
-.verify-status.status-pending {
-  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
-}
-
-.verify-status.status-approved {
-  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
-}
-
-.verify-status.status-rejected {
-  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
-}
-
-.status-icon {
-  font-size: 80rpx;
+.status-shell {
   margin-bottom: 20rpx;
 }
 
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14rpx 28rpx rgba(15, 23, 42, 0.06);
+}
+
+.status-none {
+  border: 2rpx solid #e5e7eb;
+}
+
+.status-pending {
+  border: 2rpx solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.status-approved {
+  border: 2rpx solid #bbf7d0;
+  background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+}
+
+.status-rejected {
+  border: 2rpx solid #fecaca;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%);
+}
+
+.status-badge {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38rpx;
+  font-weight: 800;
+  color: #111827;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.status-pending .status-badge {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-approved .status-badge {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-rejected .status-badge {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-copy {
+  flex: 1;
+}
+
 .status-text {
-  font-size: 36rpx;
-  font-weight: var(--font-weight-bold);
-  color: white;
-  margin-bottom: 10rpx;
+  font-size: 34rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #111827;
 }
 
 .status-desc {
-  font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.8);
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #6b7280;
 }
 
-/* 通用区块 */
-.section {
-  margin: 30rpx;
-  padding: 30rpx;
-  background: var(--card-bg);
-  border-radius: var(--radius-lg);
+.section-card,
+.tips-card,
+.history-item {
+  background: #ffffff;
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 24rpx rgba(15, 23, 42, 0.05);
 }
 
-.section-title {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  margin-bottom: 30rpx;
-  position: relative;
-  padding-left: 20rpx;
+.section-card {
+  padding: 28rpx 24rpx;
 }
 
-.section-title.required::before {
+.form-card {
+  margin-bottom: 20rpx;
+}
+
+.section-head {
+  margin-bottom: 20rpx;
+}
+
+.section-title,
+.history-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.section-subtitle {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.field-group {
+  margin-bottom: 22rpx;
+}
+
+.field-group:last-child {
+  margin-bottom: 0;
+}
+
+.field-label {
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.field-label.required::before {
   content: '*';
-  position: absolute;
-  left: 0;
-  color: var(--danger);
-  font-weight: var(--font-weight-bold);
+  margin-right: 8rpx;
+  color: #ef4444;
 }
 
-/* 表单输入 */
 .form-input {
   width: 100%;
-  height: 80rpx;
-  padding: 0 20rpx;
-  background: var(--page-bg);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  color: var(--text-primary);
+  height: 82rpx;
+  padding: 0 22rpx;
+  box-sizing: border-box;
+  border-radius: 18rpx;
+  border: 2rpx solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  font-size: 26rpx;
 }
 
-/* 身份证上传 */
-.id-card-upload {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20rpx;
+.tips-card {
+  padding: 24rpx;
 }
 
-.upload-item {
-  position: relative;
-  aspect-ratio: 1.58;
-  background: var(--page-bg);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+.tip-item {
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #334155;
 }
 
-.id-card-image {
-  width: 100%;
-  height: 100%;
+.tip-item + .tip-item {
+  margin-top: 8rpx;
 }
 
-.upload-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
+.info-card {
+  margin-top: 20rpx;
 }
 
-.placeholder-icon {
-  font-size: 60rpx;
-}
-
-.placeholder-text {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-/* 认证信息 */
 .info-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid var(--border-color);
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #e5e7eb;
 }
 
 .info-row:last-child {
@@ -135,81 +187,71 @@
 }
 
 .info-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  font-size: 24rpx;
+  color: #64748b;
 }
 
 .info-value {
-  font-size: var(--font-size-md);
-  color: var(--text-primary);
+  max-width: 60%;
+  text-align: right;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #111827;
+  font-weight: 600;
+  word-break: break-all;
 }
 
-/* 提示 */
-.tips {
-  margin: 0 30rpx;
-  padding: 20rpx;
-  background: var(--warning-bg);
-  border-radius: var(--radius-md);
-}
-
-.tips .tip-item {
-  font-size: var(--font-size-xs);
-  color: var(--warning-text);
-  line-height: 1.8;
-  margin-bottom: 5rpx;
-}
-
-.tips .tip-item:last-child {
-  margin-bottom: 0;
-}
-
-/* 提交栏 */
 .submit-bar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 20rpx 30rpx;
-  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
-  background: var(--card-bg);
-  border-top: 1rpx solid var(--border-color);
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -12rpx 30rpx rgba(15, 23, 42, 0.08);
 }
 
 .btn-submit {
   width: 100%;
   height: 88rpx;
   line-height: 88rpx;
-  background: var(--primary);
-  color: white;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-medium);
-  border-radius: var(--radius-lg);
+  border: none;
+  border-radius: 22rpx;
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.btn-submit::after {
   border: none;
 }
 
 .btn-submit[disabled] {
-  background: var(--text-disabled);
-  opacity: 0.5;
+  background: #cbd5e1;
+  color: #ffffff;
 }
 
-/* 历史记录 */
 .history-section {
-  margin: 30rpx;
+  margin-top: 20rpx;
+}
+
+.history-title {
+  margin-bottom: 16rpx;
+  padding-left: 4rpx;
 }
 
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 14rpx;
 }
 
 .history-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 24rpx 30rpx;
-  background: var(--card-bg);
-  border-radius: var(--radius-md);
+  justify-content: space-between;
+  padding: 22rpx 24rpx;
 }
 
 .history-left {
@@ -219,29 +261,28 @@
 }
 
 .history-status {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .history-status.pending {
-  color: var(--warning);
+  color: #2563eb;
 }
 
 .history-status.approved {
-  color: var(--success);
+  color: #16a34a;
 }
 
 .history-status.rejected {
-  color: var(--danger);
+  color: #dc2626;
 }
 
 .history-time {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  font-size: 22rpx;
+  color: #64748b;
 }
 
 .history-arrow {
-  font-size: var(--font-size-lg);
-  color: var(--text-secondary);
+  font-size: 26rpx;
+  color: #94a3b8;
 }
-
