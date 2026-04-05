@@ -12,7 +12,7 @@ page {
 .tabs {
   display: flex;
   background: #ffffff;
-  padding: 20rpx 0;
+  padding: calc(env(safe-area-inset-top) + 20rpx) 0 20rpx;
   position: sticky;
   top: 0;
   z-index: 10;

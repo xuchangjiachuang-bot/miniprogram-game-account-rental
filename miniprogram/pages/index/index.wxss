@@ -10,7 +10,7 @@
 }
 
 .hero-inner {
-  padding: 34rpx 30rpx 36rpx;
+  padding: calc(env(safe-area-inset-top) + 34rpx) 30rpx 36rpx;
   text-align: center;
   background-image: linear-gradient(rgba(118, 118, 255, 0.06) 1rpx, transparent 1rpx), linear-gradient(90deg, rgba(118, 118, 255, 0.06) 1rpx, transparent 1rpx);
   background-size: 28rpx 28rpx;

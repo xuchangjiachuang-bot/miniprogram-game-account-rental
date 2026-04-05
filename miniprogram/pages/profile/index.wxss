@@ -8,7 +8,7 @@ page {
 }
 
 .profile-header {
-  padding: 34rpx 24rpx 30rpx;
+  padding: calc(env(safe-area-inset-top) + 34rpx) 24rpx 30rpx;
   background: linear-gradient(135deg, #312e81 0%, #4f46e5 45%, #6366f1 100%);
 }
 

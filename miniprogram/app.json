@@ -23,6 +23,7 @@
   ],
   "window": {
     "backgroundTextStyle": "light",
+    "navigationStyle": "custom",
     "navigationBarBackgroundColor": "#6366f1",
     "navigationBarTitleText": "账号租赁",
     "navigationBarTextStyle": "white",

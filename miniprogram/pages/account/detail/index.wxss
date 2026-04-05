@@ -8,7 +8,7 @@ page {
 }
 
 .error-card {
-  margin: 24rpx;
+  margin: calc(env(safe-area-inset-top) + 24rpx) 24rpx 24rpx;
   padding: 42rpx 30rpx;
   border-radius: 24rpx;
   background: #ffffff;
@@ -48,9 +48,11 @@ page {
 
 .hero-gallery {
   position: relative;
-  margin: 24rpx 24rpx 0;
-  height: 360rpx;
-  border-radius: 26rpx;
+  margin: 0;
+  padding-top: env(safe-area-inset-top);
+  height: calc(360rpx + env(safe-area-inset-top));
+  box-sizing: border-box;
+  border-radius: 0 0 26rpx 26rpx;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 14rpx 32rpx rgba(15, 23, 42, 0.05);
@@ -98,7 +100,7 @@ page {
 .swiper-btn.next { right: 18rpx; }
 
 .content-shell {
-  padding: 20rpx 24rpx 24rpx;
+  padding: 24rpx 24rpx 24rpx;
 }
 
 .headline-card,
