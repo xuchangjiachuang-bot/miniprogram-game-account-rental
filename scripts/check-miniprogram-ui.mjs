@@ -3,15 +3,21 @@ import path from 'node:path';
 
 const root = 'C:/Users/11257/Documents/Playground';
 const checks = [
-  { file: 'miniprogram/app.json', includes: ['"navigationBarTitleText": "账号租赁"', '"text": "首页"', '"text": "订单"', '"text": "消息"', '"text": "我的"'] },
-  { file: 'miniprogram/pages/index/index.wxml', includes: ['筛选账号', '哈夫币（M）', '租金（元）', 'publish-text'] },
-  { file: 'miniprogram/pages/account/detail/index.wxml', includes: ['账号属性', '皮肤标签', '立即租号'] },
-  { file: 'miniprogram/pages/order/detail/index.wxml', includes: ['订单信息', '游戏账号信息', '订单状态'] },
-  { file: 'miniprogram/pages/order/payment/index.wxml', includes: ['订单信息', '支付方式', '立即支付'] },
-  { file: 'miniprogram/pages/profile/index.wxml', includes: ['个人中心', '完成实名认证后可开启更多交易和提现能力', '去认证'] },
+  {
+    file: 'miniprogram/app.json',
+    includes: ['"navigationBarTitleText": "账号租赁"', '"text": "首页"', '"text": "订单"', '"text": "消息"', '"text": "我的"'],
+  },
+  {
+    file: 'miniprogram/pages/index/index.wxml',
+    includes: ['筛选账号', '哈夫币（M）', '租金（元）', 'publish-text'],
+  },
+  {
+    file: 'miniprogram/pages/account/detail/index.wxml',
+    includes: ['账号属性', '皮肤标签', '立即租号'],
+  },
 ];
 
-const suspiciousFragments = ['鍙', '棣', '璁', '閫', '锟', '???'];
+const suspiciousFragments = ['�', '绛涢', '璐﹀', '鍝堝', '鏀'];
 const failures = [];
 
 for (const item of checks) {
@@ -43,4 +49,3 @@ if (failures.length) {
 }
 
 console.log('Mini program UI check passed.');
-

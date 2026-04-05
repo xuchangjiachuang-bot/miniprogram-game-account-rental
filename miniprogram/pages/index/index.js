@@ -6,13 +6,40 @@ const dataTransformer = require('../../utils/data-transformer.js');
 
 const DEFAULT_ACCOUNT_IMAGE = dataTransformer.DEFAULT_ACCOUNT_IMAGE || '/images/default-account.png';
 
+const PLATFORM_OPTIONS = [
+  { label: '全部', value: '' },
+  { label: '微信扫码', value: 'wechat' },
+  { label: 'QQ扫码', value: 'qq_scan' },
+  { label: 'QQ账号密码', value: 'qq' },
+  { label: 'Steam账号密码', value: 'password' },
+];
+
+const RANK_OPTIONS = [
+  { label: '全部', value: '' },
+  { label: '无段位', value: 'none' },
+  { label: '青铜', value: 'bronze' },
+  { label: '白银', value: 'silver' },
+  { label: '黄金', value: 'gold' },
+  { label: '铂金', value: 'platinum' },
+  { label: '钻石', value: 'diamond' },
+  { label: '黑鹰', value: 'blackeagle' },
+  { label: '巅峰', value: 'peak' },
+];
+
+const SAFEBOX_OPTIONS = [
+  { label: '全部', value: 0 },
+  { label: '2x2', value: 4 },
+  { label: '2x3', value: 6 },
+  { label: '3x3', value: 9 },
+];
+
 const fallbackHomepageConfig = {
   carousels: [],
   skinOptions: [],
   fallbackTitle: {
-    badgeText: '哈夫币账号出租平台',
-    mainTitle: '快速找到靠谱账号',
-    subTitle: '担保交易、押金保护、消息直连，让租号更安心。',
+    badgeText: '专业哈夫币账号出租平台',
+    mainTitle: '快速筛选可租账号',
+    subTitle: '担保交易、押金保障、消息直连，让租号更安心。',
     buttonText: '发布账号',
   },
 };
@@ -36,21 +63,24 @@ function buildCarouselView(carousels = []) {
 }
 
 function buildSkinOptionsView(options = [], selectedSkins = []) {
-  return options.map((item, index) => ({
-    id: item.id || `skin_${index}`,
-    name: item.name || '',
-    selected: selectedSkins.includes(item.name),
-    className: selectedSkins.includes(item.name) ? 'active' : '',
-  }));
+  return options.map((item, index) => {
+    const name = item.name || item.code || `皮肤${index + 1}`;
+    const selected = selectedSkins.includes(name);
+    return {
+      id: item.id || `skin_${index}`,
+      name,
+      selected,
+      className: selected ? 'active' : '',
+    };
+  });
 }
 
 function buildAccountView(accounts = []) {
   return accounts.map((item) => ({
     ...item,
     coverImage: item.images && item.images.length > 0 ? item.images[0] : DEFAULT_ACCOUNT_IMAGE,
-    showKd: Number(item.kd || 0) > 0,
+    showKd: item.kd !== '-' && item.kd !== '0',
     showRegion: Boolean(item.regionText),
-    showKdOrRegion: Number(item.kd || 0) > 0 || Boolean(item.regionText),
     showSkinPreview: Array.isArray(item.tagPreview) && item.tagPreview.length > 0,
     showMoreTagCount: Number(item.moreTagCount || 0) > 0,
   }));
@@ -72,10 +102,10 @@ Page({
       minRental: '',
       maxRental: '',
     },
-    platformOptions: ['全部', '微信扫码', 'QQ 账号密码', 'Steam 账号密码'],
-    rankOptions: ['全部', '青铜', '白银', '黄金', '铂金', '钻石', '黑鹰', '巅峰'],
-    safeboxOptions: ['全部', '1 格', '2 格', '3 格', '4 格以上'],
-    provinceOptions: ['全部', '北京', '上海', '广东', '浙江', '江苏', '四川', '湖北'],
+    platformOptions: PLATFORM_OPTIONS.map((item) => item.label),
+    rankOptions: RANK_OPTIONS.map((item) => item.label),
+    safeboxOptions: SAFEBOX_OPTIONS.map((item) => item.label),
+    provinceOptions: ['全部'],
     selectedPlatformText: '全部',
     selectedRankText: '全部',
     selectedSafeboxText: '全部',
@@ -107,28 +137,29 @@ Page({
 
   onLoad() {
     wx.setNavigationBarTitle({ title: '首页' });
+    this.syncFilterLabels();
+    this.syncSkinState();
+    this.syncAccountState();
     this.loadHomepageConfig();
     this.loadAccounts();
   },
 
   onPullDownRefresh() {
-    this.setData({ page: 1, accounts: [], displayAccounts: [], displayAccountsView: [], listErrorText: '' });
-    this.syncAccountState();
     Promise.all([this.loadHomepageConfig(), this.loadAccounts()]).finally(() => wx.stopPullDownRefresh());
   },
 
   onReachBottom() {
     if (this.data.hasMore && !this.data.loading) {
-      this.loadMoreAccounts();
+      this.onLoadMore();
     }
   },
 
   syncFilterLabels() {
     this.setData({
-      selectedPlatformText: this.data.platformOptions[this.data.filters.platformIndex] || this.data.platformOptions[0],
-      selectedRankText: this.data.rankOptions[this.data.filters.rankIndex] || this.data.rankOptions[0],
-      selectedSafeboxText: this.data.safeboxOptions[this.data.filters.safeboxIndex] || this.data.safeboxOptions[0],
-      selectedProvinceText: this.data.provinceOptions[this.data.filters.provinceIndex] || this.data.provinceOptions[0],
+      selectedPlatformText: this.data.platformOptions[this.data.filters.platformIndex] || '全部',
+      selectedRankText: this.data.rankOptions[this.data.filters.rankIndex] || '全部',
+      selectedSafeboxText: this.data.safeboxOptions[this.data.filters.safeboxIndex] || '全部',
+      selectedProvinceText: this.data.provinceOptions[this.data.filters.provinceIndex] || '全部',
     });
   },
 
@@ -157,6 +188,19 @@ Page({
     });
   },
 
+  updateProvinceOptions(accounts = []) {
+    const uniqueProvinces = Array.from(new Set(accounts.map((item) => item.province).filter(Boolean)));
+    const provinceOptions = ['全部'].concat(uniqueProvinces);
+    const currentProvince = this.data.provinceOptions[this.data.filters.provinceIndex] || '全部';
+    const nextProvinceIndex = Math.max(provinceOptions.indexOf(currentProvince), 0);
+
+    this.setData({
+      provinceOptions,
+      'filters.provinceIndex': nextProvinceIndex,
+    });
+    this.syncFilterLabels();
+  },
+
   loadHomepageConfig() {
     return api.getHomepageConfig()
       .then((res) => {
@@ -173,7 +217,7 @@ Page({
       })
       .catch((error) => {
         console.error('加载首页配置失败:', error);
-        const homepageConfig = config.useMockData && mockData.homepageConfig ? mockData.homepageConfig : fallbackHomepageConfig;
+        const homepageConfig = mockData.homepageConfig || fallbackHomepageConfig;
         const skinOptions = homepageConfig.skinOptions || [];
         const carouselView = buildCarouselView(homepageConfig.carousels || []);
         this.setData({
@@ -189,40 +233,46 @@ Page({
   loadAccounts() {
     this.setData({ loading: true, listErrorText: '' });
     this.syncAccountState();
-    const params = this.buildFilterParams();
 
-    return api.getAccounts({ limit: 200, ...params })
+    return api.getAccounts({
+      limit: 200,
+      status: 'available',
+      auditStatus: 'approved',
+    })
       .then((res) => {
-        const data = res && res.data ? res.data : {};
-        const accounts = Array.isArray(data) ? data : (data.list || data.accounts || []);
-        const transformedAccounts = dataTransformer.transformAccountList(accounts);
-        const nextAccounts = this.data.page === 1 ? transformedAccounts : this.data.accounts.concat(transformedAccounts);
+        const payload = res && res.data ? res.data : {};
+        const sourceList = Array.isArray(payload) ? payload : (payload.list || payload.accounts || []);
+        const accounts = dataTransformer.transformAccountList(sourceList);
         this.setData({
-          accounts: nextAccounts,
-          displayAccounts: nextAccounts,
-          displayAccountsView: buildAccountView(nextAccounts),
-          hasMore: false,
+          accounts,
           listErrorText: '',
+          hasMore: false,
         });
+        this.updateProvinceOptions(accounts);
+        this.applyFilters();
       })
       .catch((error) => {
         console.error('加载账号列表失败:', error);
-        if (config.useMockData) {
-          const accounts = dataTransformer.transformAccountList(mockData.accounts || []);
+        if (config.useMockData && Array.isArray(mockData.accounts)) {
+          const accounts = dataTransformer.transformAccountList(mockData.accounts);
           this.setData({
             accounts,
-            displayAccounts: accounts,
-            displayAccountsView: buildAccountView(accounts),
-            hasMore: false,
             listErrorText: '',
+            hasMore: false,
           });
+          this.updateProvinceOptions(accounts);
+          this.applyFilters();
           return;
         }
 
         this.setData({
-          listErrorText: error && error.error ? error.error : '账号列表加载失败，请稍后重试。',
+          accounts: [],
+          displayAccounts: [],
+          displayAccountsView: [],
+          listErrorText: (error && error.error) || '账号列表加载失败，请稍后重试。',
           hasMore: false,
         });
+        this.syncAccountState();
       })
       .finally(() => {
         this.setData({ loading: false });
@@ -230,43 +280,50 @@ Page({
       });
   },
 
-  loadMoreAccounts() {
-    this.setData({ page: this.data.page + 1 });
-    this.loadAccounts();
-  },
-
-  buildFilterParams() {
-    const filters = this.data.filters;
+  applyFilters() {
+    const searchKeyword = this.data.searchQuery.trim().toLowerCase();
+    const minCoins = Number(this.data.filters.minCoins || 0);
+    const maxCoins = Number(this.data.filters.maxCoins || 0);
+    const minRental = Number(this.data.filters.minRental || 0);
+    const maxRental = Number(this.data.filters.maxRental || 0);
+    const selectedPlatform = PLATFORM_OPTIONS[this.data.filters.platformIndex] || PLATFORM_OPTIONS[0];
+    const selectedRank = RANK_OPTIONS[this.data.filters.rankIndex] || RANK_OPTIONS[0];
+    const selectedSafebox = SAFEBOX_OPTIONS[this.data.filters.safeboxIndex] || SAFEBOX_OPTIONS[0];
+    const selectedProvince = this.data.provinceOptions[this.data.filters.provinceIndex] || '全部';
     const selectedSkins = this.data.selectedSkins;
-    const searchQuery = this.data.searchQuery;
-    const params = {};
 
-    if (searchQuery) params.keyword = searchQuery;
-    if (filters.minCoins) params.minCoins = filters.minCoins;
-    if (filters.maxCoins) params.maxCoins = filters.maxCoins;
-    if (filters.minRental) params.minRental = filters.minRental;
-    if (filters.maxRental) params.maxRental = filters.maxRental;
+    const displayAccounts = this.data.accounts.filter((account) => {
+      const searchableText = [
+        account.fullTitle,
+        account.account_name,
+        account.regionText,
+        (account.tags || []).join(' '),
+      ].join(' ').toLowerCase();
 
-    if (filters.platformIndex > 0) {
-      const platformMap = { 1: 'wechat', 2: 'qq', 3: 'steam' };
-      params.loginMethod = platformMap[filters.platformIndex];
-    }
-    if (filters.rankIndex > 0) params.rank = this.data.rankOptions[filters.rankIndex];
-    if (filters.safeboxIndex > 0) params.safebox = String(filters.safeboxIndex);
-    if (filters.provinceIndex > 0) params.province = this.data.provinceOptions[filters.provinceIndex];
-    if (selectedSkins.length > 0) params.skins = selectedSkins.join(',');
+      if (searchKeyword && !searchableText.includes(searchKeyword)) return false;
+      if (minCoins && account.coinsValue < minCoins) return false;
+      if (maxCoins && account.coinsValue > maxCoins) return false;
+      if (minRental && account.actualRentalValue < minRental) return false;
+      if (maxRental && account.actualRentalValue > maxRental) return false;
+      if (selectedPlatform.value && account.loginMethodKey !== selectedPlatform.value) return false;
+      if (selectedRank.value && account.rankKey !== selectedRank.value) return false;
+      if (selectedSafebox.value && account.safeboxCount !== selectedSafebox.value) return false;
+      if (selectedProvince !== '全部' && account.province !== selectedProvince) return false;
+      if (selectedSkins.length > 0 && !selectedSkins.some((skin) => (account.tags || []).includes(skin))) return false;
+      return true;
+    });
 
-    return params;
-  },
-
-  resetAndLoad() {
-    this.setData({ page: 1, accounts: [], displayAccounts: [], displayAccountsView: [], listErrorText: '' });
+    this.setData({
+      displayAccounts,
+      displayAccountsView: buildAccountView(displayAccounts),
+      page: 1,
+      hasMore: false,
+    });
     this.syncAccountState();
-    this.loadAccounts();
   },
 
   onRetryAccounts() {
-    this.resetAndLoad();
+    this.loadAccounts();
   },
 
   onCarouselTap(e) {
@@ -297,10 +354,12 @@ Page({
       this.setData({ showLoginModal: true });
       return;
     }
+
     if (!(userInfo.isVerified || userInfo.isRealNameVerified || userInfo.verifyStatus === 'approved')) {
       wx.showToast({ title: '请先完成实名认证', icon: 'none' });
       return;
     }
+
     wx.navigateTo({ url: '/pages/account/publish/index' });
   },
 
@@ -311,33 +370,55 @@ Page({
   onPlatformChange(e) {
     this.setData({ 'filters.platformIndex': Number(e.detail.value) || 0 });
     this.syncFilterLabels();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
   onRankChange(e) {
     this.setData({ 'filters.rankIndex': Number(e.detail.value) || 0 });
     this.syncFilterLabels();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
   onSafeboxChange(e) {
     this.setData({ 'filters.safeboxIndex': Number(e.detail.value) || 0 });
     this.syncFilterLabels();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
   onProvinceChange(e) {
     this.setData({ 'filters.provinceIndex': Number(e.detail.value) || 0 });
     this.syncFilterLabels();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
-  onMinCoinsInput(e) { this.setData({ 'filters.minCoins': e.detail.value }); },
-  onMaxCoinsInput(e) { this.setData({ 'filters.maxCoins': e.detail.value }); },
-  onMinRentalInput(e) { this.setData({ 'filters.minRental': e.detail.value }); },
-  onMaxRentalInput(e) { this.setData({ 'filters.maxRental': e.detail.value }); },
-  onSearchInput(e) { this.setData({ searchQuery: e.detail.value }); },
-  onSearchConfirm() { this.resetAndLoad(); },
+  onMinCoinsInput(e) {
+    this.setData({ 'filters.minCoins': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMaxCoinsInput(e) {
+    this.setData({ 'filters.maxCoins': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMinRentalInput(e) {
+    this.setData({ 'filters.minRental': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMaxRentalInput(e) {
+    this.setData({ 'filters.maxRental': e.detail.value });
+    this.applyFilters();
+  },
+
+  onSearchInput(e) {
+    this.setData({ searchQuery: e.detail.value });
+    this.applyFilters();
+  },
+
+  onSearchConfirm() {
+    this.applyFilters();
+  },
 
   onShowMoreFilters() {
     this.setData({ showMoreFilters: !this.data.showMoreFilters });
@@ -361,13 +442,14 @@ Page({
     });
     this.syncFilterLabels();
     this.syncSkinState();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
   onSkinTap(e) {
     const name = e.currentTarget.dataset.name;
     const selectedSkins = this.data.selectedSkins.slice();
     const index = selectedSkins.indexOf(name);
+
     if (index >= 0) {
       selectedSkins.splice(index, 1);
     } else {
@@ -376,11 +458,11 @@ Page({
 
     this.setData({ selectedSkins });
     this.syncSkinState();
-    this.resetAndLoad();
+    this.applyFilters();
   },
 
   onLoadMore() {
-    this.loadMoreAccounts();
+    wx.showToast({ title: '当前已加载全部账号', icon: 'none' });
   },
 
   onAccountTap(e) {
@@ -396,11 +478,5 @@ Page({
 
   onCustomerServiceClose() {
     this.setData({ showCustomerService: false });
-  },
-
-  onReady() {
-    this.syncFilterLabels();
-    this.syncSkinState();
-    this.syncAccountState();
   },
 });

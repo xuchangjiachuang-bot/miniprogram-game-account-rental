@@ -1,6 +1,7 @@
 const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
+const mockData = require('../../../utils/mock-data.js');
 const dataTransformer = require('../../../utils/data-transformer.js');
 const navigation = require('../../../utils/navigation.js');
 
@@ -10,7 +11,7 @@ function buildQuickFacts(account = {}) {
   return [
     { label: '哈夫币', value: account.coins_display || '-', className: 'coins' },
     { label: '出租比例', value: account.ratio_display || '1:35', className: 'ratio' },
-    { label: '保险箱', value: account.safebox || '-', className: 'safebox' },
+    { label: '安全箱', value: account.safebox || '-', className: 'safebox' },
     { label: '账号等级', value: account.account_level ? `Lv.${account.account_level}` : '-', className: 'level' },
   ];
 }
@@ -30,7 +31,7 @@ function buildDetailItems(account = {}) {
   appendDetailItem(list, 'AWM 子弹', account.awmBullets);
   appendDetailItem(list, '六级甲', account.level6Armor);
   appendDetailItem(list, '六级头', account.level6Helmet);
-  appendDetailItem(list, '地区', `${account.region && account.region.province ? account.region.province : '-'} ${account.region && account.region.city ? account.region.city : ''}`.trim());
+  appendDetailItem(list, '地区', account.regionText);
   appendDetailItem(list, '浏览次数', account.view_count);
   appendDetailItem(list, '成交次数', account.trade_count);
   appendDetailItem(list, '上架时间', account.listed_at);
@@ -59,7 +60,7 @@ function normalizeAccount(account = {}) {
     ...account,
     images,
     fullTitle: account.fullTitle || account.title || account.account_name || '游戏账号',
-    subtitle: account.account_name || '平台担保发号，支持快速租号',
+    subtitle: account.account_name || '平台担保发号，支持快速租用',
     login_method: account.login_method || '未知登录方式',
     statusText: account.statusText || '可出租',
     description: account.description || '卖家暂未补充描述，可先查看属性、皮肤标签与租期后再决定是否下单。',
@@ -110,10 +111,8 @@ Page({
     this.loadAccountDetail();
   },
 
-  onShow() {
-    if (this.data.id) {
-      this.loadAccountDetail();
-    }
+  onPullDownRefresh() {
+    this.loadAccountDetail().finally(() => wx.stopPullDownRefresh());
   },
 
   onShareAppMessage() {
@@ -123,10 +122,6 @@ Page({
       path: `/pages/account/detail/index?id=${this.data.id}`,
       imageUrl: (account.images && account.images[0]) || DEFAULT_ACCOUNT_IMAGE,
     };
-  },
-
-  onPullDownRefresh() {
-    this.loadAccountDetail().finally(() => wx.stopPullDownRefresh());
   },
 
   syncStateFlags(account, errorText, loading) {
@@ -171,6 +166,10 @@ Page({
   },
 
   loadAccountDetail() {
+    if (!this.data.id) {
+      return Promise.resolve();
+    }
+
     if (this.data.loading) {
       return Promise.resolve();
     }
@@ -187,7 +186,6 @@ Page({
         console.error('加载账号详情失败:', error);
 
         if (config.useMockData) {
-          const mockData = require('../../../utils/mock-data.js');
           const source = (mockData.accounts || []).find((item) => String(item.id) === String(this.data.id)) || (mockData.accounts || [])[0];
           if (source) {
             this.applyAccount(dataTransformer.transformAccount(source) || {});
@@ -195,7 +193,7 @@ Page({
           }
         }
 
-        const errorText = error && error.error ? error.error : '账号详情加载失败，请稍后重试。';
+        const errorText = (error && error.error) || '账号详情加载失败，请稍后重试。';
         this.setData({ error: errorText });
         this.syncStateFlags(this.data.account, errorText, false);
       })
@@ -261,7 +259,7 @@ Page({
     wx.showLoading({ title: '创建订单中', mask: true });
     this.setData({ creatingOrder: true });
 
-    const rentHours = Number(account.rental_hours || 0) || 24;
+    const rentHours = Number(account.rental_hours || account.rental_duration || 24) || 24;
     api.createOrder({ account_id: account.id, rent_hours: rentHours })
       .then((res) => {
         const data = res && res.data ? res.data : {};

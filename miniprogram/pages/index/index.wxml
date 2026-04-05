@@ -1,4 +1,3 @@
-<!-- pages/index/index.wxml -->
 <view class="page">
   <view class="hero-section">
     <view class="hero-container">
@@ -33,14 +32,13 @@
   <view class="filter-section">
     <view class="filter-container">
       <view class="filter-header">
-        <image class="filter-icon" src="/images/icons/shield.svg" mode="aspectFit" />
         <text class="filter-title">筛选账号</text>
       </view>
 
       <view class="search-row">
         <view class="search-box">
           <text class="search-icon">搜</text>
-          <input class="search-input" placeholder="输入关键字搜索账号" value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
+          <input class="search-input" placeholder="输入关键词搜索账号" value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
         </view>
       </view>
 
@@ -66,7 +64,7 @@
         </view>
 
         <view class="filter-item">
-          <view class="filter-label">保险箱</view>
+          <view class="filter-label">安全箱</view>
           <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
             <view class="picker-box">
               <text>{{selectedSafeboxText}}</text>
@@ -133,7 +131,7 @@
       <view class="state-card" wx:if="{{showLoadingState}}">
         <view class="loading-spinner"></view>
         <view class="state-title">正在加载账号</view>
-        <view class="state-hint">筛选结果稍后就会显示出来。</view>
+        <view class="state-hint">筛选结果很快就会显示出来。</view>
       </view>
 
       <view class="state-card error" wx:elif="{{showErrorState}}">
@@ -169,14 +167,14 @@
                   <text class="info-value">{{item.coins_display}}</text>
                 </view>
                 <view class="info-box ratio">
-                  <text class="info-label">比例</text>
+                  <text class="info-label">出租比例</text>
                   <text class="info-value">{{item.ratio_display}}</text>
                 </view>
               </view>
 
               <view class="attributes-row">
                 <view class="attribute">
-                  <text class="attr-label">保险箱</text>
+                  <text class="attr-label">安全箱</text>
                   <text class="attr-value">{{item.safebox}}</text>
                 </view>
                 <view class="attribute">
@@ -189,8 +187,8 @@
                 </view>
               </view>
 
-              <view class="meta-row" wx:if="{{item.showKdOrRegion}}">
-                <text class="meta-pill" wx:if="{{item.showKd}}">KD {{item.kd}}</text>
+              <view class="meta-row" wx:if="{{item.showKd}}">
+                <text class="meta-pill">KD {{item.kd}}</text>
               </view>
 
               <view class="skins-row" wx:if="{{item.showSkinPreview}}">
@@ -230,7 +228,7 @@
 
         <view class="empty" wx:if="{{showEmptyState}}">
           <view class="empty-icon">空</view>
-          <view class="empty-text">暂无账号</view>
+          <view class="empty-text">暂无符合条件的账号</view>
           <view class="empty-hint">调整筛选条件后再试试。</view>
         </view>
       </block>

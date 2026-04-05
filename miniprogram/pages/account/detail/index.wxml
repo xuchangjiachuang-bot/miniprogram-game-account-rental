@@ -14,16 +14,7 @@
     <view class="hero-gallery" wx:if="{{hasImages}}">
       <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{showGalleryControls}}">
         <swiper-item wx:for="{{account.images}}" wx:key="*this">
-          <image
-            class="swiper-image"
-            src="{{item}}"
-            mode="aspectFill"
-            bindtap="onImagePreview"
-            binderror="onGalleryImageError"
-            data-index="{{index}}"
-            data-urls="{{account.images}}"
-            data-current="{{item}}"
-          />
+          <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" binderror="onGalleryImageError" data-index="{{index}}" data-urls="{{account.images}}" data-current="{{item}}" />
         </swiper-item>
       </swiper>
 
@@ -101,11 +92,6 @@
       <button class="btn-rent" disabled wx:else>暂不可租</button>
     </view>
 
-    <login-modal
-      wx:if="{{showLoginModal}}"
-      visible="{{showLoginModal}}"
-      bind:loginSuccess="onLoginSuccess"
-      bind:close="onLoginModalClose"
-    />
+    <login-modal wx:if="{{showLoginModal}}" visible="{{showLoginModal}}" bind:loginSuccess="onLoginSuccess" bind:close="onLoginModalClose" />
   </block>
 </view>
