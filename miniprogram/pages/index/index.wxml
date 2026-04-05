@@ -1,4 +1,4 @@
-﻿<!-- pages/index/index.wxml -->
+<!-- pages/index/index.wxml -->
 <view class="page">
   <view class="hero-section">
     <view class="hero-container">
@@ -130,87 +130,107 @@
     <view class="account-container">
       <view class="list-header"><text class="account-count">共 {{displayAccounts.length}} 个账号</text></view>
 
-      <view class="account-grid">
-        <view class="account-card" wx:for="{{displayAccounts}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
-          <view class="card-image">
-            <image class="card-img" src="{{item.images[0] || '/images/default-account.png'}}" mode="aspectFill" />
-            <view class="card-status {{item.status}}">{{item.statusText}}</view>
-            <view class="platform-badge">{{item.login_method}}</view>
-          </view>
+      <view class="state-card" wx:if="{{loading && displayAccounts.length === 0}}">
+        <view class="loading-spinner"></view>
+        <view class="state-title">正在加载账号</view>
+        <view class="state-hint">筛选结果稍后就会显示出来。</view>
+      </view>
 
-          <view class="card-content">
-            <view class="card-title">{{item.fullTitle}}</view>
-            <view class="info-row">
-              <view class="info-box coins">
-                <text class="info-label">哈夫币</text>
-                <text class="info-value">{{item.coins_display}}</text>
-              </view>
-              <view class="info-box ratio">
-                <text class="info-label">比例</text>
-                <text class="info-value">{{item.ratio_display}}</text>
-              </view>
+      <view class="state-card error" wx:elif="{{!loading && listErrorText && displayAccounts.length === 0}}">
+        <view class="state-icon">!</view>
+        <view class="state-title">账号列表加载失败</view>
+        <view class="state-hint">{{listErrorText}}</view>
+        <view class="state-action" bindtap="onRetryAccounts">重新加载</view>
+      </view>
+
+      <block wx:else>
+        <view class="inline-error" wx:if="{{listErrorText && displayAccounts.length > 0}}">
+          <text class="inline-error-text">{{listErrorText}}</text>
+          <text class="inline-error-action" bindtap="onRetryAccounts">重试</text>
+        </view>
+
+        <view class="account-grid" wx:if="{{displayAccounts.length > 0}}">
+          <view class="account-card" wx:for="{{displayAccounts}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
+            <view class="card-image">
+              <image class="card-img" src="{{item.images[0] || '/images/default-account.png'}}" mode="aspectFill" />
+              <view class="card-status {{item.status}}">{{item.statusText}}</view>
+              <view class="platform-badge">{{item.login_method}}</view>
             </view>
 
-            <view class="attributes-row">
-              <view class="attribute">
-                <text class="attr-label">保险箱</text>
-                <text class="attr-value">{{item.safebox}}</text>
+            <view class="card-content">
+              <view class="card-title">{{item.fullTitle}}</view>
+              <view class="info-row">
+                <view class="info-box coins">
+                  <text class="info-label">哈夫币</text>
+                  <text class="info-value">{{item.coins_display}}</text>
+                </view>
+                <view class="info-box ratio">
+                  <text class="info-label">比例</text>
+                  <text class="info-value">{{item.ratio_display}}</text>
+                </view>
               </view>
-              <view class="attribute">
-                <text class="attr-label">体力/负重</text>
-                <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
-              </view>
-              <view class="attribute">
-                <text class="attr-label">段位</text>
-                <text class="attr-value">{{item.rank_display}}</text>
-              </view>
-            </view>
 
-            <view class="kd-region-row" wx:if="{{item.kd > 0 || item.regionText}}">
-              <text class="kd-text" wx:if="{{item.kd > 0}}">KD: {{item.kd}}</text>
-              <text class="region-text">{{item.regionText}}</text>
-            </view>
-
-            <view class="skins-row" wx:if="{{item.tagPreview.length > 0}}">
-              <text class="skin-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
-              <text class="skin-more" wx:if="{{item.moreTagCount > 0}}">+{{item.moreTagCount}}</text>
-            </view>
-
-            <view class="price-row">
-              <view class="price-box">
-                <text class="price-label">租金</text>
-                <text class="price-value">¥{{item.actual_rental}}</text>
+              <view class="attributes-row">
+                <view class="attribute">
+                  <text class="attr-label">保险箱</text>
+                  <text class="attr-value">{{item.safebox}}</text>
+                </view>
+                <view class="attribute">
+                  <text class="attr-label">体力/负重</text>
+                  <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
+                </view>
+                <view class="attribute">
+                  <text class="attr-label">段位</text>
+                  <text class="attr-value">{{item.rank_display}}</text>
+                </view>
               </view>
-              <view class="price-box">
-                <text class="price-label">押金</text>
-                <text class="price-value">¥{{item.deposit}}</text>
-              </view>
-              <view class="price-box">
-                <text class="price-label">总价</text>
-                <text class="price-value total">¥{{item.total_price}}</text>
-              </view>
-            </view>
 
-            <view class="rental-duration">
-              <text class="duration-label">租期</text>
-              <text class="duration-value">{{item.rental_description}}</text>
+              <view class="kd-region-row" wx:if="{{item.kd > 0 || item.regionText}}">
+                <text class="kd-text" wx:if="{{item.kd > 0}}">KD: {{item.kd}}</text>
+                <text class="region-text">{{item.regionText}}</text>
+              </view>
+
+              <view class="skins-row" wx:if="{{item.tagPreview.length > 0}}">
+                <text class="skin-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+                <text class="skin-more" wx:if="{{item.moreTagCount > 0}}">+{{item.moreTagCount}}</text>
+              </view>
+
+              <view class="price-row">
+                <view class="price-box">
+                  <text class="price-label">租金</text>
+                  <text class="price-value">¥{{item.actual_rental}}</text>
+                </view>
+                <view class="price-box">
+                  <text class="price-label">押金</text>
+                  <text class="price-value">¥{{item.deposit}}</text>
+                </view>
+                <view class="price-box">
+                  <text class="price-label">总价</text>
+                  <text class="price-value total">¥{{item.total_price}}</text>
+                </view>
+              </view>
+
+              <view class="rental-duration">
+                <text class="duration-label">租期</text>
+                <text class="duration-value">{{item.rental_description}}</text>
+              </view>
             </view>
           </view>
         </view>
-      </view>
 
-      <view class="load-more" wx:if="{{hasMore && !loading}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
+        <view class="load-more" wx:if="{{hasMore && !loading}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
 
-      <view class="loading" wx:if="{{loading}}">
-        <view class="loading-spinner"></view>
-        <text>加载中...</text>
-      </view>
+        <view class="loading inline-loading" wx:if="{{loading && displayAccounts.length > 0}}">
+          <view class="loading-spinner"></view>
+          <text>正在刷新列表...</text>
+        </view>
 
-      <view class="empty" wx:if="{{!loading && displayAccounts.length === 0}}">
-        <view class="empty-icon">空</view>
-        <view class="empty-text">暂无账号</view>
-        <view class="empty-hint">调整筛选条件后再试试。</view>
-      </view>
+        <view class="empty" wx:if="{{!loading && !listErrorText && displayAccounts.length === 0}}">
+          <view class="empty-icon">空</view>
+          <view class="empty-text">暂无账号</view>
+          <view class="empty-hint">调整筛选条件后再试试。</view>
+        </view>
+      </block>
     </view>
   </view>
 

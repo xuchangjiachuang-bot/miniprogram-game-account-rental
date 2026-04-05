@@ -1,13 +1,13 @@
 /* pages/index/index.wxss */
 
-/* 页面容器 - 禁止横向滚动 */
+/* 椤甸潰瀹瑰櫒 - 绂佹妯悜婊氬姩 */
 .page {
   width: 100%;
   overflow-x: hidden;
   background: #ffffff;
 }
 
-/* ============ Hero Section (轮播图区域) ============ */
+/* ============ Hero Section (杞挱鍥惧尯鍩? ============ */
 .hero-section {
   width: 100%;
   max-width: 100%;
@@ -78,7 +78,7 @@
   text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
 }
 
-/* 发布按钮区域（固定在轮播图下方） */
+/* 鍙戝竷鎸夐挳鍖哄煙锛堝浐瀹氬湪杞挱鍥句笅鏂癸級 */
 .publish-section {
   display: flex;
   justify-content: center;
@@ -116,7 +116,7 @@
   font-weight: 600;
 }
 
-/* 备用 Hero */
+/* 澶囩敤 Hero */
 .fallback-hero {
   padding: 60rpx 40rpx;
   text-align: center;
@@ -166,7 +166,7 @@
   box-shadow: 0 6rpx 20rpx rgba(147, 51, 234, 0.4);
 }
 
-/* ============ Filter Section (筛选区域) ============ */
+/* ============ Filter Section (绛涢€夊尯鍩? ============ */
 .filter-section {
   width: 100%;
   max-width: 100%;
@@ -201,7 +201,7 @@
   color: #1f2937;
 }
 
-/* 筛选行 */
+/* 绛涢€夎 */
 .filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -220,7 +220,7 @@
   margin-bottom: 20rpx;
 }
 
-/* 筛选项 */
+/* 绛涢€夐」 */
 .filter-item {
   flex: 0 0 calc(50% - 10rpx);
   min-width: 0;
@@ -306,7 +306,7 @@
   flex-shrink: 0;
 }
 
-/* 搜索行 */
+/* 鎼滅储琛?*/
 .search-row {
   width: 100%;
   margin-bottom: 20rpx;
@@ -345,7 +345,7 @@
   background: #faf5ff;
 }
 
-/* 操作行 */
+/* 鎿嶄綔琛?*/
 .action-row {
   display: flex;
   gap: 12rpx;
@@ -458,7 +458,7 @@
   font-weight: 700;
 }
 
-/* ============ Account Section (账号列表) ============ */
+/* ============ Account Section (璐﹀彿鍒楄〃) ============ */
 .account-section {
   width: 100%;
   max-width: 100%;
@@ -551,7 +551,7 @@
   color: #ffffff;
 }
 
-/* 平台标签 */
+/* 骞冲彴鏍囩 */
 .platform-badge {
   position: absolute;
   top: 16rpx;
@@ -647,7 +647,7 @@
   color: #1f2937;
 }
 
-/* KD和地区行 */
+/* KD鍜屽湴鍖鸿 */
 .kd-region-row {
   display: flex;
   justify-content: space-between;
@@ -669,7 +669,7 @@
   color: #6b7280;
 }
 
-/* 皮肤标签行 */
+/* 鐨偆鏍囩琛?*/
 .skins-row {
   display: flex;
   flex-wrap: wrap;
@@ -695,7 +695,7 @@
   font-weight: 600;
 }
 
-/* 价格行 */
+/* 浠锋牸琛?*/
 .price-row {
   display: flex;
   justify-content: space-between;
@@ -731,7 +731,7 @@
   font-size: 28rpx;
 }
 
-/* 租期 */
+/* 绉熸湡 */
 .rental-duration {
   display: flex;
   justify-content: center;
@@ -857,4 +857,86 @@
 .tabbar-placeholder {
   height: 120rpx;
   width: 100%;
+}
+
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 90rpx 40rpx;
+  background: #ffffff;
+  border: 2rpx solid #eef2ff;
+  border-radius: 24rpx;
+  box-shadow: 0 14rpx 30rpx rgba(15, 23, 42, 0.05);
+}
+
+.state-card.error {
+  border-color: #fde2e2;
+  background: #fff8f8;
+}
+
+.state-icon {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.state-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.state-hint {
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #6b7280;
+  text-align: center;
+}
+
+.state-action {
+  margin-top: 8rpx;
+  padding: 18rpx 36rpx;
+  border-radius: 999rpx;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 18rpx;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.inline-error-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.inline-error-action {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.inline-loading {
+  padding-top: 32rpx;
 }

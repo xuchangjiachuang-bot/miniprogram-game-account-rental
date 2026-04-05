@@ -1,4 +1,4 @@
-﻿const api = require('../../utils/api.js');
+const api = require('../../utils/api.js');
 const storage = require('../../utils/storage.js');
 const config = require('../../utils/config.js');
 const mockData = require('../../utils/mock-data.js');
@@ -41,6 +41,7 @@ Page({
     accounts: [],
     displayAccounts: [],
     loading: false,
+    listErrorText: '',
     hasMore: false,
     page: 1,
     showLoginModal: false,
@@ -54,7 +55,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.setData({ page: 1, accounts: [], displayAccounts: [] });
+    this.setData({ page: 1, accounts: [], displayAccounts: [], listErrorText: '' });
     Promise.all([this.loadHomepageConfig(), this.loadAccounts()]).finally(() => wx.stopPullDownRefresh());
   },
 
@@ -78,7 +79,7 @@ Page({
   loadHomepageConfig() {
     return api.getHomepageConfig()
       .then((res) => {
-        const data = res?.data || {};
+        const data = res && res.data ? res.data : {};
         const skinOptions = Array.isArray(data.skinOptions) ? data.skinOptions : [];
         this.setData({
           carousels: Array.isArray(data.carousels) ? data.carousels : [],
@@ -103,25 +104,39 @@ Page({
   },
 
   loadAccounts() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, listErrorText: '' });
     const params = this.buildFilterParams();
 
     return api.getAccounts({ limit: 200, ...params })
       .then((res) => {
-        const data = res?.data || {};
+        const data = res && res.data ? res.data : {};
         const accounts = Array.isArray(data) ? data : (data.list || data.accounts || []);
         const transformedAccounts = dataTransformer.transformAccountList(accounts);
         const nextAccounts = this.data.page === 1 ? transformedAccounts : this.data.accounts.concat(transformedAccounts);
-        this.setData({ accounts: nextAccounts, displayAccounts: nextAccounts, hasMore: false });
+        this.setData({
+          accounts: nextAccounts,
+          displayAccounts: nextAccounts,
+          hasMore: false,
+          listErrorText: '',
+        });
       })
       .catch((error) => {
         console.error('加载账号列表失败:', error);
         if (config.useMockData) {
           const accounts = dataTransformer.transformAccountList(mockData.accounts || []);
-          this.setData({ accounts, displayAccounts: accounts, hasMore: false });
+          this.setData({
+            accounts,
+            displayAccounts: accounts,
+            hasMore: false,
+            listErrorText: '',
+          });
           return;
         }
-        wx.showToast({ title: error.error || '加载失败', icon: 'none' });
+
+        this.setData({
+          listErrorText: error && error.error ? error.error : '账号列表加载失败，请稍后重试。',
+          hasMore: false,
+        });
       })
       .finally(() => this.setData({ loading: false }));
   },
@@ -154,8 +169,12 @@ Page({
   },
 
   resetAndLoad() {
-    this.setData({ page: 1, accounts: [], displayAccounts: [] });
+    this.setData({ page: 1, accounts: [], displayAccounts: [], listErrorText: '' });
     this.loadAccounts();
+  },
+
+  onRetryAccounts() {
+    this.resetAndLoad();
   },
 
   onCarouselTap(e) {

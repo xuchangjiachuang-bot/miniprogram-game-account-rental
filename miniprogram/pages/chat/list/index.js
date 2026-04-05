@@ -1,4 +1,4 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const config = require('../../../utils/config.js');
 
 function formatTime(timestamp) {
@@ -38,12 +38,25 @@ function normalizeGroup(group) {
   };
 }
 
+function buildMockGroups() {
+  const mockData = require('../../../utils/mock-data.js');
+  return (mockData.chatList || []).map((chatItem) => normalizeGroup({
+    id: chatItem.id,
+    name: chatItem.targetUser && chatItem.targetUser.nickname,
+    avatar: chatItem.targetUser && chatItem.targetUser.avatar,
+    lastMessage: chatItem.lastMessage,
+    lastMessageTime: Date.now() - 3600000,
+    unreadCount: chatItem.unreadCount,
+  }));
+}
+
 Page({
   data: {
     searchKeyword: '',
     chatGroups: [],
     allChatGroups: [],
     loading: false,
+    errorText: '',
   },
 
   onLoad() {
@@ -61,54 +74,60 @@ Page({
   },
 
   loadChatGroups() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, errorText: '' });
     return api.getChatGroups()
       .then((res) => {
         const list = res && res.data ? (res.data.list || []) : [];
         const normalized = list.map(normalizeGroup);
         this.setData({
           allChatGroups: normalized,
-          chatGroups: normalized,
+          chatGroups: this.filterGroups(normalized, this.data.searchKeyword),
           loading: false,
+          errorText: '',
         });
       })
       .catch((error) => {
         console.error('加载聊天列表失败:', error);
         if (config.useMockData) {
-          const mockData = require('../../../utils/mock-data.js');
-          const normalized = (mockData.chatList || []).map((chatItem) => normalizeGroup({
-            id: chatItem.id,
-            name: chatItem.targetUser && chatItem.targetUser.nickname,
-            avatar: chatItem.targetUser && chatItem.targetUser.avatar,
-            lastMessage: chatItem.lastMessage,
-            lastMessageTime: Date.now() - 3600000,
-            unreadCount: chatItem.unreadCount,
-          }));
+          const normalized = buildMockGroups();
           this.setData({
             allChatGroups: normalized,
-            chatGroups: normalized,
+            chatGroups: this.filterGroups(normalized, this.data.searchKeyword),
             loading: false,
+            errorText: '',
           });
           return;
         }
-        this.setData({ loading: false });
+
+        this.setData({
+          loading: false,
+          errorText: error && error.error ? error.error : '聊天列表加载失败，请稍后重试。',
+        });
       });
+  },
+
+  filterGroups(groups, keyword) {
+    const normalizedKeyword = String(keyword || '').trim().toLowerCase();
+    if (!normalizedKeyword) {
+      return groups;
+    }
+
+    return groups.filter((group) => {
+      return String(group.name || '').toLowerCase().includes(normalizedKeyword)
+        || String(group.lastMessage || '').toLowerCase().includes(normalizedKeyword);
+    });
   },
 
   onSearchInput(e) {
     const keyword = (e.detail.value || '').trim();
-    const lowerKeyword = keyword.toLowerCase();
-    const chatGroups = keyword
-      ? this.data.allChatGroups.filter((group) => {
-        return String(group.name || '').toLowerCase().includes(lowerKeyword)
-          || String(group.lastMessage || '').toLowerCase().includes(lowerKeyword);
-      })
-      : this.data.allChatGroups;
-
     this.setData({
       searchKeyword: keyword,
-      chatGroups,
+      chatGroups: this.filterGroups(this.data.allChatGroups, keyword),
     });
+  },
+
+  onRetry() {
+    this.loadChatGroups();
   },
 
   onChatTap(e) {

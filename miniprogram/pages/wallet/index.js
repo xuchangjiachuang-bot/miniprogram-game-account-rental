@@ -1,4 +1,4 @@
-﻿const api = require('../../utils/api.js');
+const api = require('../../utils/api.js');
 const config = require('../../utils/config.js');
 
 const PERIOD_LIST = [
@@ -137,10 +137,12 @@ Page({
       totalWithdraw: '0.00',
       availableBalance: '0.00',
     },
-    statistics: normalizeStatistics(MOCK_STATISTICS),
+    statistics: null,
     periodList: PERIOD_LIST,
     currentPeriodIndex: 1,
     transactions: [],
+    loading: false,
+    errorText: '',
   },
 
   onLoad() {
@@ -158,11 +160,20 @@ Page({
   },
 
   refreshPage() {
+    this.setData({ loading: true, errorText: '' });
     return Promise.allSettled([
       this.loadWalletInfo(),
       this.loadStatistics(),
       this.loadTransactions(),
-    ]);
+    ]).then((results) => {
+      const hasSuccess = results.some((item) => item.status === 'fulfilled' && item.value === true);
+      const firstFailure = results.find((item) => item.status === 'rejected');
+
+      this.setData({
+        loading: false,
+        errorText: hasSuccess ? '' : (firstFailure ? firstFailure.reason : '钱包数据加载失败，请稍后重试。'),
+      });
+    });
   },
 
   loadWalletInfo() {
@@ -181,6 +192,7 @@ Page({
             availableBalance: formatMoney(availableBalance),
           },
         });
+        return true;
       })
       .catch((error) => {
         console.error('加载钱包信息失败:', error);
@@ -193,7 +205,9 @@ Page({
               availableBalance: formatMoney(MOCK_WALLET.availableBalance),
             },
           });
+          return true;
         }
+        return Promise.reject(error && error.error ? error.error : '钱包余额加载失败，请稍后重试。');
       });
   },
 
@@ -204,6 +218,7 @@ Page({
         this.setData({
           statistics: normalizeStatistics(res && res.data ? res.data : null),
         });
+        return true;
       })
       .catch((error) => {
         console.error('加载钱包统计失败:', error);
@@ -211,7 +226,10 @@ Page({
           this.setData({
             statistics: normalizeStatistics(MOCK_STATISTICS),
           });
+          return true;
         }
+        this.setData({ statistics: null });
+        return Promise.reject(error && error.error ? error.error : '收支统计加载失败，请稍后重试。');
       });
   },
 
@@ -222,6 +240,7 @@ Page({
         this.setData({
           transactions: normalizeTransactions(list),
         });
+        return true;
       })
       .catch((error) => {
         console.error('加载交易记录失败:', error);
@@ -229,8 +248,15 @@ Page({
           this.setData({
             transactions: normalizeTransactions(MOCK_TRANSACTIONS),
           });
+          return true;
         }
+        this.setData({ transactions: [] });
+        return Promise.reject(error && error.error ? error.error : '交易记录加载失败，请稍后重试。');
       });
+  },
+
+  onRetry() {
+    this.refreshPage();
   },
 
   onPeriodChange(e) {
@@ -238,7 +264,7 @@ Page({
     this.setData({
       currentPeriodIndex: index,
     });
-    this.loadStatistics();
+    this.refreshPage();
   },
 
   onMonthlyBillTap() {

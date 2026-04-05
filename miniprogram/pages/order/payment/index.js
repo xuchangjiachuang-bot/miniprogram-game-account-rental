@@ -9,16 +9,20 @@ function formatMoney(amount) {
   return value.toFixed(2);
 }
 
-function normalizeAccount(account = {}, order = {}) {
+function normalizeAccount(account, order) {
+  const safeAccount = account || {};
+  const safeOrder = order || {};
   return {
-    avatar: account.avatar || account.image || account.account_image || '/images/default-account.png',
-    title: account.title || account.name || order.accountName || order.account_name || '游戏账号',
+    avatar: safeAccount.avatar || safeAccount.image || safeAccount.account_image || '/images/default-account.png',
+    title: safeAccount.title || safeAccount.name || safeOrder.accountName || safeOrder.account_name || '游戏账号',
   };
 }
 
 Page({
   data: {
     orderId: null,
+    loading: false,
+    errorText: '',
     order: {
       status: '',
       total_price: '0.00',
@@ -92,24 +96,37 @@ Page({
   },
 
   loadData() {
-    return Promise.all([
+    this.clearCountdown();
+    this.setData({ loading: true, errorText: '' });
+
+    return Promise.allSettled([
       this.loadOrderDetail(),
       this.loadWalletInfo(),
-    ]).catch((error) => {
-      console.error('加载支付页数据失败:', error);
+    ]).then((results) => {
+      const firstFailure = results.find((item) => item.status === 'rejected');
+      const hasFailure = Boolean(firstFailure);
+
+      if (hasFailure) {
+        this.clearCountdown();
+      }
+
+      this.setData({
+        loading: false,
+        errorText: hasFailure ? firstFailure.reason : '',
+      });
     });
   },
 
   loadOrderDetail() {
     return api.getOrderDetail(this.data.orderId)
       .then((res) => {
-        const source = res?.data || {};
+        const source = res && res.data ? res.data : {};
         const order = source.order || source;
-        const account = normalizeAccount(source.account || {}, order);
+        const account = normalizeAccount(source.account, order);
 
         if (order.status && order.status !== 'pending_payment') {
           wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
-          return;
+          return true;
         }
 
         const normalizedOrder = {
@@ -123,25 +140,29 @@ Page({
         this.setData({ order: normalizedOrder, account });
         this.startCountdown(normalizedOrder.paymentTimeoutSeconds);
         this.checkBalance();
+        return true;
       })
       .catch((error) => {
-        wx.showToast({ title: error.error || '订单信息加载失败', icon: 'none' });
+        console.error('加载订单信息失败:', error);
+        return Promise.reject(error && error.error ? error.error : '订单信息加载失败，请稍后重试。');
       });
   },
 
   loadWalletInfo() {
     return api.getWalletInfo()
       .then((res) => {
-        const wallet = res?.data || {};
+        const wallet = res && res.data ? res.data : {};
         this.setData({
           wallet: {
             availableBalance: formatMoney(wallet.availableBalance || wallet.available_balance || 0),
           },
         });
         this.checkBalance();
+        return true;
       })
       .catch((error) => {
-        wx.showToast({ title: error.error || '钱包信息加载失败', icon: 'none' });
+        console.error('加载钱包信息失败:', error);
+        return Promise.reject(error && error.error ? error.error : '钱包信息加载失败，请稍后重试。');
       });
   },
 
@@ -189,6 +210,10 @@ Page({
     this.setData({ countdownTimer: timer });
   },
 
+  onRetry() {
+    this.loadData();
+  },
+
   onPaymentTap(e) {
     const payment = e.currentTarget.dataset.payment;
     if (payment === 'wechat') {
@@ -205,7 +230,7 @@ Page({
   },
 
   onPay() {
-    if (this.data.paying) {
+    if (this.data.paying || this.data.loading || this.data.errorText) {
       return;
     }
 
@@ -228,7 +253,7 @@ Page({
         }, 1200);
       })
       .catch((error) => {
-        wx.showToast({ title: error.error || '支付失败', icon: 'none' });
+        wx.showToast({ title: error && error.error ? error.error : '支付失败', icon: 'none' });
       })
       .finally(() => {
         this.setData({ paying: false });

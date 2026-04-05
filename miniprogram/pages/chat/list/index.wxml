@@ -1,4 +1,4 @@
-﻿<!-- pages/chat/list/index.wxml -->
+<!-- pages/chat/list/index.wxml -->
 <view class="page">
   <view class="search-bar">
     <view class="search-input-wrapper">
@@ -14,41 +14,61 @@
   </view>
 
   <view class="chat-list">
-    <view
-      class="chat-item"
-      wx:for="{{chatGroups}}"
-      wx:key="id"
-      bindtap="onChatTap"
-      data-id="{{item.id}}"
-    >
-      <view class="chat-avatar">
-        <image class="avatar-image" src="{{item.avatar}}" mode="aspectFill" />
-        <view class="unread-badge" wx:if="{{item.unreadCount > 0}}">{{item.unreadCount > 99 ? '99+' : item.unreadCount}}</view>
+    <view class="state-card" wx:if="{{loading && chatGroups.length === 0}}">
+      <view class="state-spinner"></view>
+      <view class="state-title">正在同步聊天列表</view>
+      <view class="state-hint">新的订单会话和客服消息会显示在这里。</view>
+    </view>
+
+    <view class="state-card error" wx:elif="{{!loading && errorText && chatGroups.length === 0}}">
+      <view class="state-icon">!</view>
+      <view class="state-title">聊天列表加载失败</view>
+      <view class="state-hint">{{errorText}}</view>
+      <view class="state-action" bindtap="onRetry">重新加载</view>
+    </view>
+
+    <block wx:else>
+      <view class="inline-error" wx:if="{{errorText && chatGroups.length > 0}}">
+        <text class="inline-error-text">{{errorText}}</text>
+        <text class="inline-error-action" bindtap="onRetry">重试</text>
       </view>
 
-      <view class="chat-content">
-        <view class="chat-header">
-          <view class="chat-name">{{item.name}}</view>
-          <view class="chat-time">{{item.lastTime}}</view>
+      <view
+        class="chat-item"
+        wx:for="{{chatGroups}}"
+        wx:key="id"
+        bindtap="onChatTap"
+        data-id="{{item.id}}"
+      >
+        <view class="chat-avatar">
+          <image class="avatar-image" src="{{item.avatar}}" mode="aspectFill" />
+          <view class="unread-badge" wx:if="{{item.unreadCount > 0}}">{{item.unreadCount > 99 ? '99+' : item.unreadCount}}</view>
         </view>
-        <view class="chat-message">
-          <text class="message-text">{{item.lastMessagePreview}}</text>
+
+        <view class="chat-content">
+          <view class="chat-header">
+            <view class="chat-name">{{item.name}}</view>
+            <view class="chat-time">{{item.lastTime}}</view>
+          </view>
+          <view class="chat-message">
+            <text class="message-text">{{item.lastMessagePreview}}</text>
+          </view>
+        </view>
+
+        <view class="chat-status" wx:if="{{item.statusText}}">
+          <text class="status-tag">{{item.statusText}}</text>
         </view>
       </view>
 
-      <view class="chat-status" wx:if="{{item.statusText}}">
-        <text class="status-tag">{{item.statusText}}</text>
+      <view class="loading" wx:if="{{loading && chatGroups.length > 0}}">
+        <text>正在刷新聊天列表...</text>
       </view>
-    </view>
 
-    <view class="loading" wx:if="{{loading}}">
-      <text>加载中...</text>
-    </view>
-
-    <view class="empty" wx:if="{{!loading && chatGroups.length === 0}}">
-      <view class="empty-text">暂无聊天</view>
-      <view class="empty-hint">上架后产生的新订单和客服会话会显示在这里。</view>
-    </view>
+      <view class="empty" wx:if="{{!loading && !errorText && chatGroups.length === 0}}">
+        <view class="empty-text">暂无聊天</view>
+        <view class="empty-hint">上架后产生的新订单和客服会话会显示在这里。</view>
+      </view>
+    </block>
   </view>
 
   <view class="tabbar-placeholder"></view>

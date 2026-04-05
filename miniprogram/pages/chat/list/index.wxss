@@ -1,17 +1,20 @@
 /* pages/chat/list/index.wxss */
+.page {
+  min-height: 100vh;
+  background: #f6f8fc;
+}
 
-/* 搜索栏 */
 .search-bar {
   padding: 20rpx;
   background: #ffffff;
-  border-bottom: 1rpx solid #eeeeee;
+  border-bottom: 1rpx solid #eef2f7;
 }
 
 .search-input-wrapper {
   display: flex;
   align-items: center;
   padding: 20rpx 24rpx;
-  background: #f5f5f5;
+  background: #f5f7fb;
   border-radius: 100rpx;
 }
 
@@ -26,7 +29,6 @@
   color: #1a1a1a;
 }
 
-/* 聊天列表 */
 .chat-list {
   min-height: calc(100vh - 120rpx);
 }
@@ -36,7 +38,7 @@
   align-items: center;
   padding: 30rpx 24rpx;
   background: #ffffff;
-  border-bottom: 1rpx solid #f5f5f5;
+  border-bottom: 1rpx solid #f1f5f9;
 }
 
 .chat-avatar {
@@ -48,7 +50,7 @@
 .avatar-image {
   width: 100rpx;
   height: 100rpx;
-  border-radius: 12rpx;
+  border-radius: 20rpx;
   background: #f5f5f5;
 }
 
@@ -91,22 +93,17 @@
 
 .chat-time {
   font-size: 22rpx;
-  color: #999999;
+  color: #94a3b8;
   flex-shrink: 0;
   margin-left: 20rpx;
 }
 
 .chat-message {
   font-size: 26rpx;
-  color: #666666;
+  color: #64748b;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.message-type {
-  color: #667eea;
-  margin-left: 8rpx;
 }
 
 .chat-status {
@@ -116,43 +113,129 @@
 
 .status-tag {
   padding: 8rpx 16rpx;
-  background: #f0f0f0;
-  color: #666666;
-  border-radius: 8rpx;
+  background: #eef2ff;
+  color: #4f46e5;
+  border-radius: 999rpx;
   font-size: 22rpx;
 }
 
-/* 加载中 */
 .loading {
   padding: 40rpx 0;
   text-align: center;
   font-size: 28rpx;
-  color: #999999;
+  color: #94a3b8;
 }
 
-/* 空状态 */
 .empty {
-  padding: 80rpx 0;
+  padding: 80rpx 40rpx;
   text-align: center;
-}
-
-.empty-icon {
-  font-size: 120rpx;
-  margin-bottom: 20rpx;
 }
 
 .empty-text {
   font-size: 32rpx;
-  color: #333333;
+  color: #1e293b;
   margin-bottom: 12rpx;
+  font-weight: 700;
 }
 
 .empty-hint {
   font-size: 26rpx;
-  color: #999999;
+  line-height: 1.7;
+  color: #94a3b8;
 }
 
-/* 底部占位 */
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  margin: 24rpx;
+  padding: 90rpx 40rpx;
+  background: #ffffff;
+  border-radius: 28rpx;
+  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.06);
+}
+
+.state-card.error {
+  background: #fff8f8;
+}
+
+.state-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #dbe4f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.state-icon {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.state-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.state-hint {
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
+  text-align: center;
+}
+
+.state-action {
+  margin-top: 8rpx;
+  padding: 18rpx 34rpx;
+  border-radius: 999rpx;
+  background: #4f46e5;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: 20rpx 24rpx 0;
+  padding: 18rpx 20rpx;
+  border-radius: 18rpx;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.inline-error-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.inline-error-action {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
 .tabbar-placeholder {
   height: 100rpx;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
