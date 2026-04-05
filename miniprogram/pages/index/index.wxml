@@ -1,11 +1,11 @@
 <view class="page">
   <view class="hero-section">
-    <view class="hero-inner">
-      <view class="hero-title">
-        三角洲行动
-        <text class="hero-highlight">哈夫币出租</text>
+    <view class="hero-card">
+      <view class="hero-copy">
+        <view class="hero-badge">三角洲行动账号出租</view>
+        <view class="hero-title">更快筛选，更清晰下单</view>
+        <view class="hero-subtitle">安全便捷的哈夫币租赁服务，支持快速筛选、担保交易和实时沟通。</view>
       </view>
-      <view class="hero-subtitle">安全便捷的哈夫币租赁服务，担保交易，支持快速筛选与下单。</view>
       <view class="hero-action">
         <view class="publish-btn" bindtap="onPublishTap">
           <text class="publish-icon">+</text>
@@ -16,13 +16,28 @@
   </view>
 
   <view class="filter-section">
-    <view class="filter-header-row">
-      <text class="filter-shield">筛</text>
-      <text class="filter-title">筛选账号</text>
+    <view class="section-head">
+      <view class="section-title">筛选账号</view>
+      <view class="section-caption">{{accountCountText}}</view>
     </view>
 
     <view class="filter-panel">
-      <view class="field-block">
+      <view class="field-block full search-block">
+        <view class="field-label">搜索账号</view>
+        <view class="search-box">
+          <text class="search-icon">搜</text>
+          <input
+            class="search-input"
+            placeholder="输入账号标题、地区或皮肤关键词"
+            value="{{searchQuery}}"
+            bindinput="onSearchInput"
+            bindconfirm="onSearchConfirm"
+            confirm-type="search"
+          />
+        </view>
+      </view>
+
+      <view class="field-block half">
         <view class="field-label">平台 / 上号方式</view>
         <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
           <view class="select-box">
@@ -32,16 +47,7 @@
         </picker>
       </view>
 
-      <view class="field-block">
-        <view class="field-label">哈夫币(M)</view>
-        <view class="range-row">
-          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
-          <text class="range-separator">-</text>
-          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
-        </view>
-      </view>
-
-      <view class="field-block">
+      <view class="field-block half">
         <view class="field-label">段位</view>
         <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
           <view class="select-box">
@@ -51,7 +57,7 @@
         </picker>
       </view>
 
-      <view class="field-block">
+      <view class="field-block half">
         <view class="field-label">安全箱</view>
         <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
           <view class="select-box">
@@ -61,27 +67,7 @@
         </picker>
       </view>
 
-      <view class="field-block">
-        <view class="field-label">体力等级</view>
-        <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
-          <view class="select-box">
-            <text>{{selectedStaminaText}}</text>
-            <text class="picker-arrow">v</text>
-          </view>
-        </picker>
-      </view>
-
-      <view class="field-block">
-        <view class="field-label">负重等级</view>
-        <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
-          <view class="select-box">
-            <text>{{selectedLoadText}}</text>
-            <text class="picker-arrow">v</text>
-          </view>
-        </picker>
-      </view>
-
-      <view class="field-block">
+      <view class="field-block half">
         <view class="field-label">地区</view>
         <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
           <view class="select-box region-select">
@@ -91,8 +77,37 @@
         </picker>
       </view>
 
-      <view class="field-block">
-        <view class="field-label">租金(元)</view>
+      <view class="field-block half">
+        <view class="field-label">体力等级</view>
+        <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
+          <view class="select-box">
+            <text>{{selectedStaminaText}}</text>
+            <text class="picker-arrow">v</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="field-block half">
+        <view class="field-label">负重等级</view>
+        <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
+          <view class="select-box">
+            <text>{{selectedLoadText}}</text>
+            <text class="picker-arrow">v</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="field-block full">
+        <view class="field-label">哈夫币 (M)</view>
+        <view class="range-row">
+          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
+          <text class="range-separator">-</text>
+          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
+        </view>
+      </view>
+
+      <view class="field-block full">
+        <view class="field-label">租金 (元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
           <text class="range-separator">-</text>
@@ -100,8 +115,8 @@
         </view>
       </view>
 
-      <view class="field-block">
-        <view class="field-label">押金(元)</view>
+      <view class="field-block full">
+        <view class="field-label">押金 (元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
           <text class="range-separator">-</text>
@@ -109,20 +124,12 @@
         </view>
       </view>
 
-      <view class="field-block">
-        <view class="field-label">总价(元)</view>
+      <view class="field-block full">
+        <view class="field-label">总价 (元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
           <text class="range-separator">-</text>
           <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
-        </view>
-      </view>
-
-      <view class="field-block search-block">
-        <view class="field-label">搜索账号</view>
-        <view class="search-box">
-          <text class="search-icon">搜</text>
-          <input class="search-input" placeholder="输入账号名进行搜索..." value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
         </view>
       </view>
 
@@ -142,7 +149,7 @@
         </view>
         <view class="skin-list">
           <view class="skin-tag {{item.className}}" wx:for="{{skinOptionsView}}" wx:key="id" bindtap="onSkinTap" data-name="{{item.name}}">
-            <text class="skin-check" wx:if="{{item.selected}}">选</text>
+            <text class="skin-check" wx:if="{{item.selected}}">✓</text>
             <text>{{item.name}}</text>
           </view>
         </view>
@@ -151,128 +158,128 @@
   </view>
 
   <view class="account-section">
-    <view class="account-container">
-      <view class="list-header">
-        <text class="account-count">{{accountCountText}}</text>
+    <view class="section-head">
+      <view class="section-title">账号列表</view>
+      <view class="section-caption">按价格、段位和地区快速比较</view>
+    </view>
+
+    <view class="state-card" wx:if="{{showLoadingState}}">
+      <view class="loading-spinner"></view>
+      <view class="state-title">正在加载账号</view>
+      <view class="state-hint">很快就能看到筛选结果。</view>
+    </view>
+
+    <view class="state-card error" wx:elif="{{showErrorState}}">
+      <view class="state-icon">!</view>
+      <view class="state-title">账号列表加载失败</view>
+      <view class="state-hint">{{listErrorText}}</view>
+      <view class="state-action" bindtap="onRetryAccounts">重新加载</view>
+    </view>
+
+    <block wx:else>
+      <view class="inline-error" wx:if="{{showInlineError}}">
+        <text class="inline-error-text">{{listErrorText}}</text>
+        <text class="inline-error-action" bindtap="onRetryAccounts">重试</text>
       </view>
 
-      <view class="state-card" wx:if="{{showLoadingState}}">
-        <view class="loading-spinner"></view>
-        <view class="state-title">正在加载账号</view>
-        <view class="state-hint">筛选结果很快就会显示出来。</view>
-      </view>
+      <view class="account-grid" wx:if="{{hasAccounts}}">
+        <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
+          <view class="card-image">
+            <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" binderror="onCardImageError" data-id="{{item.id}}" />
+            <view class="card-status {{item.status}}">{{item.statusText}}</view>
+            <view class="card-tag-overlay" wx:if="{{item.showSkinPreview}}">
+              <text class="overlay-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+            </view>
+          </view>
 
-      <view class="state-card error" wx:elif="{{showErrorState}}">
-        <view class="state-icon">!</view>
-        <view class="state-title">账号列表加载失败</view>
-        <view class="state-hint">{{listErrorText}}</view>
-        <view class="state-action" bindtap="onRetryAccounts">重新加载</view>
-      </view>
-
-      <block wx:else>
-        <view class="inline-error" wx:if="{{showInlineError}}">
-          <text class="inline-error-text">{{listErrorText}}</text>
-          <text class="inline-error-action" bindtap="onRetryAccounts">重试</text>
-        </view>
-
-        <view class="account-grid" wx:if="{{hasAccounts}}">
-          <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
-            <view class="card-image">
-              <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" binderror="onCardImageError" data-id="{{item.id}}" />
-              <view class="card-tag-overlay" wx:if="{{item.showSkinPreview}}">
-                <text class="overlay-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
-              </view>
-              <view class="card-status {{item.status}}">{{item.statusText}}</view>
+          <view class="card-content">
+            <view class="card-topline">
+              <text class="platform-inline">{{item.platformText}}</text>
+              <text class="card-region plain" wx:if="{{item.showRegion}}">{{item.regionText}}</text>
             </view>
 
-            <view class="card-content">
-              <view class="card-title">{{item.fullTitle}}</view>
-              <view class="card-platform-row">
-                <text class="platform-inline">{{item.platformText}}</text>
-                <text class="card-region plain" wx:if="{{item.showRegion}}">{{item.regionText}}</text>
-              </view>
+            <view class="card-title">{{item.fullTitle}}</view>
 
-              <view class="metric-pair-row">
-                <view class="metric-pair coins">
-                  <text class="metric-label">哈夫币</text>
-                  <text class="metric-value">{{item.coins_display}}</text>
-                </view>
-                <view class="metric-pair ratio">
-                  <text class="metric-label">比例</text>
-                  <text class="metric-value">{{item.ratio_display}}</text>
-                </view>
+            <view class="metric-pair-row">
+              <view class="metric-pair coins">
+                <text class="metric-label">哈夫币</text>
+                <text class="metric-value">{{item.coins_display}}</text>
               </view>
-
-              <view class="attributes-row webish-grid">
-                <view class="attribute">
-                  <text class="attr-label">保险箱</text>
-                  <text class="attr-value">{{item.safebox}}</text>
-                </view>
-                <view class="attribute">
-                  <text class="attr-label">体力/负重</text>
-                  <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
-                </view>
-                <view class="attribute">
-                  <text class="attr-label">等级</text>
-                  <text class="attr-value">{{item.levelText}}</text>
-                </view>
-                <view class="attribute">
-                  <text class="attr-label">段位</text>
-                  <text class="attr-value">{{item.rank_display}}</text>
-                </view>
+              <view class="metric-pair ratio">
+                <text class="metric-label">比例</text>
+                <text class="metric-value">{{item.ratio_display}}</text>
               </view>
+            </view>
 
-              <view class="meta-row webish-meta" wx:if="{{item.showKd || item.showLoginMethod}}">
-                <text class="meta-text" wx:if="{{item.showKd}}">KD: {{item.kd}}</text>
-                <text class="meta-text" wx:if="{{item.showLoginMethod}}">{{item.login_method}}</text>
+            <view class="attributes-row webish-grid">
+              <view class="attribute">
+                <text class="attr-label">保险箱</text>
+                <text class="attr-value">{{item.safebox}}</text>
               </view>
-
-              <view class="skins-row compact-skins" wx:if="{{item.showSkinPreview}}">
-                <text class="card-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
-                <text class="skin-more" wx:if="{{item.showMoreTagCount}}">+{{item.moreTagCount}}</text>
+              <view class="attribute">
+                <text class="attr-label">体力 / 负重</text>
+                <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
               </view>
-
-              <view class="summary-footer">
-                <view class="summary-pricing">
-                  <text class="summary-label">租金/押金</text>
-                  <text class="summary-value">￥{{item.actual_rental}} / ￥{{item.deposit}}</text>
-                </view>
-                <view class="summary-duration">
-                  <text class="summary-label">租期</text>
-                  <text class="summary-value">{{item.rental_description}}</text>
-                </view>
-                <view class="summary-total">
-                  <text class="summary-label">总价</text>
-                  <text class="summary-total-value">￥{{item.total_price}}</text>
-                </view>
+              <view class="attribute">
+                <text class="attr-label">等级</text>
+                <text class="attr-value">{{item.levelText}}</text>
               </view>
+              <view class="attribute">
+                <text class="attr-label">段位</text>
+                <text class="attr-value">{{item.rank_display}}</text>
+              </view>
+            </view>
 
-              <view class="card-action-row">
-                <view class="detail-button">
-                  <text>查看详情</text>
-                  <text class="detail-arrow">></text>
-                </view>
+            <view class="meta-row webish-meta" wx:if="{{item.showKd || item.showLoginMethod}}">
+              <text class="meta-text" wx:if="{{item.showKd}}">KD: {{item.kd}}</text>
+              <text class="meta-text" wx:if="{{item.showLoginMethod}}">{{item.login_method}}</text>
+            </view>
+
+            <view class="skins-row compact-skins" wx:if="{{item.showSkinPreview}}">
+              <text class="card-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+              <text class="skin-more" wx:if="{{item.showMoreTagCount}}">+{{item.moreTagCount}}</text>
+            </view>
+
+            <view class="summary-footer">
+              <view class="summary-pricing">
+                <text class="summary-label">租金 / 押金</text>
+                <text class="summary-value">¥{{item.actual_rental}} / ¥{{item.deposit}}</text>
+              </view>
+              <view class="summary-duration">
+                <text class="summary-label">租期</text>
+                <text class="summary-value">{{item.rental_description}}</text>
+              </view>
+              <view class="summary-total">
+                <text class="summary-label">总价</text>
+                <text class="summary-total-value">¥{{item.total_price}}</text>
+              </view>
+            </view>
+
+            <view class="card-action-row">
+              <view class="detail-button">
+                <text>查看详情</text>
+                <text class="detail-arrow">></text>
               </view>
             </view>
           </view>
         </view>
+      </view>
 
-        <view class="load-more" wx:if="{{hasMore}}">
-          <view class="btn-load-more" bindtap="onLoadMore">加载更多</view>
-        </view>
+      <view class="load-more" wx:if="{{hasMore}}">
+        <view class="btn-load-more" bindtap="onLoadMore">加载更多</view>
+      </view>
 
-        <view class="loading inline-loading" wx:if="{{showInlineLoading}}">
-          <view class="loading-spinner"></view>
-          <text>正在刷新列表...</text>
-        </view>
+      <view class="loading inline-loading" wx:if="{{showInlineLoading}}">
+        <view class="loading-spinner"></view>
+        <text>正在刷新列表...</text>
+      </view>
 
-        <view class="empty" wx:if="{{showEmptyState}}">
-          <view class="empty-icon">空</view>
-          <view class="empty-text">暂无符合条件的账号</view>
-          <view class="empty-hint">调整筛选条件后再试试。</view>
-        </view>
-      </block>
-    </view>
+      <view class="empty" wx:if="{{showEmptyState}}">
+        <view class="empty-icon">空</view>
+        <view class="empty-text">暂无符合条件的账号</view>
+        <view class="empty-hint">换一个价格区间或减少筛选条件再试试。</view>
+      </view>
+    </block>
   </view>
 
   <view class="tabbar-placeholder"></view>

@@ -1,116 +1,126 @@
-/* pages/order/list/index.wxss */
 page {
-  background: #f5f5f5;
   min-height: 100vh;
+  background: #f4f1eb;
 }
 
 .page {
-  padding-top: 88rpx;
-  padding-bottom: 120rpx;
+  padding: 96rpx 24rpx 120rpx;
+  box-sizing: border-box;
 }
 
-/* 标签切换 */
-.tabs {
-  display: flex;
-  background: #ffffff;
-  padding: 16rpx 0 20rpx;
+.page-head {
+  margin-bottom: 18rpx;
+}
+
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  height: 44rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+}
+
+.page-title {
+  margin-top: 16rpx;
+  font-size: 54rpx;
+  line-height: 1;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.page-subtitle {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.tabs-shell {
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
-  overflow-x: auto;
+  margin-bottom: 18rpx;
+  padding: 8rpx 0 4rpx;
+  background: linear-gradient(180deg, rgba(244, 241, 235, 0.96) 0%, rgba(244, 241, 235, 0.88) 100%);
+  backdrop-filter: blur(14rpx);
+}
+
+.tabs {
   white-space: nowrap;
 }
 
 .tab-item {
-  flex: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8rpx;
-  padding: 16rpx 20rpx;
-  font-size: 28rpx;
-  color: #666666;
-  position: relative;
-  transition: all 0.3s ease;
+  height: 68rpx;
+  padding: 0 22rpx;
+  margin-right: 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+  font-size: 24rpx;
 }
 
 .tab-item.active {
-  color: #667eea;
-  font-weight: 600;
-}
-
-.tab-item.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40rpx;
-  height: 4rpx;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 2rpx;
+  background: #0f172a;
+  color: #ffffff;
 }
 
 .tab-name {
-  font-size: 28rpx;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .tab-badge {
-  min-width: 32rpx;
-  height: 32rpx;
+  min-width: 30rpx;
+  height: 30rpx;
   padding: 0 8rpx;
-  background: #ff4757;
+  border-radius: 999rpx;
+  background: #ef4444;
   color: #ffffff;
-  font-size: 20rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+  font-size: 18rpx;
+  line-height: 30rpx;
+  text-align: center;
 }
 
-/* 订单列表 */
 .order-list {
-  padding: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
 .order-card {
+  border-radius: 28rpx;
   background: #ffffff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
-  transition: all 0.3s ease;
+  box-shadow: 0 16rpx 30rpx rgba(15, 23, 42, 0.06);
+  overflow: hidden;
 }
 
-.order-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
-}
-
-/* 订单头部 */
 .order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 20rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-  margin-bottom: 20rpx;
+  gap: 16rpx;
+  padding: 22rpx 24rpx 18rpx;
+  border-bottom: 1rpx solid #eef2f7;
 }
 
 .order-number {
-  font-size: 24rpx;
-  color: #999999;
-  font-weight: 500;
+  font-size: 22rpx;
+  color: #64748b;
 }
 
 .order-status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8rpx;
-  font-size: 26rpx;
-  font-weight: 600;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .status-dot {
@@ -119,210 +129,164 @@ page {
   border-radius: 50%;
 }
 
-/* 订单主体 */
 .order-body {
-  margin-bottom: 20rpx;
-}
-
-/* 账号信息 */
-.account-info {
   display: flex;
-  gap: 20rpx;
-  margin-bottom: 20rpx;
+  gap: 18rpx;
+  padding: 22rpx 24rpx 24rpx;
 }
 
 .account-image {
-  width: 140rpx;
-  height: 140rpx;
-  border-radius: 12rpx;
-  background: #f5f5f5;
+  width: 152rpx;
+  height: 152rpx;
+  border-radius: 22rpx;
+  background: #e2e8f0;
   flex-shrink: 0;
 }
 
-.account-details {
+.account-content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  min-width: 0;
 }
 
 .account-name {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  line-height: 1.4;
-  margin-bottom: 12rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.account-metas {
+.meta-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
+  gap: 8rpx;
+  margin-top: 12rpx;
 }
 
 .meta-tag {
-  display: inline-block;
-  padding: 6rpx 16rpx;
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-  color: #667eea;
-  font-size: 22rpx;
-  border-radius: 20rpx;
-  border: 1rpx solid rgba(102, 126, 234, 0.3);
-  font-weight: 500;
+  padding: 7rpx 12rpx;
+  border-radius: 999rpx;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 20rpx;
 }
 
-/* 价格信息 */
-.price-info {
+.metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16rpx;
-  margin-bottom: 20rpx;
-  padding: 20rpx;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 12rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10rpx;
+  margin-top: 16rpx;
 }
 
-.price-item {
-  text-align: center;
+.metric-item {
+  padding: 14rpx 12rpx;
+  border-radius: 18rpx;
+  background: #f8fafc;
 }
 
-.price-label {
+.metric-item.total {
+  background: #ecfdf5;
+}
+
+.metric-label {
   display: block;
-  font-size: 22rpx;
-  color: #666666;
-  margin-bottom: 8rpx;
+  font-size: 18rpx;
+  color: #64748b;
 }
 
-.price-value {
+.metric-value {
   display: block;
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1a1a1a;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #0f172a;
 }
 
-.price-item.total .price-value {
-  font-size: 32rpx;
-  color: #667eea;
+.timeline {
+  margin-top: 16rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid #eef2f7;
 }
 
-/* 租期信息 */
-.rental-info {
+.timeline-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 16rpx 20rpx;
-  background: #f7f8fc;
-  border-radius: 10rpx;
-  margin-bottom: 16rpx;
+  gap: 20rpx;
 }
 
-.rental-label {
-  font-size: 24rpx;
-  color: #666666;
+.timeline-row + .timeline-row {
+  margin-top: 10rpx;
 }
 
-.rental-value {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-/* 时间信息 */
-.time-info {
-  display: flex;
-  justify-content: space-between;
-  padding: 16rpx 20rpx;
-  background: #fafafa;
-  border-radius: 10rpx;
-}
-
-.time-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.time-label {
+.timeline-label {
   font-size: 22rpx;
-  color: #999999;
+  color: #64748b;
 }
 
-.time-value {
-  font-size: 24rpx;
-  color: #666666;
-  font-weight: 500;
+.timeline-value {
+  max-width: 64%;
+  text-align: right;
+  font-size: 22rpx;
+  color: #0f172a;
+  font-weight: 600;
 }
 
-/* 订单操作 */
 .order-actions {
   display: flex;
-  gap: 16rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #f0f0f0;
-  margin-top: 20rpx;
+  gap: 12rpx;
+  padding: 0 24rpx 24rpx;
 }
 
 .btn-action {
   flex: 1;
-  height: 70rpx;
+  height: 72rpx;
+  margin: 0;
   padding: 0 24rpx;
-  border-radius: 10rpx;
-  font-size: 26rpx;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
+  border-radius: 18rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.btn-action::after {
+  border: none;
 }
 
 .btn-action.outline {
   background: #ffffff;
-  color: #666666;
-  border: 2rpx solid #e0e0e0;
-}
-
-.btn-action.outline:active {
-  background: #f5f5f5;
+  color: #334155;
+  border: 1rpx solid #cbd5e1;
 }
 
 .btn-action.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0f172a;
   color: #ffffff;
-  border: none;
-}
-
-.btn-action.primary:active {
-  opacity: 0.8;
 }
 
 .btn-action.danger {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+  background: #ef4444;
   color: #ffffff;
-  border: none;
 }
 
-.btn-action.danger:active {
-  opacity: 0.8;
-}
-
-/* 加载中 */
-.loading-wrapper {
+.loading-wrapper,
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80rpx 0;
-  gap: 20rpx;
+  gap: 16rpx;
+  padding: 80rpx 36rpx;
+  border-radius: 30rpx;
+  background: #ffffff;
+  box-shadow: 0 16rpx 28rpx rgba(15, 23, 42, 0.05);
 }
 
 .loading-spinner {
-  width: 60rpx;
-  height: 60rpx;
-  border: 4rpx solid #f0f0f0;
-  border-top-color: #667eea;
+  width: 52rpx;
+  height: 52rpx;
+  border: 4rpx solid #e2e8f0;
+  border-top-color: #0f172a;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes spin {
@@ -332,50 +296,52 @@ page {
 }
 
 .loading-text {
-  font-size: 26rpx;
-  color: #999999;
+  font-size: 24rpx;
+  color: #64748b;
 }
 
-/* 空状态 */
-.empty-state {
+.empty-badge {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 32rpx;
+  background: #f8fafc;
+  color: #64748b;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 120rpx 40rpx;
-  gap: 20rpx;
-}
-
-.empty-icon {
-  font-size: 120rpx;
-  opacity: 0.5;
+  font-size: 48rpx;
+  font-weight: 800;
 }
 
 .empty-title {
   font-size: 30rpx;
-  color: #666666;
-  font-weight: 600;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .empty-hint {
-  font-size: 24rpx;
-  color: #999999;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: #64748b;
   text-align: center;
-  line-height: 1.6;
 }
 
 .btn-go-home {
-  margin-top: 20rpx;
-  padding: 20rpx 60rpx;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-width: 220rpx;
+  height: 74rpx;
+  margin: 8rpx 0 0;
+  padding: 0 28rpx;
+  border-radius: 18rpx;
+  background: #0f172a;
   color: #ffffff;
-  border: none;
-  border-radius: 30rpx;
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
-/* 底部占位 */
+.btn-go-home::after {
+  border: none;
+}
+
 .tabbar-placeholder {
   height: 120rpx;
 }

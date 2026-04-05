@@ -1,16 +1,23 @@
-<!-- pages/order/list/index.wxml -->
 <view class="page">
-  <view class="tabs">
-    <view
-      class="tab-item {{currentTab === item.key ? 'active' : ''}}"
-      wx:for="{{tabs}}"
-      wx:key="key"
-      bindtap="onTabChange"
-      data-tab="{{item.key}}"
-    >
-      <text class="tab-name">{{item.name}}</text>
-      <view class="tab-badge" wx:if="{{item.count > 0}}">{{item.count}}</view>
-    </view>
+  <view class="page-head">
+    <view class="page-eyebrow">订单中心</view>
+    <view class="page-title">我的订单</view>
+    <view class="page-subtitle">查看待支付、租赁中与历史订单状态</view>
+  </view>
+
+  <view class="tabs-shell">
+    <scroll-view class="tabs" scroll-x enable-flex show-scrollbar="{{false}}">
+      <view
+        class="tab-item {{currentTab === item.key ? 'active' : ''}}"
+        wx:for="{{tabs}}"
+        wx:key="key"
+        bindtap="onTabChange"
+        data-tab="{{item.key}}"
+      >
+        <text class="tab-name">{{item.name}}</text>
+        <view class="tab-badge" wx:if="{{item.count > 0}}">{{item.count}}</view>
+      </view>
+    </scroll-view>
   </view>
 
   <view class="order-list">
@@ -24,46 +31,43 @@
       </view>
 
       <view class="order-body">
-        <view class="account-info">
-          <image class="account-image" src="{{item.account.image}}" mode="aspectFill" />
-          <view class="account-details">
-            <view class="account-name">{{item.account.name}}</view>
-            <view class="account-metas">
-              <text class="meta-tag">哈夫币 {{item.account.coins}}</text>
-              <text class="meta-tag">{{item.account.safebox}}</text>
-              <text class="meta-tag">{{item.account.stamina}}</text>
+        <image class="account-image" src="{{item.account.image}}" mode="aspectFill" />
+        <view class="account-content">
+          <view class="account-name">{{item.account.name}}</view>
+          <view class="meta-row">
+            <text class="meta-tag">哈夫币 {{item.account.coins}}</text>
+            <text class="meta-tag">{{item.account.safebox}}</text>
+            <text class="meta-tag">{{item.account.stamina}}</text>
+          </view>
+
+          <view class="metric-grid">
+            <view class="metric-item">
+              <text class="metric-label">租金</text>
+              <text class="metric-value">¥{{item.rental_price}}</text>
+            </view>
+            <view class="metric-item">
+              <text class="metric-label">押金</text>
+              <text class="metric-value">¥{{item.deposit}}</text>
+            </view>
+            <view class="metric-item total">
+              <text class="metric-label">总价</text>
+              <text class="metric-value">¥{{item.total_price}}</text>
             </view>
           </view>
-        </view>
 
-        <view class="price-info">
-          <view class="price-item">
-            <text class="price-label">租金</text>
-            <text class="price-value">¥{{item.rental_price}}</text>
-          </view>
-          <view class="price-item">
-            <text class="price-label">押金</text>
-            <text class="price-value">¥{{item.deposit}}</text>
-          </view>
-          <view class="price-item total">
-            <text class="price-label">总价</text>
-            <text class="price-value">¥{{item.total_price}}</text>
-          </view>
-        </view>
-
-        <view class="rental-info">
-          <text class="rental-label">租期</text>
-          <text class="rental-value">{{item.rental_period}}</text>
-        </view>
-
-        <view class="time-info">
-          <view class="time-item">
-            <text class="time-label">开始</text>
-            <text class="time-value">{{item.rental_start}}</text>
-          </view>
-          <view class="time-item">
-            <text class="time-label">结束</text>
-            <text class="time-value">{{item.rental_end}}</text>
+          <view class="timeline">
+            <view class="timeline-row">
+              <text class="timeline-label">租期</text>
+              <text class="timeline-value">{{item.rental_period}}</text>
+            </view>
+            <view class="timeline-row">
+              <text class="timeline-label">开始</text>
+              <text class="timeline-value">{{item.rental_start}}</text>
+            </view>
+            <view class="timeline-row">
+              <text class="timeline-label">结束</text>
+              <text class="timeline-value">{{item.rental_end}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -86,14 +90,15 @@
 
     <view class="loading-wrapper" wx:if="{{loading}}">
       <view class="loading-spinner"></view>
-      <text class="loading-text">加载中...</text>
+      <text class="loading-text">正在加载订单...</text>
     </view>
 
     <view class="empty-state" wx:if="{{!loading && orders.length === 0}}">
-      <view class="empty-icon">空</view>
+      <view class="empty-badge">空</view>
       <view class="empty-title">暂无订单</view>
-      <view class="empty-hint" wx:if="{{currentTab === 'all'}}">去首页租一个账号吧。</view>
-      <button class="btn-go-home" bindtap="onGoHome" wx:if="{{currentTab === 'all'}}">去首页</button>
+      <view class="empty-hint" wx:if="{{currentTab === 'all'}}">先去首页挑一个账号，订单会出现在这里。</view>
+      <view class="empty-hint" wx:else>这个状态下暂时还没有订单。</view>
+      <button class="btn-go-home" bindtap="onGoHome" wx:if="{{currentTab === 'all'}}">去首页看看</button>
     </view>
   </view>
 

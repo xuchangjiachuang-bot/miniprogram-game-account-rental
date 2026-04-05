@@ -4,27 +4,34 @@
     <text class="inline-error-action" bindtap="onRetry">重试</text>
   </view>
 
-  <view class="profile-header">
-    <view class="header-badge">个人中心</view>
-    <view class="user-card" bindtap="onEditProfile">
-      <image class="user-avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}" mode="aspectFill" />
-      <view class="user-copy">
-        <view class="user-name-row">
-          <text class="user-name">{{userInfo.nickname || '未设置昵称'}}</text>
-          <text class="verify-pill {{userInfo.isVerified ? 'verified' : 'pending'}}">{{userInfo.verifyText}}</text>
-        </view>
-        <view class="user-id">{{memberText}}</view>
-        <view class="user-tags" wx:if="{{userInfo.tags && userInfo.tags.length > 0}}">
-          <text class="user-tag" wx:for="{{userInfo.tags}}" wx:key="*this">{{item}}</text>
-        </view>
-      </view>
-      <text class="user-arrow">></text>
+  <view class="profile-shell">
+    <view class="profile-top">
+      <view class="profile-eyebrow">账户中心</view>
+      <view class="profile-title">我的</view>
+      <view class="profile-subtitle">查看交易、资产与账号状态</view>
     </view>
 
-    <view class="stat-grid">
-      <view class="stat-item" wx:for="{{statCards}}" wx:key="key" bindtap="onStatTap" data-action="{{item.action}}">
-        <text class="stat-value">{{item.value}}</text>
-        <text class="stat-label">{{item.label}}</text>
+    <view class="identity-panel">
+      <view class="identity-main" bindtap="onEditProfile">
+        <image class="user-avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}" mode="aspectFill" />
+        <view class="user-copy">
+          <view class="user-name-row">
+            <text class="user-name">{{userInfo.nickname || '未设置昵称'}}</text>
+            <text class="verify-pill {{userInfo.isVerified ? 'verified' : 'pending'}}">{{userInfo.verifyText}}</text>
+          </view>
+          <view class="user-id">{{memberText}}</view>
+          <view class="user-tags" wx:if="{{userInfo.tags && userInfo.tags.length > 0}}">
+            <text class="user-tag" wx:for="{{userInfo.tags}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+        <text class="user-arrow">></text>
+      </view>
+
+      <view class="stat-strip">
+        <view class="stat-item" wx:for="{{statCards}}" wx:key="key" bindtap="onStatTap" data-action="{{item.action}}">
+          <text class="stat-value">{{item.value}}</text>
+          <text class="stat-label">{{item.label}}</text>
+        </view>
       </view>
     </view>
   </view>
@@ -35,6 +42,7 @@
   </view>
 
   <view class="auth-section" wx:if="{{!userInfo.isVerified}}">
+    <view class="auth-mark">实名</view>
     <view class="auth-copy">
       <view class="auth-title">完成实名认证后可开启更多交易和提现能力</view>
       <view class="auth-desc">当前只需填写姓名、身份证号和手机号即可完成认证。</view>
@@ -44,7 +52,14 @@
 
   <view class="menu-wrap">
     <view class="menu-group" wx:for="{{menuSections}}" wx:key="key" wx:for-item="group">
-      <view class="menu-item {{item.danger ? 'danger' : ''}}" wx:for="{{group.items}}" wx:key="action" wx:for-item="item" bindtap="onMenuTap" data-action="{{item.action}}">
+      <view
+        class="menu-item {{item.danger ? 'danger' : ''}}"
+        wx:for="{{group.items}}"
+        wx:key="action"
+        wx:for-item="item"
+        bindtap="onMenuTap"
+        data-action="{{item.action}}"
+      >
         <view class="menu-mark {{item.danger ? 'danger' : ''}}">{{item.shortLabel}}</view>
         <view class="menu-copy">
           <view class="menu-title">{{item.title}}</view>
