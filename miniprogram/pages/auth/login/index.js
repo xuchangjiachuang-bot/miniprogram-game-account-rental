@@ -1,4 +1,4 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const chat = require('../../../utils/chat.js');
 

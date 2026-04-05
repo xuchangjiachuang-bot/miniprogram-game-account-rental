@@ -1,4 +1,4 @@
-﻿<!-- pages/auth/login/index.wxml -->
+<!-- pages/auth/login/index.wxml -->
 <view class="page">
   <view class="login-container">
     <view class="logo-section">

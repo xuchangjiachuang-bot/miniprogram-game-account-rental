@@ -1,4 +1,4 @@
-﻿<!-- pages/wallet/recharge/index.wxml -->
+<!-- pages/wallet/recharge/index.wxml -->
 <view class="page">
   <view class="balance-section">
     <view class="balance-label">当前余额</view>

@@ -1,4 +1,4 @@
-﻿<!-- pages/account/publish/index.wxml -->
+<!-- pages/account/publish/index.wxml -->
 <view class="page">
   <form bindsubmit="onSubmit">
     <view class="section">

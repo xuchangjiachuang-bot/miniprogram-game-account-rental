@@ -14,7 +14,7 @@ App({
 
   onLaunch() {
     console.log('小程序启动');
-    this.getSystemInfo();
+    this.collectSystemInfo();
     this.checkLogin();
   },
 
@@ -40,7 +40,7 @@ App({
   verifyToken() {
     return api.getUserInfo()
       .then((res) => {
-        const userInfo = res?.data || null;
+        const userInfo = res && res.data ? res.data : null;
         this.globalData.userInfo = userInfo;
         if (userInfo) {
           storage.setUserInfo(userInfo);
@@ -59,12 +59,20 @@ App({
       });
   },
 
-  getSystemInfo() {
-    wx.getSystemInfo({
-      success: (res) => {
-        this.globalData.systemInfo = res;
-      },
-    });
+  collectSystemInfo() {
+    const deviceInfo = typeof wx.getDeviceInfo === 'function' ? wx.getDeviceInfo() : {};
+    const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : {};
+    const appBaseInfo = typeof wx.getAppBaseInfo === 'function' ? wx.getAppBaseInfo() : {};
+    const systemSetting = typeof wx.getSystemSetting === 'function' ? wx.getSystemSetting() : {};
+    const appAuthorizeSetting = typeof wx.getAppAuthorizeSetting === 'function' ? wx.getAppAuthorizeSetting() : {};
+
+    this.globalData.systemInfo = {
+      ...deviceInfo,
+      ...windowInfo,
+      ...appBaseInfo,
+      systemSetting,
+      appAuthorizeSetting,
+    };
   },
 
   showLoginModal() {
@@ -76,7 +84,7 @@ App({
   },
 
   onLoginSuccess(detail) {
-    const payload = detail?.detail || detail || {};
+    const payload = detail && detail.detail ? detail.detail : (detail || {});
     this.globalData.userInfo = payload.user || null;
     this.globalData.token = payload.token || storage.getToken() || null;
 

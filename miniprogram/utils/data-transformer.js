@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Mini program account data transformer.
  */
 

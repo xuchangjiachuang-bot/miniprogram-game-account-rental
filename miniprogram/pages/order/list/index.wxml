@@ -1,4 +1,4 @@
-﻿<!-- pages/order/list/index.wxml -->
+<!-- pages/order/list/index.wxml -->
 <view class="page">
   <view class="tabs">
     <view

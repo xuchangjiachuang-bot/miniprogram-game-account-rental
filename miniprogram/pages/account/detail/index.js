@@ -1,4 +1,4 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const dataTransformer = require('../../../utils/data-transformer.js');

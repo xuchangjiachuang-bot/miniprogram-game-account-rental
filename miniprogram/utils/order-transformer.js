@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Order data transformer for mini program pages.
  */
 

@@ -1,4 +1,4 @@
-﻿<!-- pages/auth/bind-phone/index.wxml -->
+<!-- pages/auth/bind-phone/index.wxml -->
 <view class="page">
   <view class="container">
     <view class="header">

@@ -1,4 +1,4 @@
-﻿<!-- pages/wallet/withdraw/index.wxml -->
+<!-- pages/wallet/withdraw/index.wxml -->
 <view class="page">
   <view class="balance-section">
     <view class="balance-label">可提现余额</view>
