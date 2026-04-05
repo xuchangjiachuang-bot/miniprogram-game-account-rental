@@ -1,150 +1,100 @@
-<!-- pages/account/detail/index.wxml -->
 <view class="page">
-  <view class="swiper-container" wx:if="{{account.images && account.images.length > 0}}">
-    <swiper class="account-swiper" bindchange="onSwiperChange">
+  <view class="hero-gallery" wx:if="{{account.images && account.images.length > 0}}">
+    <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{account.images.length > 1}}">
       <swiper-item wx:for="{{account.images}}" wx:key="*this">
-        <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" data-urls="{{account.images}}" data-current="{{item}}" />
+        <image
+          class="swiper-image"
+          src="{{item}}"
+          mode="aspectFill"
+          bindtap="onImagePreview"
+          data-urls="{{account.images}}"
+          data-current="{{item}}"
+        />
       </swiper-item>
     </swiper>
 
+    <view class="gallery-mask"></view>
+
+    <view class="gallery-counter" wx:if="{{account.images.length > 1}}">
+      {{currentImageIndex + 1}} / {{account.images.length}}
+    </view>
+
     <view class="swiper-indicators" wx:if="{{account.images.length > 1}}">
-      <view class="indicator" wx:for="{{account.images}}" wx:key="*this" wx:for-index="idx">
-        <view class="indicator-dot {{currentImageIndex === idx ? 'active' : ''}}"></view>
-      </view>
+      <view class="indicator-dot {{currentImageIndex === index ? 'active' : ''}}" wx:for="{{account.images}}" wx:key="*this"></view>
     </view>
 
     <view class="swiper-btn prev" wx:if="{{account.images.length > 1}}" bindtap="onPrevImage">‹</view>
     <view class="swiper-btn next" wx:if="{{account.images.length > 1}}" bindtap="onNextImage">›</view>
   </view>
 
-  <view class="info-section">
-    <view class="account-header">
-      <view class="account-title">{{account.fullTitle}}</view>
-      <view class="account-status {{account.status}}">
-        <text class="status-dot"></text>
-        <text>{{account.statusText}}</text>
+  <view class="content-shell">
+    <view class="headline-card">
+      <view class="headline-row">
+        <view class="headline-copy">
+          <view class="account-title">{{account.fullTitle}}</view>
+          <view class="account-subtitle">{{account.subtitle}}</view>
+        </view>
+        <view class="account-status {{account.status}}">{{account.statusText}}</view>
+      </view>
+
+      <view class="platform-badge">{{account.login_method}}</view>
+
+      <view class="info-card-grid">
+        <view class="info-card {{item.className}}" wx:for="{{quickFacts}}" wx:key="label">
+          <text class="info-label">{{item.label}}</text>
+          <text class="info-value">{{item.value}}</text>
+        </view>
       </view>
     </view>
 
-    <view class="platform-badge">{{account.login_method}}</view>
-
-    <view class="info-card-grid">
-      <view class="info-card coins">
-        <text class="info-label">哈夫币</text>
-        <text class="info-value">{{account.coins_display}}</text>
-      </view>
-      <view class="info-card ratio">
-        <text class="info-label">比例</text>
-        <text class="info-value">{{account.ratio_display}}</text>
-      </view>
-      <view class="info-card safebox">
-        <text class="info-label">保险箱</text>
-        <text class="info-value">{{account.safebox}}</text>
-      </view>
-      <view class="info-card level">
-        <text class="info-label">等级</text>
-        <text class="info-value">Lv.{{account.account_level}}</text>
-      </view>
-    </view>
-
-    <view class="attributes-section">
+    <view class="section-card">
       <view class="section-title">账号属性</view>
       <view class="attribute-list">
-        <view class="attribute-item">
-          <text class="attr-label">段位</text>
-          <text class="attr-value">{{account.rank_display}}</text>
-        </view>
-        <view class="attribute-item">
-          <text class="attr-label">体力/负重</text>
-          <text class="attr-value">{{account.stamina_level}}/{{account.load_level}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.kd > 0}}">
-          <text class="attr-label">KD 值</text>
-          <text class="attr-value">{{account.kd}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.awmBullets > 0}}">
-          <text class="attr-label">AWM 子弹</text>
-          <text class="attr-value">{{account.awmBullets}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.level6Armor > 0}}">
-          <text class="attr-label">六级甲</text>
-          <text class="attr-value">{{account.level6Armor}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.level6Helmet > 0}}">
-          <text class="attr-label">六级头</text>
-          <text class="attr-value">{{account.level6Helmet}}</text>
-        </view>
-        <view class="attribute-item">
-          <text class="attr-label">所在地</text>
-          <text class="attr-value">{{account.region.province}} {{account.region.city}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.view_count > 0}}">
-          <text class="attr-label">浏览次数</text>
-          <text class="attr-value">{{account.view_count}}</text>
-        </view>
-        <view class="attribute-item" wx:if="{{account.trade_count > 0}}">
-          <text class="attr-label">交易次数</text>
-          <text class="attr-value">{{account.trade_count}}</text>
-        </view>
-        <view class="attribute-item">
-          <text class="attr-label">上架时间</text>
-          <text class="attr-value">{{account.listed_at}}</text>
+        <view class="attribute-item" wx:for="{{detailItems}}" wx:key="label">
+          <text class="attr-label">{{item.label}}</text>
+          <text class="attr-value">{{item.value}}</text>
         </view>
       </view>
     </view>
 
-    <view class="skins-section" wx:if="{{account.skins && account.skins.length > 0}}">
+    <view class="section-card" wx:if="{{account.skins && account.skins.length > 0}}">
       <view class="section-title">皮肤标签</view>
       <view class="skins-list">
         <text class="skin-tag" wx:for="{{account.skins}}" wx:key="*this">{{item}}</text>
       </view>
     </view>
 
-    <view class="desc-section">
+    <view class="section-card">
       <view class="section-title">账号描述</view>
-      <view class="desc-content">{{account.description || '暂无描述'}}</view>
+      <view class="desc-content">{{account.description}}</view>
     </view>
-  </view>
 
-  <view class="price-section">
-    <view class="price-row">
-      <text class="price-label">租金</text>
-      <text class="price-value">¥{{account.actual_rental}}</text>
-    </view>
-    <view class="price-row">
-      <text class="price-label">押金</text>
-      <text class="price-value">¥{{account.deposit}}</text>
-    </view>
-    <view class="price-row">
-      <text class="price-label">租期</text>
-      <text class="price-value">{{account.rental_description}}</text>
-    </view>
-    <view class="price-row total">
-      <text class="price-label">总价</text>
-      <text class="price-value">¥{{account.total_price}}</text>
+    <view class="price-card">
+      <view class="price-row {{item.highlight ? 'total' : ''}}" wx:for="{{priceRows}}" wx:key="label">
+        <text class="price-label">{{item.label}}</text>
+        <text class="price-value">{{item.displayValue}}</text>
+      </view>
     </view>
   </view>
 
   <view class="bottom-bar">
-    <button class="btn-service" bindtap="onContactService">
-      <text>聊</text>
-      <text>客服</text>
+    <button class="btn-side" bindtap="onContactService">
+      <text class="btn-side-main">在线</text>
+      <text class="btn-side-sub">客服</text>
     </button>
-    <button class="btn-favorite" bindtap="onFavorite">
-      <text>藏</text>
-      <text>收藏</text>
+    <button class="btn-side" bindtap="onFavorite">
+      <text class="btn-side-main">账号</text>
+      <text class="btn-side-sub">收藏</text>
     </button>
     <button class="btn-rent" bindtap="onRentNow" disabled="{{account.status !== 'available'}}">
-      {{account.status === 'available' ? '立即租赁' : '暂不可租'}}
+      {{account.status === 'available' ? '立即租号' : '暂不可租'}}
     </button>
   </view>
-
-  <view class="bottom-placeholder"></view>
 
   <login-modal
     wx:if="{{showLoginModal}}"
     visible="{{showLoginModal}}"
     bind:loginSuccess="onLoginSuccess"
-    bind:close="onLoginSuccess"
+    bind:close="onLoginModalClose"
   />
 </view>

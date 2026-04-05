@@ -1,189 +1,258 @@
-/* pages/profile/index.wxss */
-
-/* 用户信息头部 */
-.profile-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 60rpx 30rpx 40rpx;
-  color: #ffffff;
+page {
+  min-height: 100vh;
+  background: #f4f6fb;
 }
 
-.user-info {
+.page {
+  padding-bottom: 40rpx;
+}
+
+.profile-header {
+  padding: 34rpx 24rpx 30rpx;
+  background: linear-gradient(135deg, #312e81 0%, #4f46e5 45%, #6366f1 100%);
+}
+
+.header-badge {
+  display: inline-flex;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 22rpx;
+}
+
+.user-card {
+  margin-top: 24rpx;
+  padding: 28rpx;
+  border-radius: 30rpx;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18rpx);
   display: flex;
   align-items: center;
-  margin-bottom: 40rpx;
+  gap: 20rpx;
 }
 
 .user-avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  background: #ffffff;
-  margin-right: 24rpx;
-  border: 4rpx solid rgba(255,255,255,0.3);
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
 }
 
-.user-details {
+.user-copy {
   flex: 1;
   min-width: 0;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
 .user-name {
   font-size: 36rpx;
   font-weight: 700;
-  margin-bottom: 8rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #ffffff;
+}
+
+.verify-pill {
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.verify-pill.verified {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.verify-pill.pending {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .user-id {
+  margin-top: 10rpx;
   font-size: 24rpx;
-  opacity: 0.8;
-  margin-bottom: 12rpx;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .user-tags {
   display: flex;
-  gap: 12rpx;
   flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 14rpx;
 }
 
-.tag {
-  padding: 6rpx 16rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 100rpx;
-  font-size: 20rpx;
-  backdrop-filter: blur(10rpx);
+.user-tag {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-size: 21rpx;
 }
 
-.arrow {
-  font-size: 40rpx;
-  opacity: 0.6;
-  margin-left: 20rpx;
+.user-arrow {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 30rpx;
 }
 
-/* 统计数据 */
-.stats-row {
-  display: flex;
-  justify-content: space-around;
+.stat-grid {
+  margin-top: 22rpx;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .stat-item {
+  padding: 24rpx 14rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.12);
   text-align: center;
 }
 
 .stat-value {
   display: block;
-  font-size: 40rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  margin-bottom: 8rpx;
+  color: #ffffff;
+  line-height: 1.3;
 }
 
 .stat-label {
-  font-size: 24rpx;
-  opacity: 0.8;
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-/* 认证状态 */
 .auth-section {
   margin: 20rpx;
-}
-
-.auth-content {
+  padding: 24rpx;
+  border-radius: 28rpx;
+  background: #fff7ed;
   display: flex;
   align-items: center;
-  padding: 24rpx;
-  background: #fff3cd;
-  border-radius: 12rpx;
-  border: 1rpx solid #ffeaa7;
+  gap: 20rpx;
 }
 
-.auth-icon {
-  font-size: 36rpx;
-  margin-right: 16rpx;
-}
-
-.auth-text {
+.auth-copy {
   flex: 1;
-  font-size: 26rpx;
-  color: #856404;
+}
+
+.auth-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.auth-desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #c2410c;
 }
 
 .btn-auth {
-  padding: 12rpx 32rpx;
-  background: #ffc107;
+  flex-shrink: 0;
+  width: 156rpx;
+  height: 78rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 22rpx;
+  background: #ea580c;
   color: #ffffff;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  font-weight: 600;
+  font-size: 28rpx;
+  font-weight: 700;
 }
 
-/* 菜单列表 */
-.menu-section {
-  padding: 0 20rpx;
-  padding-bottom: 40rpx;
+.btn-auth::after {
+  border: none;
+}
+
+.menu-wrap {
+  padding: 0 20rpx 30rpx;
 }
 
 .menu-group {
+  margin-top: 20rpx;
+  border-radius: 28rpx;
   background: #ffffff;
-  border-radius: 16rpx;
   overflow: hidden;
-  margin-bottom: 20rpx;
+  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 30rpx 24rpx;
-  border-bottom: 1rpx solid #f5f5f5;
+  gap: 18rpx;
+  padding: 24rpx;
 }
 
-.menu-item:last-child {
-  border-bottom: none;
+.menu-item + .menu-item {
+  border-top: 1rpx solid #eef2f7;
 }
 
-.menu-icon {
-  font-size: 36rpx;
-  margin-right: 20rpx;
-  width: 40rpx;
-  text-align: center;
+.menu-item.danger .menu-title,
+.menu-item.danger .menu-desc,
+.menu-item.danger .menu-arrow {
+  color: #dc2626;
 }
 
-.menu-text {
-  flex: 1;
+.menu-mark {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 24rpx;
+  background: #eef2ff;
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28rpx;
-  color: #1a1a1a;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.menu-mark.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.menu-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-title {
+  font-size: 29rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.menu-desc {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #64748b;
 }
 
 .menu-badge {
-  min-width: 36rpx;
-  height: 36rpx;
+  min-width: 40rpx;
   padding: 0 10rpx;
-  background: #ff4757;
+  height: 40rpx;
+  border-radius: 999rpx;
+  background: #ef4444;
   color: #ffffff;
-  border-radius: 18rpx;
-  font-size: 20rpx;
-  line-height: 36rpx;
+  font-size: 22rpx;
+  line-height: 40rpx;
   text-align: center;
-  margin-right: 12rpx;
 }
 
-.menu-item .arrow {
-  font-size: 32rpx;
-  color: #cccccc;
-  margin-left: 12rpx;
-}
-
-.menu-item.logout {
-  color: #ff4757;
-}
-
-.menu-item.logout .menu-text {
-  color: #ff4757;
-}
-
-/* 底部占位 */
-.tabbar-placeholder {
-  height: 100rpx;
+.menu-arrow {
+  color: #94a3b8;
+  font-size: 30rpx;
 }

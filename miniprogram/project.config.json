@@ -1,5 +1,5 @@
 {
-  "description": "???????????",
+  "description": "游戏账号租赁微信小程序",
   "packOptions": {
     "ignore": [
       {
@@ -52,7 +52,7 @@
   "compileType": "miniprogram",
   "libVersion": "3.5.7",
   "appid": "wx2382e1949d031ba6",
-  "projectname": "????????",
+  "projectname": "账号租赁小程序",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",

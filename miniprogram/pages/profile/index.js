@@ -3,6 +3,74 @@ const storage = require('../../utils/storage.js');
 const chat = require('../../utils/chat.js');
 const config = require('../../utils/config.js');
 
+function formatMoney(amount) {
+  const value = Number(amount || 0);
+  if (Number.isNaN(value)) {
+    return '0.00';
+  }
+  return value.toFixed(2);
+}
+
+function buildUserTags(userInfo = {}) {
+  const tags = [];
+
+  if (userInfo.isVerified || userInfo.verifyStatus === 'approved') {
+    tags.push('已实名');
+  }
+  if (Number(userInfo.creditScore || 0) >= 700) {
+    tags.push('高信用');
+  }
+  if (Number(userInfo.rentCount || 0) > 100) {
+    tags.push('资深租号用户');
+  }
+
+  return tags;
+}
+
+function buildStatCards(stats = {}) {
+  return [
+    { key: 'orders', label: '订单', value: String(stats.orderCount || 0), action: 'orders' },
+    { key: 'collect', label: '收藏', value: String(stats.collectCount || 0), action: 'collect' },
+    { key: 'balance', label: '余额', value: `¥${stats.balance || '0.00'}`, action: 'wallet' },
+    { key: 'credit', label: '信用分', value: String(stats.creditScore || 0), action: 'credit' },
+  ];
+}
+
+function buildMenuSections(menuBadges = {}) {
+  return [
+    {
+      key: 'trade',
+      items: [
+        { action: 'orders', shortLabel: '单', title: '我的订单', desc: '查看租号订单与处理进度', badge: menuBadges.order || '' },
+        { action: 'account', shortLabel: '号', title: '我的账号', desc: '发布和管理上架账号' },
+        { action: 'collect', shortLabel: '藏', title: '我的收藏', desc: '暂存感兴趣的账号', badge: menuBadges.collect || '' },
+      ],
+    },
+    {
+      key: 'asset',
+      items: [
+        { action: 'wallet', shortLabel: '钱', title: '我的钱包', desc: '查看余额、充值与提现' },
+        { action: 'address', shortLabel: '址', title: '收货地址', desc: '用于后续扩展的实物配送' },
+        { action: 'security', shortLabel: '安', title: '账户安全', desc: '管理登录与账号安全设置' },
+      ],
+    },
+    {
+      key: 'service',
+      items: [
+        { action: 'help', shortLabel: '帮', title: '帮助中心', desc: '查看常见问题与使用说明' },
+        { action: 'feedback', shortLabel: '评', title: '意见反馈', desc: '告诉我们你遇到的问题' },
+        { action: 'about', shortLabel: '关', title: '关于我们', desc: '了解平台信息与服务说明' },
+      ],
+    },
+    {
+      key: 'logout',
+      items: [
+        { action: 'logout', shortLabel: '退', title: '退出登录', desc: '退出当前账号并返回登录页', danger: true },
+      ],
+    },
+  ];
+}
+
 Page({
   data: {
     userInfo: {
@@ -11,6 +79,7 @@ Page({
       id: '',
       isVerified: false,
       verifyStatus: 'none',
+      verifyText: '未实名',
       tags: [],
     },
     stats: {
@@ -20,16 +89,23 @@ Page({
       creditScore: 0,
     },
     menuBadges: {
-      order: 0,
-      collect: 0,
+      order: '',
+      collect: '',
     },
+    statCards: [],
+    menuSections: [],
+    memberText: '欢迎使用账号租赁',
     showLoginModal: false,
   },
 
   onLoad() {
     const userInfo = storage.getUserInfo();
     if (!userInfo) {
-      this.setData({ showLoginModal: true });
+      this.setData({
+        showLoginModal: true,
+        statCards: buildStatCards(this.data.stats),
+        menuSections: buildMenuSections(this.data.menuBadges),
+      });
       return;
     }
 
@@ -46,6 +122,33 @@ Page({
     this.loadUserInfo().finally(() => wx.stopPullDownRefresh());
   },
 
+  applyProfileState(userInfo = {}, stats = this.data.stats) {
+    const normalizedUser = {
+      ...this.data.userInfo,
+      ...userInfo,
+      avatar: userInfo.avatar || '/images/default-avatar.png',
+      isVerified: userInfo.isVerified || userInfo.verifyStatus === 'approved',
+      verifyStatus: userInfo.verifyStatus || 'none',
+      verifyText: userInfo.isVerified || userInfo.verifyStatus === 'approved' ? '已实名' : '未实名',
+      tags: buildUserTags(userInfo),
+    };
+
+    const normalizedStats = {
+      orderCount: Number(stats.orderCount || 0),
+      collectCount: Number(stats.collectCount || 0),
+      balance: formatMoney(stats.balance),
+      creditScore: Number(stats.creditScore || 0),
+    };
+
+    this.setData({
+      userInfo: normalizedUser,
+      stats: normalizedStats,
+      memberText: normalizedUser.id ? `会员编号 ${normalizedUser.id}` : '欢迎使用账号租赁',
+      statCards: buildStatCards(normalizedStats),
+      menuSections: buildMenuSections(this.data.menuBadges),
+    });
+  },
+
   onLoginSuccess(e) {
     const detail = e?.detail || {};
     if (detail.user) {
@@ -55,7 +158,11 @@ Page({
     this.loadUserInfo();
   },
 
-  showComingSoon(message = '该功能正在建设中') {
+  onLoginModalClose() {
+    this.setData({ showLoginModal: false });
+  },
+
+  showComingSoon(message = '该功能即将上线') {
     wx.showToast({
       title: message,
       icon: 'none',
@@ -65,16 +172,7 @@ Page({
   loadUserInfo() {
     const localUserInfo = storage.getUserInfo();
     if (localUserInfo) {
-      this.setData({
-        userInfo: {
-          ...this.data.userInfo,
-          ...localUserInfo,
-          avatar: localUserInfo.avatar || '/images/default-avatar.png',
-          tags: this.buildUserTags(localUserInfo),
-          isVerified: localUserInfo.isVerified || localUserInfo.verifyStatus === 'approved',
-          verifyStatus: localUserInfo.verifyStatus || 'none',
-        },
-      });
+      this.applyProfileState(localUserInfo, this.data.stats);
     }
 
     return Promise.all([
@@ -88,22 +186,22 @@ Page({
           avatar: rawUser.avatar || '/images/default-avatar.png',
           isVerified: rawUser.isVerified || rawUser.verifyStatus === 'approved',
           verifyStatus: rawUser.verifyStatus || 'none',
-          tags: this.buildUserTags(rawUser),
+          creditScore: Number(statsRes?.data?.creditScore || rawUser.creditScore || 0),
         };
 
         const stats = {
           orderCount: Number(statsRes?.data?.orderCount || 0),
           collectCount: Number(statsRes?.data?.collectCount || 0),
-          balance: this.formatMoney(statsRes?.data?.balance),
+          balance: statsRes?.data?.balance,
           creditScore: Number(statsRes?.data?.creditScore || 0),
         };
 
-        this.setData({
-          userInfo,
-          stats,
+        this.applyProfileState(userInfo, stats);
+        storage.setUserInfo({
+          ...userInfo,
+          tags: buildUserTags(userInfo),
+          verifyText: userInfo.isVerified ? '已实名' : '未实名',
         });
-
-        storage.setUserInfo(userInfo);
       })
       .catch((error) => {
         console.error('加载个人中心数据失败:', error);
@@ -116,7 +214,7 @@ Page({
             avatar: '/images/default-avatar.png',
             isVerified: true,
             verifyStatus: 'approved',
-            tags: ['已实名', '高信用'],
+            creditScore: 750,
           };
 
           const stats = mockData.userStats || {
@@ -126,31 +224,52 @@ Page({
             creditScore: 750,
           };
 
-          this.setData({ userInfo, stats });
+          this.applyProfileState(userInfo, stats);
         }
       });
   },
 
-  buildUserTags(userInfo = {}) {
-    const tags = [];
-
-    if (userInfo.isVerified || userInfo.verifyStatus === 'approved') {
-      tags.push('已实名');
-    }
-    if (Number(userInfo.creditScore || 0) >= 700) {
-      tags.push('高信用');
-    }
-    if (Number(userInfo.rentCount || 0) > 100) {
-      tags.push('资深租户');
-    }
-
-    return tags;
+  onStatTap(e) {
+    const action = e.currentTarget.dataset.action;
+    this.handleMenuAction(action);
   },
 
-  formatMoney(amount) {
-    const value = Number(amount || 0);
-    if (Number.isNaN(value)) return '0.00';
-    return value.toFixed(2);
+  onMenuTap(e) {
+    const action = e.currentTarget.dataset.action;
+    this.handleMenuAction(action);
+  },
+
+  handleMenuAction(action) {
+    switch (action) {
+      case 'orders':
+        wx.navigateTo({ url: '/pages/order/list/index' });
+        break;
+      case 'account':
+        wx.navigateTo({ url: '/pages/account/publish/index' });
+        break;
+      case 'wallet':
+        wx.navigateTo({ url: '/pages/wallet/index' });
+        break;
+      case 'verify':
+        wx.navigateTo({ url: '/pages/profile/verify/index' });
+        break;
+      case 'credit':
+        this.onCreditTap();
+        break;
+      case 'logout':
+        this.onLogout();
+        break;
+      case 'collect':
+      case 'address':
+      case 'security':
+      case 'help':
+      case 'feedback':
+      case 'about':
+        this.showComingSoon();
+        break;
+      default:
+        break;
+    }
   },
 
   onEditProfile() {
@@ -158,43 +277,7 @@ Page({
   },
 
   onVerifyTap() {
-    wx.navigateTo({ url: '/pages/profile/verify/index' });
-  },
-
-  onOrdersTap() {
-    wx.navigateTo({ url: '/pages/order/list/index' });
-  },
-
-  onAccountTap() {
-    wx.navigateTo({ url: '/pages/account/publish/index' });
-  },
-
-  onCollectTap() {
-    this.showComingSoon();
-  },
-
-  onWalletTap() {
-    wx.navigateTo({ url: '/pages/wallet/index' });
-  },
-
-  onAddressTap() {
-    this.showComingSoon();
-  },
-
-  onSecurityTap() {
-    this.showComingSoon();
-  },
-
-  onHelpTap() {
-    this.showComingSoon();
-  },
-
-  onFeedbackTap() {
-    this.showComingSoon();
-  },
-
-  onAboutTap() {
-    this.showComingSoon();
+    this.handleMenuAction('verify');
   },
 
   onCreditTap() {
@@ -207,10 +290,12 @@ Page({
 
   onLogout() {
     wx.showModal({
-      title: '确认退出',
-      content: '确定要退出当前登录状态吗？',
+      title: '确认退出登录',
+      content: '退出后需要重新授权登录才能继续下单和查看个人数据。',
       success: (res) => {
-        if (!res.confirm) return;
+        if (!res.confirm) {
+          return;
+        }
 
         storage.removeToken();
         storage.removeUserInfo();

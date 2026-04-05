@@ -2,8 +2,17 @@ const api = require('../../../utils/api.js');
 
 function formatMoney(amount) {
   const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '0.00';
+  if (Number.isNaN(value)) {
+    return '0.00';
+  }
   return value.toFixed(2);
+}
+
+function normalizeAccount(account = {}, order = {}) {
+  return {
+    avatar: account.avatar || account.image || account.account_image || '/images/default-account.png',
+    title: account.title || account.name || order.accountName || order.account_name || '游戏账号',
+  };
 }
 
 Page({
@@ -16,7 +25,10 @@ Page({
       rental_period: '-',
       paymentTimeoutSeconds: 900,
     },
-    account: {},
+    account: {
+      avatar: '/images/default-account.png',
+      title: '游戏账号',
+    },
     wallet: {
       availableBalance: '0.00',
     },
@@ -26,6 +38,7 @@ Page({
     countdownTimer: null,
     insufficient: false,
     insufficientAmount: '0.00',
+    paymentMethods: [],
   },
 
   onLoad(options) {
@@ -50,6 +63,30 @@ Page({
     }
   },
 
+  refreshPaymentMethods() {
+    const walletBalance = this.data.wallet.availableBalance || '0.00';
+    this.setData({
+      paymentMethods: [
+        {
+          key: 'balance',
+          shortLabel: '余',
+          title: '余额支付',
+          desc: `当前可用余额 ¥${walletBalance}`,
+          active: this.data.selectedPayment === 'balance',
+          disabled: false,
+        },
+        {
+          key: 'wechat',
+          shortLabel: '微',
+          title: '微信支付',
+          desc: '当前订单暂不支持微信直接支付',
+          active: false,
+          disabled: true,
+        },
+      ],
+    });
+  },
+
   loadData() {
     return Promise.all([
       this.loadOrderDetail(),
@@ -64,7 +101,7 @@ Page({
       .then((res) => {
         const source = res?.data || {};
         const order = source.order || source;
-        const account = source.account || {};
+        const account = normalizeAccount(source.account || {}, order);
 
         if (order.status && order.status !== 'pending_payment') {
           wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
@@ -82,6 +119,9 @@ Page({
         this.setData({ order: normalizedOrder, account });
         this.startCountdown(normalizedOrder.paymentTimeoutSeconds);
         this.checkBalance();
+      })
+      .catch((error) => {
+        wx.showToast({ title: error.error || '订单信息加载失败', icon: 'none' });
       });
   },
 
@@ -95,6 +135,9 @@ Page({
           },
         });
         this.checkBalance();
+      })
+      .catch((error) => {
+        wx.showToast({ title: error.error || '钱包信息加载失败', icon: 'none' });
       });
   },
 
@@ -107,6 +150,7 @@ Page({
       insufficient,
       insufficientAmount: insufficient ? formatMoney(amount - balance) : '0.00',
     });
+    this.refreshPaymentMethods();
   },
 
   startCountdown(totalSeconds) {
@@ -148,7 +192,8 @@ Page({
       return;
     }
 
-    this.setData({ selectedPayment: 'balance' }, () => this.checkBalance());
+    this.setData({ selectedPayment: 'balance' });
+    this.refreshPaymentMethods();
   },
 
   onRecharge() {
@@ -156,7 +201,9 @@ Page({
   },
 
   onPay() {
-    if (this.data.paying) return;
+    if (this.data.paying) {
+      return;
+    }
 
     if (this.data.insufficient) {
       wx.showToast({ title: '余额不足，请先充值', icon: 'none' });

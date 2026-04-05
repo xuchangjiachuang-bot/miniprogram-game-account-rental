@@ -1,115 +1,54 @@
-<!-- pages/profile/index.wxml -->
 <view class="page">
   <view class="profile-header">
-    <view class="user-info" bindtap="onEditProfile">
+    <view class="header-badge">个人中心</view>
+    <view class="user-card" bindtap="onEditProfile">
       <image class="user-avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}" mode="aspectFill" />
-      <view class="user-details">
-        <view class="user-name">{{userInfo.nickname || '未设置昵称'}}</view>
-        <view class="user-id">ID: {{userInfo.id || '-'}}</view>
+      <view class="user-copy">
+        <view class="user-name-row">
+          <text class="user-name">{{userInfo.nickname || '未设置昵称'}}</text>
+          <text class="verify-pill {{userInfo.isVerified ? 'verified' : 'pending'}}">{{userInfo.verifyText}}</text>
+        </view>
+        <view class="user-id">{{memberText}}</view>
         <view class="user-tags" wx:if="{{userInfo.tags && userInfo.tags.length > 0}}">
-          <view class="tag" wx:for="{{userInfo.tags}}" wx:key="*this">{{item}}</view>
+          <text class="user-tag" wx:for="{{userInfo.tags}}" wx:key="*this">{{item}}</text>
         </view>
       </view>
-      <text class="arrow">›</text>
+      <text class="user-arrow">></text>
     </view>
 
-    <view class="stats-row">
-      <view class="stat-item" bindtap="onOrdersTap">
-        <text class="stat-value">{{stats.orderCount}}</text>
-        <text class="stat-label">订单</text>
-      </view>
-      <view class="stat-item" bindtap="onCollectTap">
-        <text class="stat-value">{{stats.collectCount}}</text>
-        <text class="stat-label">收藏</text>
-      </view>
-      <view class="stat-item" bindtap="onWalletTap">
-        <text class="stat-value">¥{{stats.balance}}</text>
-        <text class="stat-label">余额</text>
-      </view>
-      <view class="stat-item" bindtap="onCreditTap">
-        <text class="stat-value">{{stats.creditScore}}</text>
-        <text class="stat-label">信用分</text>
+    <view class="stat-grid">
+      <view class="stat-item" wx:for="{{statCards}}" wx:key="key" bindtap="onStatTap" data-action="{{item.action}}">
+        <text class="stat-value">{{item.value}}</text>
+        <text class="stat-label">{{item.label}}</text>
       </view>
     </view>
   </view>
 
   <view class="auth-section" wx:if="{{!userInfo.isVerified}}">
-    <view class="auth-content">
-      <text class="auth-icon">!</text>
-      <text class="auth-text">完成实名认证后可开启更多交易和提现能力</text>
-      <button class="btn-auth" bindtap="onVerifyTap">去认证</button>
+    <view class="auth-copy">
+      <view class="auth-title">完成实名认证后可开启更多交易和提现能力</view>
+      <view class="auth-desc">当前只需填写姓名、身份证号和手机号即可完成认证。</view>
     </view>
+    <button class="btn-auth" bindtap="onVerifyTap">去认证</button>
   </view>
 
-  <view class="menu-section">
-    <view class="menu-group">
-      <view class="menu-item" bindtap="onOrdersTap">
-        <text class="menu-icon">单</text>
-        <text class="menu-text">我的订单</text>
-        <text class="menu-badge" wx:if="{{menuBadges.order > 0}}">{{menuBadges.order}}</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onAccountTap">
-        <text class="menu-icon">号</text>
-        <text class="menu-text">我的账号</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onCollectTap">
-        <text class="menu-icon">藏</text>
-        <text class="menu-text">我的收藏</text>
-        <text class="menu-badge" wx:if="{{menuBadges.collect > 0}}">{{menuBadges.collect}}</text>
-        <text class="arrow">›</text>
-      </view>
-    </view>
-
-    <view class="menu-group">
-      <view class="menu-item" bindtap="onWalletTap">
-        <text class="menu-icon">钱</text>
-        <text class="menu-text">我的钱包</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onAddressTap">
-        <text class="menu-icon">址</text>
-        <text class="menu-text">收货地址</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onSecurityTap">
-        <text class="menu-icon">安</text>
-        <text class="menu-text">账户安全</text>
-        <text class="arrow">›</text>
-      </view>
-    </view>
-
-    <view class="menu-group">
-      <view class="menu-item" bindtap="onHelpTap">
-        <text class="menu-icon">助</text>
-        <text class="menu-text">帮助中心</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onFeedbackTap">
-        <text class="menu-icon">评</text>
-        <text class="menu-text">意见反馈</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onAboutTap">
-        <text class="menu-icon">关</text>
-        <text class="menu-text">关于我们</text>
-        <text class="arrow">›</text>
-      </view>
-    </view>
-
-    <view class="menu-group">
-      <view class="menu-item logout" bindtap="onLogout">
-        <text class="menu-icon">退</text>
-        <text class="menu-text">退出登录</text>
+  <view class="menu-wrap">
+    <view class="menu-group" wx:for="{{menuSections}}" wx:key="key" wx:for-item="group">
+      <view class="menu-item {{item.danger ? 'danger' : ''}}" wx:for="{{group.items}}" wx:key="action" wx:for-item="item" bindtap="onMenuTap" data-action="{{item.action}}">
+        <view class="menu-mark {{item.danger ? 'danger' : ''}}">{{item.shortLabel}}</view>
+        <view class="menu-copy">
+          <view class="menu-title">{{item.title}}</view>
+          <view class="menu-desc">{{item.desc}}</view>
+        </view>
+        <text class="menu-badge" wx:if="{{item.badge}}">{{item.badge}}</text>
+        <text class="menu-arrow">></text>
       </view>
     </view>
   </view>
-
-  <view class="tabbar-placeholder"></view>
 
   <login-modal
     visible="{{showLoginModal}}"
     bind:loginSuccess="onLoginSuccess"
+    bind:close="onLoginModalClose"
   />
 </view>

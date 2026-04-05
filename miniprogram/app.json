@@ -24,7 +24,7 @@
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#6366f1",
-    "navigationBarTitleText": "?????",
+    "navigationBarTitleText": "账号租赁",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f9fafb"
   },
@@ -36,19 +36,19 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "??"
+        "text": "首页"
       },
       {
         "pagePath": "pages/order/list/index",
-        "text": "??"
+        "text": "订单"
       },
       {
         "pagePath": "pages/chat/list/index",
-        "text": "??"
+        "text": "消息"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "??"
+        "text": "我的"
       }
     ]
   },

@@ -1,7 +1,7 @@
 {
   "name": "havoc-miniprogram",
   "version": "1.0.0",
-  "description": "???????????",
+  "description": "游戏账号租赁微信小程序",
   "scripts": {
     "upload": "bash ./upload-miniprogram.sh",
     "upload:quick": "bash ./upload-miniprogram.sh",
