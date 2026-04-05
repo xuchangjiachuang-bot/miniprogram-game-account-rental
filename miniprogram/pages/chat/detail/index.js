@@ -1,7 +1,8 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const chat = require('../../../utils/chat.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
+const navigation = require('../../../utils/navigation.js');
 
 function formatMessageTime(value) {
   if (!value) return '';
@@ -65,7 +66,10 @@ Page({
   onLoad(options) {
     if (!options.groupId) {
       wx.showToast({ title: '缺少会话信息', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/chat/list/index',
+        fallbackType: 'switchTab',
+      }), 1200);
       return;
     }
 

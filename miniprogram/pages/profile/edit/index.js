@@ -1,5 +1,6 @@
 const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
+const navigation = require('../../../utils/navigation.js');
 
 const genderOptions = [
   { label: '暂不填写', value: '' },
@@ -147,7 +148,10 @@ Page({
         this.setUserForm(updatedUserInfo);
 
         wx.showToast({ title: '资料已保存', icon: 'success' });
-        setTimeout(() => wx.navigateBack(), 1000);
+        setTimeout(() => navigation.safeNavigateBack({
+          fallbackUrl: '/pages/profile/index',
+          fallbackType: 'switchTab',
+        }), 1000);
       })
       .catch((error) => {
         console.error('保存资料失败:', error);

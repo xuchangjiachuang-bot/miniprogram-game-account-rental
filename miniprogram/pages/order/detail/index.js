@@ -1,6 +1,7 @@
 const api = require('../../../utils/api.js');
 const config = require('../../../utils/config.js');
 const orderTransformer = require('../../../utils/order-transformer.js');
+const navigation = require('../../../utils/navigation.js');
 
 function buildAccountFromOrder(orderData = {}) {
   return {
@@ -104,7 +105,10 @@ Page({
   onLoad(options) {
     if (!options.id) {
       wx.showToast({ title: '订单 ID 不能为空', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/order/list/index',
+        fallbackType: 'switchTab',
+      }), 1200);
       return;
     }
 

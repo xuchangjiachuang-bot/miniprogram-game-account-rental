@@ -1,6 +1,7 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
+const navigation = require('../../../utils/navigation.js');
 
 const RENTAL_SPEED_OPTIONS = [10, 20, 30, 40, 50];
 
@@ -249,14 +250,20 @@ Page({
       .then(() => {
         this.setData({ submitting: false });
         wx.showToast({ title: '发布成功，等待审核', icon: 'success' });
-        setTimeout(() => wx.navigateBack(), 1200);
+        setTimeout(() => navigation.safeNavigateBack({
+            fallbackUrl: '/pages/profile/index',
+            fallbackType: 'switchTab',
+          }), 1200);
       })
       .catch((error) => {
         console.error('发布失败:', error);
         this.setData({ submitting: false });
         if (config.useMockData) {
           wx.showToast({ title: '发布成功（Mock）', icon: 'success' });
-          setTimeout(() => wx.navigateBack(), 1200);
+          setTimeout(() => navigation.safeNavigateBack({
+            fallbackUrl: '/pages/profile/index',
+            fallbackType: 'switchTab',
+          }), 1200);
           return;
         }
         wx.showToast({

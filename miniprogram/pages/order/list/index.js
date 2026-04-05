@@ -1,7 +1,8 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const orderTransformer = require('../../../utils/order-transformer.js');
+const navigation = require('../../../utils/navigation.js');
 
 const TAB_KEYS = ['all', 'pending_payment', 'active', 'pending_verification', 'completed', 'cancelled', 'disputed'];
 
@@ -29,7 +30,10 @@ Page({
     const userInfo = storage.getUserInfo();
     if (!userInfo) {
       wx.showToast({ title: '请先登录', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/auth/login/index',
+        fallbackType: 'reLaunch',
+      }), 1200);
       return;
     }
 

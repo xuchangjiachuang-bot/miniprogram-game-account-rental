@@ -2,6 +2,7 @@ const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const dataTransformer = require('../../../utils/data-transformer.js');
+const navigation = require('../../../utils/navigation.js');
 
 function buildQuickFacts(account = {}) {
   return [
@@ -90,7 +91,10 @@ Page({
     const { id } = options || {};
     if (!id) {
       wx.showToast({ title: '账号 ID 缺失', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/index/index',
+        fallbackType: 'switchTab',
+      }), 1200);
       return;
     }
 

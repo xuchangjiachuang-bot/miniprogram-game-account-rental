@@ -1,4 +1,5 @@
 const api = require('../../../utils/api.js');
+const navigation = require('../../../utils/navigation.js');
 
 function formatMoney(amount) {
   const value = Number(amount || 0);
@@ -44,7 +45,10 @@ Page({
   onLoad(options) {
     if (!options.id) {
       wx.showToast({ title: '订单 ID 不能为空', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/order/list/index',
+        fallbackType: 'switchTab',
+      }), 1200);
       return;
     }
 

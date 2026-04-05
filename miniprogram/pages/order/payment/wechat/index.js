@@ -1,5 +1,6 @@
 const api = require('../../../../utils/api.js');
 const dataTransformer = require('../../../../utils/data-transformer.js');
+const navigation = require('../../../../utils/navigation.js');
 
 function formatMoney(value) {
   const amount = Number(value || 0);
@@ -26,7 +27,10 @@ Page({
     const { orderId = '', accountId = '', rentalHours = 0 } = options || {};
     if (!orderId && !accountId) {
       wx.showToast({ title: '支付参数不完整', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/order/list/index',
+        fallbackType: 'switchTab',
+      }), 1200);
       return;
     }
 
@@ -163,9 +167,16 @@ Page({
       title: '确认暂不支付',
       content: '返回后可在订单详情中继续完成支付。',
       success: (res) => {
-        if (res.confirm) {
-          wx.navigateBack();
+        if (!res.confirm) {
+          return;
         }
+
+        navigation.safeNavigateBack({
+          fallbackUrl: this.data.orderId
+            ? `/pages/order/detail/index?id=${this.data.orderId}`
+            : '/pages/order/list/index',
+          fallbackType: this.data.orderId ? 'redirectTo' : 'switchTab',
+        });
       },
     });
   },

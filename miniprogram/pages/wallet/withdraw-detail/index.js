@@ -1,5 +1,6 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 const config = require('../../../utils/config.js');
+const navigation = require('../../../utils/navigation.js');
 
 function formatMoney(amount) {
   return Number(amount || 0).toFixed(2);
@@ -105,7 +106,10 @@ Page({
     const id = options.id || '';
     if (!id) {
       wx.showToast({ title: '缺少提现单号', icon: 'none' });
-      setTimeout(() => wx.navigateBack(), 1200);
+      setTimeout(() => navigation.safeNavigateBack({
+        fallbackUrl: '/pages/wallet/index',
+        fallbackType: 'redirectTo',
+      }), 1200);
       return;
     }
     this.setData({ id });
@@ -165,6 +169,9 @@ Page({
   },
 
   onBack() {
-    wx.navigateBack();
+    navigation.safeNavigateBack({
+      fallbackUrl: '/pages/wallet/index',
+      fallbackType: 'redirectTo',
+    });
   },
 });

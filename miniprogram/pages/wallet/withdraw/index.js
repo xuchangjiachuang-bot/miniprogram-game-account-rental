@@ -1,4 +1,4 @@
-﻿const api = require('../../../utils/api.js');
+const api = require('../../../utils/api.js');
 
 function formatMoney(amount) {
   return Number(amount || 0).toFixed(2);
@@ -175,7 +175,10 @@ Page({
             });
             return;
           }
-          wx.navigateBack();
+          navigation.safeNavigateBack({
+            fallbackUrl: '/pages/wallet/index',
+            fallbackType: 'redirectTo',
+          });
         }, 1200);
       })
       .catch((error) => {
