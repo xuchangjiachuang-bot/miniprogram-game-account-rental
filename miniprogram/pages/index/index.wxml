@@ -1,12 +1,13 @@
 <view class="page">
   <view class="hero-section">
     <view class="hero-container">
-      <swiper wx:if="{{hasCarousels}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff">
+      <swiper wx:if="{{hasCarousels}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.45)" indicator-active-color="#ffffff">
         <swiper-item wx:for="{{carouselView}}" wx:key="id">
           <view class="carousel-item" bindtap="onCarouselTap" data-url="{{item.targetUrl}}">
             <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" binderror="onCarouselImageError" data-id="{{item.id}}" />
             <view class="carousel-overlay"></view>
             <view class="carousel-content">
+              <view class="hero-badge-inline">{{fallbackTitle.badgeText}}</view>
               <view class="carousel-title">{{item.title}}</view>
               <view class="carousel-desc" wx:if="{{item.hasDescription}}">{{item.description}}</view>
             </view>
@@ -21,8 +22,8 @@
       </view>
     </view>
 
-    <view class="publish-section" bindtap="onPublishTap">
-      <view class="publish-btn">
+    <view class="publish-section">
+      <view class="publish-btn" bindtap="onPublishTap">
         <text class="publish-icon">+</text>
         <text class="publish-text">{{fallbackTitle.buttonText}}</text>
       </view>
@@ -35,68 +36,64 @@
         <text class="filter-title">筛选账号</text>
       </view>
 
-      <view class="search-row">
-        <view class="search-box">
-          <text class="search-icon">搜</text>
-          <input class="search-input" placeholder="输入关键词搜索账号" value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
-        </view>
-      </view>
-
       <view class="filter-row">
-        <view class="filter-item">
+        <view class="filter-item compact">
           <view class="filter-label">平台·上号方式</view>
           <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box">
               <text>{{selectedPlatformText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
-
-        <view class="filter-item">
+        <view class="filter-item compact">
+          <view class="filter-label">哈夫币(M)</view>
+          <view class="range-box compact-range">
+            <input class="range-input compact-input" type="number" placeholder="最小" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
+            <text class="range-separator">-</text>
+            <input class="range-input compact-input" type="number" placeholder="最大" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
+          </view>
+        </view>
+        <view class="filter-item compact">
           <view class="filter-label">段位</view>
           <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box">
               <text>{{selectedRankText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
-
-        <view class="filter-item">
+        <view class="filter-item compact">
           <view class="filter-label">安全箱</view>
           <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box">
               <text>{{selectedSafeboxText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
-
-        <view class="filter-item">
+        <view class="filter-item compact">
           <view class="filter-label">体力等级</view>
           <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box">
               <text>{{selectedStaminaText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
-
-        <view class="filter-item">
+        <view class="filter-item compact">
           <view class="filter-label">负重等级</view>
           <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box">
               <text>{{selectedLoadText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
         </view>
-
-        <view class="filter-item">
+        <view class="filter-item compact">
           <view class="filter-label">地区</view>
           <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
-            <view class="picker-box">
+            <view class="picker-box compact-box region-box">
               <text>{{selectedProvinceText}}</text>
               <text class="picker-arrow">v</text>
             </view>
@@ -104,49 +101,45 @@
         </view>
       </view>
 
-      <view class="filter-row compact-row">
-        <view class="filter-item">
-          <view class="filter-label">哈夫币（M）</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
+      <view class="filter-row">
+        <view class="filter-item compact">
+          <view class="filter-label">租金(元)</view>
+          <view class="range-box compact-range">
+            <input class="range-input compact-input" type="number" placeholder="最小" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
             <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
+            <input class="range-input compact-input" type="number" placeholder="最大" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
           </view>
         </view>
-
-        <view class="filter-item">
-          <view class="filter-label">租金（元）</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
+        <view class="filter-item compact">
+          <view class="filter-label">押金(元)</view>
+          <view class="range-box compact-range">
+            <input class="range-input compact-input" type="number" placeholder="最小" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
             <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
+            <input class="range-input compact-input" type="number" placeholder="最大" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
           </view>
         </view>
-      </view>
-
-      <view class="filter-row compact-row">
-        <view class="filter-item">
-          <view class="filter-label">押金（元）</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
+        <view class="filter-item compact">
+          <view class="filter-label">总价(元)</view>
+          <view class="range-box compact-range">
+            <input class="range-input compact-input" type="number" placeholder="最小" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
             <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
-          </view>
-        </view>
-
-        <view class="filter-item">
-          <view class="filter-label">总价（元）</view>
-          <view class="range-box">
-            <input class="range-input" type="number" placeholder="最低" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
-            <text class="range-separator">-</text>
-            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
+            <input class="range-input compact-input" type="number" placeholder="最大" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
           </view>
         </view>
       </view>
 
-      <view class="action-row">
-        <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{skinToggleText}}</text></view>
-        <view class="btn-reset" bindtap="onResetFilters"><text>重置</text></view>
+      <view class="search-action-row">
+        <view class="search-panel">
+          <view class="filter-label">搜索账号</view>
+          <view class="search-box compact-search">
+            <text class="search-icon">搜</text>
+            <input class="search-input compact-search-input" placeholder="输入账号名进行搜索..." value="{{searchQuery}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" confirm-type="search" />
+          </view>
+        </view>
+        <view class="action-panel">
+          <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{skinToggleText}}</text></view>
+          <view class="btn-reset" bindtap="onResetFilters"><text>重置筛选</text></view>
+        </view>
       </view>
 
       <view class="skin-filter" wx:if="{{showMoreFilters}}">
@@ -191,30 +184,33 @@
           <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
             <view class="card-image">
               <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" binderror="onCardImageError" data-id="{{item.id}}" />
-              <view class="platform-badge">{{item.platformBadgeText}}</view>
+              <view class="card-tag-overlay" wx:if="{{item.showSkinPreview}}">
+                <text class="overlay-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+              </view>
               <view class="card-status {{item.status}}">{{item.statusText}}</view>
             </view>
 
             <view class="card-content">
-              <view class="card-top-row">
-                <view class="card-title">{{item.fullTitle}}</view>
-                <view class="card-region" wx:if="{{item.showRegion}}">{{item.regionText}}</view>
+              <view class="card-title">{{item.fullTitle}}</view>
+              <view class="card-platform-row">
+                <text class="platform-inline">{{item.platformText}}</text>
+                <text class="card-region plain" wx:if="{{item.showRegion}}">{{item.regionText}}</text>
               </view>
 
-              <view class="info-row">
-                <view class="info-box coins">
-                  <text class="info-label">哈夫币</text>
-                  <text class="info-value">{{item.coins_display}}</text>
+              <view class="metric-pair-row">
+                <view class="metric-pair coins">
+                  <text class="metric-label">哈夫币</text>
+                  <text class="metric-value">{{item.coins_display}}</text>
                 </view>
-                <view class="info-box ratio">
-                  <text class="info-label">出租比例</text>
-                  <text class="info-value">{{item.ratio_display}}</text>
+                <view class="metric-pair ratio">
+                  <text class="metric-label">比例</text>
+                  <text class="metric-value">{{item.ratio_display}}</text>
                 </view>
               </view>
 
-              <view class="attributes-row">
+              <view class="attributes-row webish-grid">
                 <view class="attribute">
-                  <text class="attr-label">安全箱</text>
+                  <text class="attr-label">保险箱</text>
                   <text class="attr-value">{{item.safebox}}</text>
                 </view>
                 <view class="attribute">
@@ -231,34 +227,36 @@
                 </view>
               </view>
 
-              <view class="meta-row" wx:if="{{item.showKd || item.showLoginMethod}}">
-                <text class="meta-pill" wx:if="{{item.showKd}}">KD {{item.kd}}</text>
-                <text class="meta-pill login" wx:if="{{item.showLoginMethod}}">{{item.login_method}}</text>
+              <view class="meta-row webish-meta" wx:if="{{item.showKd || item.showLoginMethod}}">
+                <text class="meta-text" wx:if="{{item.showKd}}">KD: {{item.kd}}</text>
+                <text class="meta-text" wx:if="{{item.showLoginMethod}}">{{item.login_method}}</text>
               </view>
 
-              <view class="skins-row" wx:if="{{item.showSkinPreview}}">
+              <view class="skins-row compact-skins" wx:if="{{item.showSkinPreview}}">
                 <text class="card-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
                 <text class="skin-more" wx:if="{{item.showMoreTagCount}}">+{{item.moreTagCount}}</text>
               </view>
 
-              <view class="price-row">
-                <view class="price-box">
-                  <text class="price-label">租金</text>
-                  <text class="price-value">¥{{item.actual_rental}}</text>
+              <view class="summary-footer">
+                <view class="summary-pricing">
+                  <text class="summary-label">租金/押金</text>
+                  <text class="summary-value">¥{{item.actual_rental}} / ¥{{item.deposit}}</text>
                 </view>
-                <view class="price-box">
-                  <text class="price-label">押金</text>
-                  <text class="price-value">¥{{item.deposit}}</text>
+                <view class="summary-duration">
+                  <text class="summary-label">租期</text>
+                  <text class="summary-value">{{item.rental_description}}</text>
                 </view>
-                <view class="price-box total-box">
-                  <text class="price-label">总价</text>
-                  <text class="price-value total">¥{{item.total_price}}</text>
+                <view class="summary-total">
+                  <text class="summary-label">总价</text>
+                  <text class="summary-total-value">¥{{item.total_price}}</text>
                 </view>
               </view>
 
-              <view class="rental-duration">
-                <text class="duration-label">租期</text>
-                <text class="duration-value">{{item.rental_description}}</text>
+              <view class="card-action-row">
+                <view class="detail-button">
+                  <text>查看详情</text>
+                  <text class="detail-arrow">></text>
+                </view>
               </view>
             </view>
           </view>

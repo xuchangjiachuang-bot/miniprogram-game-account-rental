@@ -292,6 +292,13 @@ Page({
     wx.showToast({ title: '收藏功能即将上线', icon: 'none' });
   },
 
+  onClosePage() {
+    navigation.safeNavigateBack({
+      fallbackUrl: '/pages/index/index',
+      fallbackType: 'switchTab',
+    });
+  },
+
   onLoginSuccess() {
     this.setData({ showLoginModal: false });
     this.loadAccountDetail();

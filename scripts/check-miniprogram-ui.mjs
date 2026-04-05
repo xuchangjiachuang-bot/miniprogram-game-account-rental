@@ -9,11 +9,11 @@ const checks = [
   },
   {
     file: 'miniprogram/pages/index/index.wxml',
-    includes: ['筛选账号', '哈夫币（M）', '租金（元）', 'publish-text'],
+    includes: ['筛选账号', '哈夫币(M)', '租金(元)', 'publish-text'],
   },
   {
     file: 'miniprogram/pages/account/detail/index.wxml',
-    includes: ['账号属性', '皮肤标签', '立即租号'],
+    includes: ['账号概览', '皮肤信息', '立即下单'],
   },
 ];
 

@@ -14,48 +14,55 @@
     <view class="hero-gallery" wx:if="{{hasImages}}">
       <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{showGalleryControls}}">
         <swiper-item wx:for="{{account.images}}" wx:key="*this">
-          <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="onImagePreview" binderror="onGalleryImageError" data-index="{{index}}" data-urls="{{account.images}}" data-current="{{item}}" />
+          <image class="swiper-image" src="{{item}}" mode="aspectFit" bindtap="onImagePreview" binderror="onGalleryImageError" data-index="{{index}}" data-urls="{{account.images}}" data-current="{{item}}" />
         </swiper-item>
       </swiper>
-
-      <view class="gallery-mask"></view>
       <view class="gallery-counter" wx:if="{{showGalleryControls}}">{{imageCounterText}}</view>
-
-      <view class="swiper-indicators" wx:if="{{showGalleryControls}}">
-        <view class="indicator-dot {{item.className}}" wx:for="{{galleryIndicators}}" wx:key="id"></view>
-      </view>
-
       <view class="swiper-btn prev" wx:if="{{showGalleryControls}}" bindtap="onPrevImage">&lt;</view>
       <view class="swiper-btn next" wx:if="{{showGalleryControls}}" bindtap="onNextImage">&gt;</view>
     </view>
 
     <view class="content-shell">
       <view class="headline-card">
-        <view class="headline-row">
-          <view class="headline-copy">
-            <view class="account-title">{{account.fullTitle}}</view>
-            <view class="account-subtitle">{{account.subtitle}}</view>
+        <view class="headline-copy">
+          <view class="account-title">{{account.fullTitle}}</view>
+          <view class="badge-row">
+            <text class="summary-pill brand">{{account.platformText}}</text>
+            <text class="summary-pill method">{{account.login_method}}</text>
+            <text class="summary-pill region" wx:if="{{account.regionText}}">{{account.regionText}}</text>
           </view>
-          <view class="account-status {{account.status}}">{{account.statusText}}</view>
         </view>
 
-        <view class="platform-badge">{{account.login_method}}</view>
-        <view class="summary-pills">
-          <text class="summary-pill">{{account.platformText}}</text>
-          <text class="summary-pill" wx:if="{{account.regionText}}">{{account.regionText}}</text>
-          <text class="summary-pill" wx:if="{{account.availableTimeText}}">可上号 {{account.availableTimeText}}</text>
-        </view>
-
-        <view class="info-card-grid">
-          <view class="info-card {{item.className}}" wx:for="{{quickFacts}}" wx:key="label">
-            <text class="info-label">{{item.label}}</text>
-            <text class="info-value">{{item.value}}</text>
+        <view class="metric-grid">
+          <view class="metric-card coins">
+            <text class="metric-card-label">哈夫币</text>
+            <text class="metric-card-value">{{account.coins_display}}</text>
+          </view>
+          <view class="metric-card ratio">
+            <text class="metric-card-label">比例</text>
+            <text class="metric-card-value">{{account.ratio_display}}</text>
+          </view>
+          <view class="metric-card money">
+            <text class="metric-card-label">租金</text>
+            <text class="metric-card-value compact">¥{{account.actual_rental}}</text>
+          </view>
+          <view class="metric-card money">
+            <text class="metric-card-label">押金</text>
+            <text class="metric-card-value compact">¥{{account.deposit}}</text>
+          </view>
+          <view class="metric-card total">
+            <text class="metric-card-label">总价</text>
+            <text class="metric-card-value compact">¥{{account.total_price}}</text>
+          </view>
+          <view class="metric-card duration">
+            <text class="metric-card-label">租期</text>
+            <text class="metric-card-value compact">{{account.rental_description}}</text>
           </view>
         </view>
       </view>
 
       <view class="section-card" wx:if="{{hasDetailItems}}">
-        <view class="section-title">账号属性</view>
+        <view class="section-title">账号概览</view>
         <view class="attribute-list">
           <view class="attribute-item" wx:for="{{detailItems}}" wx:key="label">
             <text class="attr-label">{{item.label}}</text>
@@ -65,7 +72,7 @@
       </view>
 
       <view class="section-card" wx:if="{{hasSkins}}">
-        <view class="section-title">皮肤标签</view>
+        <view class="section-title">皮肤信息</view>
         <view class="skins-list">
           <text class="skin-tag" wx:for="{{account.skins}}" wx:key="*this">{{item}}</text>
         </view>
@@ -75,25 +82,11 @@
         <view class="section-title">账号描述</view>
         <view class="desc-content">{{account.description}}</view>
       </view>
-
-      <view class="price-card">
-        <view class="price-row {{item.rowClassName}}" wx:for="{{priceRows}}" wx:key="label">
-          <text class="price-label">{{item.label}}</text>
-          <text class="price-value">{{item.displayValue}}</text>
-        </view>
-      </view>
     </view>
 
     <view class="bottom-bar">
-      <button class="btn-side" bindtap="onContactService">
-        <text class="btn-side-main">在线</text>
-        <text class="btn-side-sub">客服</text>
-      </button>
-      <button class="btn-side" bindtap="onFavorite">
-        <text class="btn-side-main">账号</text>
-        <text class="btn-side-sub">收藏</text>
-      </button>
-      <button class="btn-rent" bindtap="onRentNow" wx:if="{{canRent}}">立即租号</button>
+      <button class="btn-side" bindtap="onClosePage">关闭</button>
+      <button class="btn-rent" bindtap="onRentNow" wx:if="{{canRent}}">立即下单</button>
       <button class="btn-rent" disabled wx:else>暂不可租</button>
     </view>
 
