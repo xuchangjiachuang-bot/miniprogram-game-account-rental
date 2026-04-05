@@ -1,4 +1,9 @@
 <view class="page">
+  <view class="inline-error" wx:if="{{errorText}}">
+    <text class="inline-error-text">{{errorText}}</text>
+    <text class="inline-error-action" bindtap="onRetry">重试</text>
+  </view>
+
   <view class="profile-header">
     <view class="header-badge">个人中心</view>
     <view class="user-card" bindtap="onEditProfile">
@@ -22,6 +27,11 @@
         <text class="stat-label">{{item.label}}</text>
       </view>
     </view>
+  </view>
+
+  <view class="loading-card" wx:if="{{loading}}">
+    <view class="loading-dot"></view>
+    <text class="loading-text">正在刷新个人数据...</text>
   </view>
 
   <view class="auth-section" wx:if="{{!userInfo.isVerified}}">

@@ -1,4 +1,4 @@
-const api = require('../../../utils/api.js');
+﻿const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const dataTransformer = require('../../../utils/data-transformer.js');
@@ -35,7 +35,7 @@ function buildDetailItems(account = {}) {
   appendDetailItem(list, 'AWM 子弹', account.awmBullets);
   appendDetailItem(list, '六级甲', account.level6Armor);
   appendDetailItem(list, '六级头', account.level6Helmet);
-  appendDetailItem(list, '地区', `${account.region?.province || '-'} ${account.region?.city || ''}`.trim());
+  appendDetailItem(list, '地区', `${account.region && account.region.province ? account.region.province : '-'} ${account.region && account.region.city ? account.region.city : ''}`.trim());
   appendDetailItem(list, '浏览次数', account.view_count);
   appendDetailItem(list, '成交次数', account.trade_count);
   appendDetailItem(list, '上架时间', account.listed_at);
@@ -45,11 +45,18 @@ function buildDetailItems(account = {}) {
 
 function buildPriceRows(account = {}) {
   return [
-    { label: '租金', value: account.actual_rental || '0.00', displayValue: `¥${account.actual_rental || '0.00'}` },
-    { label: '押金', value: account.deposit || '0.00', displayValue: `¥${account.deposit || '0.00'}` },
-    { label: '租期', value: account.rental_description || '-', displayValue: account.rental_description || '-' },
-    { label: '合计', value: account.total_price || '0.00', displayValue: `¥${account.total_price || '0.00'}`, highlight: true },
+    { label: '租金', value: account.actual_rental || '0.00', displayValue: `¥${account.actual_rental || '0.00'}`, rowClassName: '' },
+    { label: '押金', value: account.deposit || '0.00', displayValue: `¥${account.deposit || '0.00'}`, rowClassName: '' },
+    { label: '租期', value: account.rental_description || '-', displayValue: account.rental_description || '-', rowClassName: '' },
+    { label: '合计', value: account.total_price || '0.00', displayValue: `¥${account.total_price || '0.00'}`, rowClassName: 'total' },
   ];
+}
+
+function buildGalleryIndicators(images = [], currentIndex = 0) {
+  return images.map((_, index) => ({
+    id: `indicator_${index}`,
+    className: index === currentIndex ? 'active' : '',
+  }));
 }
 
 function normalizeAccount(account = {}) {
@@ -61,7 +68,7 @@ function normalizeAccount(account = {}) {
     ...account,
     images,
     fullTitle: account.fullTitle || account.title || account.account_name || '游戏账号',
-    subtitle: account.account_name || '平台担保发号，支持快速租赁',
+    subtitle: account.account_name || '平台担保发号，支持快速租号',
     login_method: account.login_method || '未知登录方式',
     statusText: account.statusText || '可出租',
     description: account.description || '卖家暂未补充描述，可先查看属性、皮肤标签与租期后再决定是否下单。',
@@ -72,15 +79,26 @@ Page({
   data: {
     id: '',
     account: {
+      id: '',
       images: [],
       region: {},
       skins: [],
       tagPreview: [],
     },
     currentImageIndex: 0,
+    imageCounterText: '1 / 1',
+    galleryIndicators: [],
+    hasImages: false,
+    showGalleryControls: false,
+    hasDetailItems: false,
+    hasSkins: false,
+    showErrorState: false,
+    showInitialLoading: false,
+    canRent: false,
+    rentButtonText: '暂不可租',
     loading: false,
     creatingOrder: false,
-    error: null,
+    error: '',
     quickFacts: [],
     detailItems: [],
     priceRows: [],
@@ -88,7 +106,7 @@ Page({
   },
 
   onLoad(options) {
-    const { id } = options || {};
+    const id = options && options.id ? options.id : '';
     if (!id) {
       wx.showToast({ title: '账号 ID 缺失', icon: 'none' });
       setTimeout(() => navigation.safeNavigateBack({
@@ -121,16 +139,46 @@ Page({
     this.loadAccountDetail().finally(() => wx.stopPullDownRefresh());
   },
 
+  syncStateFlags(account, errorText, loading) {
+    const images = account && Array.isArray(account.images) ? account.images : [];
+    const detailItems = this.data.detailItems || [];
+    const skins = account && Array.isArray(account.skins) ? account.skins : [];
+    const hasAccountContent = Boolean(account && (account.id || images.length));
+
+    this.setData({
+      hasImages: images.length > 0,
+      showGalleryControls: images.length > 1,
+      hasDetailItems: detailItems.length > 0,
+      hasSkins: skins.length > 0,
+      showErrorState: Boolean(errorText) && !loading,
+      showInitialLoading: Boolean(loading) && !hasAccountContent,
+      canRent: account && account.status === 'available',
+      rentButtonText: account && account.status === 'available' ? '立即租号' : '暂不可租',
+    });
+  },
+
+  updateGalleryState(account, index) {
+    const images = account && Array.isArray(account.images) ? account.images : [];
+    const safeIndex = images.length > 0 ? Math.min(Math.max(index, 0), images.length - 1) : 0;
+    this.setData({
+      currentImageIndex: safeIndex,
+      imageCounterText: `${safeIndex + 1} / ${images.length || 1}`,
+      galleryIndicators: buildGalleryIndicators(images, safeIndex),
+    });
+    this.syncStateFlags(account, this.data.error, this.data.loading);
+  },
+
   applyAccount(source) {
     const account = normalizeAccount(source);
+    const detailItems = buildDetailItems(account);
     this.setData({
       account,
-      currentImageIndex: 0,
-      error: null,
+      error: '',
       quickFacts: buildQuickFacts(account),
-      detailItems: buildDetailItems(account),
+      detailItems,
       priceRows: buildPriceRows(account),
     });
+    this.updateGalleryState(account, 0);
   },
 
   loadAccountDetail() {
@@ -138,12 +186,12 @@ Page({
       return Promise.resolve();
     }
 
-    this.setData({ loading: true, error: null });
-    wx.showLoading({ title: '加载中', mask: true });
+    this.setData({ loading: true, error: '' });
+    this.syncStateFlags(this.data.account, '', true);
 
     return api.getAccountDetail(this.data.id)
       .then((res) => {
-        const account = dataTransformer.transformAccount(res?.data);
+        const account = dataTransformer.transformAccount(res && res.data ? res.data : null);
         this.applyAccount(account || {});
       })
       .catch((error) => {
@@ -151,29 +199,26 @@ Page({
 
         if (config.useMockData) {
           const mockData = require('../../../utils/mock-data.js');
-          const source = (mockData.accounts || [])[0];
+          const source = (mockData.accounts || []).find((item) => String(item.id) === String(this.data.id)) || (mockData.accounts || [])[0];
           if (source) {
             this.applyAccount(dataTransformer.transformAccount(source) || {});
             return;
           }
         }
 
-        this.setData({
-          error: error.error || '加载失败，请稍后重试',
-        });
-        wx.showToast({
-          title: error.error || '加载失败',
-          icon: 'none',
-        });
+        const errorText = error && error.error ? error.error : '账号详情加载失败，请稍后重试。';
+        this.setData({ error: errorText });
+        this.syncStateFlags(this.data.account, errorText, false);
       })
       .finally(() => {
         this.setData({ loading: false });
-        wx.hideLoading();
+        this.syncStateFlags(this.data.account, this.data.error, false);
       });
   },
 
   onSwiperChange(e) {
-    this.setData({ currentImageIndex: e.detail.current });
+    const nextIndex = Number(e.detail.current || 0);
+    this.updateGalleryState(this.data.account, nextIndex);
   },
 
   onPrevImage() {
@@ -181,7 +226,7 @@ Page({
     if (imageCount <= 1) return;
 
     const nextIndex = (this.data.currentImageIndex - 1 + imageCount) % imageCount;
-    this.setData({ currentImageIndex: nextIndex });
+    this.updateGalleryState(this.data.account, nextIndex);
   },
 
   onNextImage() {
@@ -189,7 +234,7 @@ Page({
     if (imageCount <= 1) return;
 
     const nextIndex = (this.data.currentImageIndex + 1) % imageCount;
-    this.setData({ currentImageIndex: nextIndex });
+    this.updateGalleryState(this.data.account, nextIndex);
   },
 
   onImagePreview(e) {
@@ -229,7 +274,7 @@ Page({
       rent_hours: rentHours,
     })
       .then((res) => {
-        const data = res?.data || {};
+        const data = res && res.data ? res.data : {};
         const orderId = data.id || data.orderId;
         if (!orderId) {
           throw new Error('订单创建成功，但未返回订单编号');
@@ -241,7 +286,7 @@ Page({
       })
       .catch((error) => {
         wx.showToast({
-          title: error.error || error.message || '创建订单失败',
+          title: (error && (error.error || error.message)) || '创建订单失败',
           icon: 'none',
         });
       })

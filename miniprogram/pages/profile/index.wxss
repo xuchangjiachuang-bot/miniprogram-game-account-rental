@@ -256,3 +256,53 @@ page {
   color: #94a3b8;
   font-size: 30rpx;
 }
+
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: 20rpx 20rpx 0;
+  padding: 18rpx 20rpx;
+  border-radius: 18rpx;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.inline-error-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.inline-error-action {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  margin: 20rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 22rpx;
+  background: #ffffff;
+  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
+}
+
+.loading-dot {
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 50%;
+  background: #6366f1;
+  box-shadow: 30rpx 0 0 rgba(99, 102, 241, 0.32), -30rpx 0 0 rgba(99, 102, 241, 0.32);
+}
+
+.loading-text {
+  font-size: 24rpx;
+  color: #64748b;
+}

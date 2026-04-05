@@ -5,104 +5,109 @@
     <button class="error-btn" bindtap="onRetry">重新加载</button>
   </view>
 
+  <view class="error-card" wx:elif="{{loading && !order.id && !order.order_number}}">
+    <view class="error-title">正在加载订单详情</view>
+    <view class="error-text">订单状态、账号信息和操作按钮正在同步。</view>
+  </view>
+
   <block wx:else>
-  <view class="status-header status-{{orderStatusKey}}">
-    <view class="status-chip">订单状态</view>
-    <view class="status-main">
-      <view class="status-icon">{{statusIcon}}</view>
-      <view class="status-copy">
-        <view class="status-text">{{order.statusText || '订单详情'}}</view>
-        <view class="status-desc">{{statusDesc}}</view>
-      </view>
-    </view>
-  </view>
-
-  <view class="section-card">
-    <view class="section-title">账号信息</view>
-    <view class="account-card" bindtap="onAccountTap">
-      <image class="account-image" src="{{account.avatar || '/images/default-account.png'}}" mode="aspectFill" />
-      <view class="account-copy">
-        <view class="account-title">{{account.title || '游戏账号'}}</view>
-        <view class="account-summary" wx:if="{{account.summaryList && account.summaryList.length > 0}}">
-          <text class="summary-item" wx:for="{{account.summaryList}}" wx:key="*this">{{item}}</text>
-        </view>
-        <view class="account-tags" wx:if="{{account.tags && account.tags.length > 0}}">
-          <text class="account-tag" wx:for="{{account.tags}}" wx:key="*this">{{item}}</text>
-        </view>
-      </view>
-      <text class="account-arrow">></text>
-    </view>
-  </view>
-
-  <view class="section-card">
-    <view class="section-title">订单信息</view>
-    <view class="info-list">
-      <view class="info-item" wx:for="{{orderInfoRows}}" wx:key="label">
-        <text class="info-label">{{item.label}}</text>
-        <view class="info-value-wrap">
-          <text class="info-value {{item.highlight ? 'highlight' : ''}}">{{item.value}}</text>
-          <text
-            class="copy-btn"
-            wx:if="{{item.copyValue}}"
-            bindtap="onCopyValue"
-            data-value="{{item.copyValue}}"
-            data-text="订单号已复制"
-          >复制</text>
+    <view class="status-header status-{{orderStatusKey}}">
+      <view class="status-chip">订单状态</view>
+      <view class="status-main">
+        <view class="status-icon">{{statusIcon}}</view>
+        <view class="status-copy">
+          <view class="status-text">{{order.statusText || '订单详情'}}</view>
+          <view class="status-desc">{{statusDesc}}</view>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="section-card" wx:if="{{rentRows.length > 0}}">
-    <view class="section-title">租赁时间</view>
-    <view class="info-list">
-      <view class="info-item" wx:for="{{rentRows}}" wx:key="label">
-        <text class="info-label">{{item.label}}</text>
-        <text class="info-value">{{item.value}}</text>
+    <view class="section-card">
+      <view class="section-title">账号信息</view>
+      <view class="account-card" bindtap="onAccountTap">
+        <image class="account-image" src="{{account.avatar || '/images/default-account.png'}}" mode="aspectFill" />
+        <view class="account-copy">
+          <view class="account-title">{{account.title || '游戏账号'}}</view>
+          <view class="account-summary" wx:if="{{account.summaryList && account.summaryList.length > 0}}">
+            <text class="summary-item" wx:for="{{account.summaryList}}" wx:key="*this">{{item}}</text>
+          </view>
+          <view class="account-tags" wx:if="{{account.tags && account.tags.length > 0}}">
+            <text class="account-tag" wx:for="{{account.tags}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+        <text class="account-arrow">></text>
       </view>
     </view>
-  </view>
 
-  <view class="section-card" wx:if="{{showGameAccount && gameAccountRows.length > 0}}">
-    <view class="section-title">游戏账号信息</view>
-    <view class="secure-note">账号敏感信息仅在租赁进行中展示，请勿外传。</view>
-    <view class="info-list secure-list">
-      <view class="info-item" wx:for="{{gameAccountRows}}" wx:key="label">
-        <text class="info-label">{{item.label}}</text>
-        <view class="info-value-wrap">
-          <text class="info-value {{item.masked ? 'mono' : ''}}">{{item.value}}</text>
-          <text
-            class="copy-btn danger"
-            wx:if="{{item.copyValue}}"
-            bindtap="onCopyValue"
-            data-value="{{item.copyValue}}"
-            data-text="已复制"
-          >复制</text>
+    <view class="section-card">
+      <view class="section-title">订单信息</view>
+      <view class="info-list">
+        <view class="info-item" wx:for="{{orderInfoRows}}" wx:key="label">
+          <text class="info-label">{{item.label}}</text>
+          <view class="info-value-wrap">
+            <text class="info-value {{item.highlight ? 'highlight' : ''}}">{{item.value}}</text>
+            <text
+              class="copy-btn"
+              wx:if="{{item.copyValue}}"
+              bindtap="onCopyValue"
+              data-value="{{item.copyValue}}"
+              data-text="订单号已复制"
+            >复制</text>
+          </view>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="section-card" wx:if="{{paymentRows.length > 0}}">
-    <view class="section-title">支付信息</view>
-    <view class="info-list">
-      <view class="info-item" wx:for="{{paymentRows}}" wx:key="label">
-        <text class="info-label">{{item.label}}</text>
-        <text class="info-value">{{item.value}}</text>
+    <view class="section-card" wx:if="{{rentRows.length > 0}}">
+      <view class="section-title">租赁时间</view>
+      <view class="info-list">
+        <view class="info-item" wx:for="{{rentRows}}" wx:key="label">
+          <text class="info-label">{{item.label}}</text>
+          <text class="info-value">{{item.value}}</text>
+        </view>
       </view>
     </view>
-  </view>
 
-  <view class="action-bar" wx:if="{{actions.length > 0}}">
-    <button
-      class="btn-action {{item.type === 'primary' ? 'primary' : item.type === 'danger' ? 'danger' : 'outline'}}"
-      wx:for="{{actions}}"
-      wx:key="action"
-      bindtap="onActionTap"
-      data-action="{{item.action}}"
-    >
-      {{item.text}}
-    </button>
-  </view>
+    <view class="section-card" wx:if="{{showGameAccount && gameAccountRows.length > 0}}">
+      <view class="section-title">游戏账号信息</view>
+      <view class="secure-note">账号敏感信息仅在租赁进行中展示，请勿外传。</view>
+      <view class="info-list secure-list">
+        <view class="info-item" wx:for="{{gameAccountRows}}" wx:key="label">
+          <text class="info-label">{{item.label}}</text>
+          <view class="info-value-wrap">
+            <text class="info-value {{item.masked ? 'mono' : ''}}">{{item.value}}</text>
+            <text
+              class="copy-btn danger"
+              wx:if="{{item.copyValue}}"
+              bindtap="onCopyValue"
+              data-value="{{item.copyValue}}"
+              data-text="已复制"
+            >复制</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card" wx:if="{{paymentRows.length > 0}}">
+      <view class="section-title">支付信息</view>
+      <view class="info-list">
+        <view class="info-item" wx:for="{{paymentRows}}" wx:key="label">
+          <text class="info-label">{{item.label}}</text>
+          <text class="info-value">{{item.value}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="action-bar" wx:if="{{actions.length > 0}}">
+      <button
+        class="btn-action {{item.type === 'primary' ? 'primary' : item.type === 'danger' ? 'danger' : 'outline'}}"
+        wx:for="{{actions}}"
+        wx:key="action"
+        bindtap="onActionTap"
+        data-action="{{item.action}}"
+      >
+        {{item.text}}
+      </button>
+    </view>
   </block>
 </view>

@@ -136,7 +136,7 @@ Page({
 
     return api.getOrderDetail(this.data.orderId)
       .then((res) => {
-        const source = res?.data || {};
+        const source = res && res.data ? res.data : {};
         const orderSource = source.order || source;
         const transformedOrder = orderTransformer.transformOrder(orderSource) || {};
         const accountSource = source.account || buildAccountFromOrder(orderSource);
@@ -149,6 +149,7 @@ Page({
           rentRows: buildRentRows(transformedOrder),
           gameAccountRows: buildGameAccountRows(account),
           paymentRows: buildPaymentRows(transformedOrder),
+          errorText: '',
         });
 
         this.updateOrderStatus();
@@ -158,7 +159,7 @@ Page({
 
         if (config.useMockData) {
           const mockData = require('../../../utils/mock-data.js');
-          const mockOrder = mockData.orders?.find((item) => item.id === this.data.orderId) || mockData.orders?.[0];
+          const mockOrder = mockData.orders && mockData.orders.find((item) => item.id === this.data.orderId) || (mockData.orders || [])[0];
           if (mockOrder) {
             const transformedOrder = orderTransformer.transformOrder(mockOrder) || {};
             const account = normalizeAccount(buildAccountFromOrder(mockOrder));
@@ -169,18 +170,15 @@ Page({
               rentRows: buildRentRows(transformedOrder),
               gameAccountRows: buildGameAccountRows(account),
               paymentRows: buildPaymentRows(transformedOrder),
+              errorText: '',
             });
             this.updateOrderStatus();
             return;
           }
         }
 
-        wx.showToast({
-          title: error.error || '加载失败，请稍后重试',
-          icon: 'none',
-        });
         this.setData({
-          errorText: error.error || '订单详情加载失败，请稍后重试',
+          errorText: error && error.error ? error.error : '订单详情加载失败，请稍后重试。',
         });
       })
       .finally(() => {
@@ -232,8 +230,8 @@ Page({
       },
       disputed: {
         key: 'dispute',
-        icon: '争',
-        desc: '订单正在争议处理流程中，请及时沟通。',
+        icon: '议',
+        desc: '订单正在争议处理中，请及时沟通。',
         showGameAccount: false,
         actions: [
           { action: 'chat', text: '联系卖家', type: 'primary' },
@@ -241,7 +239,7 @@ Page({
       },
       completed: {
         key: 'completed',
-        icon: '完',
+        icon: '成',
         desc: '订单已完成，欢迎再次租号。',
         showGameAccount: false,
         actions: account.id ? [{ action: 'reorder', text: '再次租号', type: 'outline' }] : [],
@@ -299,11 +297,12 @@ Page({
   },
 
   onAccountTap() {
-    if (!this.data.account?.id) {
+    const accountId = this.data.account && this.data.account.id ? this.data.account.id : '';
+    if (!accountId) {
       return;
     }
 
-    wx.navigateTo({ url: `/pages/account/detail/index?id=${this.data.account.id}` });
+    wx.navigateTo({ url: `/pages/account/detail/index?id=${accountId}` });
   },
 
   onChat() {
@@ -360,7 +359,7 @@ Page({
         setTimeout(() => this.loadData(), 1200);
       })
       .catch((error) => {
-        wx.showToast({ title: error.error || '操作失败', icon: 'none' });
+        wx.showToast({ title: error && error.error ? error.error : '操作失败', icon: 'none' });
       })
       .finally(() => wx.hideLoading());
   },
@@ -381,7 +380,7 @@ Page({
             setTimeout(() => this.loadData(), 1200);
           })
           .catch((error) => {
-            wx.showToast({ title: error.error || '操作失败', icon: 'none' });
+            wx.showToast({ title: error && error.error ? error.error : '操作失败', icon: 'none' });
           })
           .finally(() => wx.hideLoading());
       },
@@ -389,11 +388,12 @@ Page({
   },
 
   handleReorder() {
-    if (!this.data.account?.id) {
+    const accountId = this.data.account && this.data.account.id ? this.data.account.id : '';
+    if (!accountId) {
       return;
     }
 
-    wx.navigateTo({ url: `/pages/account/detail/index?id=${this.data.account.id}` });
+    wx.navigateTo({ url: `/pages/account/detail/index?id=${accountId}` });
   },
 
   onRetry() {

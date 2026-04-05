@@ -1,108 +1,113 @@
-<view class="page">
-  <view class="error-card" wx:if="{{error && !loading}}">
+﻿<view class="page">
+  <view class="error-card" wx:if="{{showErrorState}}">
     <view class="error-title">页面加载失败</view>
     <view class="error-text">{{error}}</view>
     <button class="error-btn" bindtap="onRetry">重新加载</button>
   </view>
 
+  <view class="error-card" wx:elif="{{showInitialLoading}}">
+    <view class="error-title">正在加载账号详情</view>
+    <view class="error-text">账号图片、属性和价格信息马上就好。</view>
+  </view>
+
   <block wx:else>
-  <view class="hero-gallery" wx:if="{{account.images && account.images.length > 0}}">
-    <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{account.images.length > 1}}">
-      <swiper-item wx:for="{{account.images}}" wx:key="*this">
-        <image
-          class="swiper-image"
-          src="{{item}}"
-          mode="aspectFill"
-          bindtap="onImagePreview"
-          data-urls="{{account.images}}"
-          data-current="{{item}}"
-        />
-      </swiper-item>
-    </swiper>
+    <view class="hero-gallery" wx:if="{{hasImages}}">
+      <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{showGalleryControls}}">
+        <swiper-item wx:for="{{account.images}}" wx:key="*this">
+          <image
+            class="swiper-image"
+            src="{{item}}"
+            mode="aspectFill"
+            bindtap="onImagePreview"
+            data-urls="{{account.images}}"
+            data-current="{{item}}"
+          />
+        </swiper-item>
+      </swiper>
 
-    <view class="gallery-mask"></view>
+      <view class="gallery-mask"></view>
 
-    <view class="gallery-counter" wx:if="{{account.images.length > 1}}">
-      {{currentImageIndex + 1}} / {{account.images.length}}
-    </view>
-
-    <view class="swiper-indicators" wx:if="{{account.images.length > 1}}">
-      <view class="indicator-dot {{currentImageIndex === index ? 'active' : ''}}" wx:for="{{account.images}}" wx:key="*this"></view>
-    </view>
-
-    <view class="swiper-btn prev" wx:if="{{account.images.length > 1}}" bindtap="onPrevImage">‹</view>
-    <view class="swiper-btn next" wx:if="{{account.images.length > 1}}" bindtap="onNextImage">›</view>
-  </view>
-
-  <view class="content-shell">
-    <view class="headline-card">
-      <view class="headline-row">
-        <view class="headline-copy">
-          <view class="account-title">{{account.fullTitle}}</view>
-          <view class="account-subtitle">{{account.subtitle}}</view>
-        </view>
-        <view class="account-status {{account.status}}">{{account.statusText}}</view>
+      <view class="gallery-counter" wx:if="{{showGalleryControls}}">
+        {{imageCounterText}}
       </view>
 
-      <view class="platform-badge">{{account.login_method}}</view>
-
-      <view class="info-card-grid">
-        <view class="info-card {{item.className}}" wx:for="{{quickFacts}}" wx:key="label">
-          <text class="info-label">{{item.label}}</text>
-          <text class="info-value">{{item.value}}</text>
-        </view>
+      <view class="swiper-indicators" wx:if="{{showGalleryControls}}">
+        <view class="indicator-dot {{item.className}}" wx:for="{{galleryIndicators}}" wx:key="id"></view>
       </view>
+
+      <view class="swiper-btn prev" wx:if="{{showGalleryControls}}" bindtap="onPrevImage">&lt;</view>
+      <view class="swiper-btn next" wx:if="{{showGalleryControls}}" bindtap="onNextImage">&gt;</view>
     </view>
 
-    <view class="section-card">
-      <view class="section-title">账号属性</view>
-      <view class="attribute-list">
-        <view class="attribute-item" wx:for="{{detailItems}}" wx:key="label">
-          <text class="attr-label">{{item.label}}</text>
-          <text class="attr-value">{{item.value}}</text>
+    <view class="content-shell">
+      <view class="headline-card">
+        <view class="headline-row">
+          <view class="headline-copy">
+            <view class="account-title">{{account.fullTitle}}</view>
+            <view class="account-subtitle">{{account.subtitle}}</view>
+          </view>
+          <view class="account-status {{account.status}}">{{account.statusText}}</view>
+        </view>
+
+        <view class="platform-badge">{{account.login_method}}</view>
+
+        <view class="info-card-grid">
+          <view class="info-card {{item.className}}" wx:for="{{quickFacts}}" wx:key="label">
+            <text class="info-label">{{item.label}}</text>
+            <text class="info-value">{{item.value}}</text>
+          </view>
         </view>
       </view>
-    </view>
 
-    <view class="section-card" wx:if="{{account.skins && account.skins.length > 0}}">
-      <view class="section-title">皮肤标签</view>
-      <view class="skins-list">
-        <text class="skin-tag" wx:for="{{account.skins}}" wx:key="*this">{{item}}</text>
+      <view class="section-card" wx:if="{{hasDetailItems}}">
+        <view class="section-title">账号属性</view>
+        <view class="attribute-list">
+          <view class="attribute-item" wx:for="{{detailItems}}" wx:key="label">
+            <text class="attr-label">{{item.label}}</text>
+            <text class="attr-value">{{item.value}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-card" wx:if="{{hasSkins}}">
+        <view class="section-title">皮肤标签</view>
+        <view class="skins-list">
+          <text class="skin-tag" wx:for="{{account.skins}}" wx:key="*this">{{item}}</text>
+        </view>
+      </view>
+
+      <view class="section-card">
+        <view class="section-title">账号描述</view>
+        <view class="desc-content">{{account.description}}</view>
+      </view>
+
+      <view class="price-card">
+        <view class="price-row {{item.rowClassName}}" wx:for="{{priceRows}}" wx:key="label">
+          <text class="price-label">{{item.label}}</text>
+          <text class="price-value">{{item.displayValue}}</text>
+        </view>
       </view>
     </view>
 
-    <view class="section-card">
-      <view class="section-title">账号描述</view>
-      <view class="desc-content">{{account.description}}</view>
+    <view class="bottom-bar">
+      <button class="btn-side" bindtap="onContactService">
+        <text class="btn-side-main">在线</text>
+        <text class="btn-side-sub">客服</text>
+      </button>
+      <button class="btn-side" bindtap="onFavorite">
+        <text class="btn-side-main">账号</text>
+        <text class="btn-side-sub">收藏</text>
+      </button>
+      <button class="btn-rent" bindtap="onRentNow" wx:if="{{canRent}}">立即租号</button>
+      <button class="btn-rent" bindtap="onRentNow" disabled wx:else>暂不可租</button>
     </view>
 
-    <view class="price-card">
-      <view class="price-row {{item.highlight ? 'total' : ''}}" wx:for="{{priceRows}}" wx:key="label">
-        <text class="price-label">{{item.label}}</text>
-        <text class="price-value">{{item.displayValue}}</text>
-      </view>
-    </view>
-  </view>
-
-  <view class="bottom-bar">
-    <button class="btn-side" bindtap="onContactService">
-      <text class="btn-side-main">在线</text>
-      <text class="btn-side-sub">客服</text>
-    </button>
-    <button class="btn-side" bindtap="onFavorite">
-      <text class="btn-side-main">账号</text>
-      <text class="btn-side-sub">收藏</text>
-    </button>
-    <button class="btn-rent" bindtap="onRentNow" disabled="{{account.status !== 'available'}}">
-      {{account.status === 'available' ? '立即租号' : '暂不可租'}}
-    </button>
-  </view>
-
-  <login-modal
-    wx:if="{{showLoginModal}}"
-    visible="{{showLoginModal}}"
-    bind:loginSuccess="onLoginSuccess"
-    bind:close="onLoginModalClose"
-  />
+    <login-modal
+      wx:if="{{showLoginModal}}"
+      visible="{{showLoginModal}}"
+      bind:loginSuccess="onLoginSuccess"
+      bind:close="onLoginModalClose"
+    />
   </block>
 </view>
+
