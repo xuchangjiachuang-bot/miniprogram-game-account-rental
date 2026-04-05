@@ -1,118 +1,146 @@
-/* pages/auth/wechat-login/index.wxss */
-.page {
+page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef2ff 0%, #f5f3ff 50%, #ffffff 100%);
+  background: linear-gradient(180deg, #ecfdf5 0%, #f8fafc 48%, #ffffff 100%);
 }
 
 .login-container {
   min-height: 100vh;
-  padding: 80rpx 60rpx;
+  padding: 88rpx 40rpx 60rpx;
+}
+
+.hero-section {
+  text-align: center;
+  margin-bottom: 52rpx;
+}
+
+.hero-badge {
+  display: inline-flex;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.logo-icon {
+  width: 128rpx;
+  height: 128rpx;
+  margin: 26rpx auto 22rpx;
+  border-radius: 40rpx;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: #ffffff;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-
-/* Logo Section */
-.logo-section {
-  text-align: center;
-  margin-bottom: 120rpx;
-}
-
-.logo {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 40rpx;
-  margin-bottom: 40rpx;
-  box-shadow: 0 8rpx 24rpx rgba(147, 51, 234, 0.2);
+  font-size: 64rpx;
+  font-weight: 700;
+  box-shadow: 0 16rpx 30rpx rgba(34, 197, 94, 0.22);
 }
 
 .app-name {
-  font-size: 40rpx;
+  font-size: 46rpx;
   font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 16rpx;
+  color: #0f172a;
 }
 
 .app-slogan {
-  font-size: 26rpx;
-  color: #6b7280;
+  margin-top: 16rpx;
+  font-size: 27rpx;
+  line-height: 1.7;
+  color: #64748b;
 }
 
-/* Login Form */
-.login-form {
-  width: 100%;
-  max-width: 600rpx;
+.login-card {
+  background: #ffffff;
+  border-radius: 30rpx;
+  padding: 42rpx 36rpx;
+  box-shadow: 0 22rpx 44rpx rgba(15, 23, 42, 0.08);
 }
 
 .form-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #1f2937;
+  color: #0f172a;
   text-align: center;
-  margin-bottom: 24rpx;
 }
 
 .form-desc {
+  margin-top: 18rpx;
   font-size: 26rpx;
-  color: #6b7280;
+  line-height: 1.7;
+  color: #64748b;
   text-align: center;
-  margin-bottom: 60rpx;
-  line-height: 1.6;
 }
 
-/* Auth Button */
 .auth-btn {
   width: 100%;
   height: 96rpx;
-  background: linear-gradient(90deg, #2563eb 0%, #9333ea 100%);
-  color: #ffffff;
+  margin-top: 34rpx;
+  border-radius: 24rpx;
   border: none;
-  border-radius: 50rpx;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: #ffffff;
   font-size: 32rpx;
-  font-weight: 600;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(147, 51, 234, 0.3);
-  margin-bottom: 40rpx;
+  gap: 16rpx;
+  box-shadow: 0 16rpx 28rpx rgba(34, 197, 94, 0.24);
 }
 
-.auth-btn.disabled {
-  opacity: 0.6;
+.auth-btn::after {
+  border: none;
 }
 
-.auth-btn:active {
-  transform: scale(0.98);
+.btn-icon {
+  font-size: 34rpx;
 }
 
-/* Agreement */
 .agreement {
+  margin-top: 28rpx;
+}
+
+.agreement-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6rpx;
   font-size: 24rpx;
-  color: #6b7280;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.agreement-label checkbox {
+  transform: scale(0.82);
+  margin-right: 4rpx;
+}
+
+.link {
+  color: #16a34a;
+}
+
+.tips {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 24rpx;
+}
+
+.tip-item {
+  flex: 1;
   text-align: center;
-  line-height: 1.6;
+  padding: 18rpx 0;
+  border-radius: 18rpx;
+  background: #ffffff;
+  color: #166534;
+  font-size: 22rpx;
+  box-shadow: 0 12rpx 24rpx rgba(15, 23, 42, 0.05);
 }
 
-.agreement .link {
-  color: #9333ea;
-}
-
-/* Back Section */
-.back-section {
-  margin-top: 80rpx;
-}
-
-.back-btn {
-  padding: 24rpx 48rpx;
-  border: 2rpx solid #e5e7eb;
-  border-radius: 50rpx;
-  font-size: 28rpx;
-  color: #6b7280;
-  transition: all 0.3s;
-}
-
-.back-btn:active {
-  background: #f9fafb;
-  border-color: #d1d5db;
+.back-link {
+  margin-top: 32rpx;
+  text-align: center;
+  font-size: 25rpx;
+  color: #64748b;
 }

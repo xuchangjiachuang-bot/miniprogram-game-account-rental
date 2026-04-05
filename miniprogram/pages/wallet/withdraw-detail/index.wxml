@@ -1,15 +1,7 @@
-﻿<!-- pages/wallet/withdraw-detail/index.wxml -->
 <view class="page">
-  <view class="nav-bar">
-    <view class="nav-back" bindtap="onBack">
-      <text class="nav-arrow">返回</text>
-    </view>
-    <text class="nav-title">提现详情</text>
-    <view class="nav-placeholder"></view>
-  </view>
-
   <view class="content" wx:if="{{withdrawal}}">
     <view class="status-card">
+      <view class="status-badge">提现详情</view>
       <view class="status-icon" style="background: {{withdrawal.statusColor}}20">
         <text class="status-emoji">{{withdrawal.statusIcon}}</text>
       </view>
@@ -17,8 +9,8 @@
       <text class="amount-text">¥{{withdrawal.actualAmountText}}</text>
     </view>
 
-    <view class="timeline-card">
-      <view class="card-title">处理进度</view>
+    <view class="section-card">
+      <view class="section-title">处理进度</view>
       <view class="timeline">
         <block wx:for="{{withdrawal.timeline}}" wx:key="key">
           <view class="timeline-item {{item.active ? 'active' : ''}} {{item.rejected ? 'rejected' : ''}}">
@@ -31,15 +23,14 @@
           <view class="timeline-line" wx:if="{{index !== withdrawal.timeline.length - 1}}"></view>
         </block>
       </view>
-
       <view class="review-remark" wx:if="{{withdrawal.reviewRemark}}">
-        <text class="remark-label">审核备注：</text>
+        <text class="remark-label">审核备注</text>
         <text class="remark-text">{{withdrawal.reviewRemark}}</text>
       </view>
     </view>
 
-    <view class="info-card">
-      <view class="card-title">提现信息</view>
+    <view class="section-card">
+      <view class="section-title">提现信息</view>
       <view class="info-row">
         <text class="info-label">提现单号</text>
         <view class="info-value-wrapper">
@@ -53,7 +44,7 @@
       </view>
       <view class="info-row">
         <text class="info-label">到账账户</text>
-        <text class="info-value">{{withdrawal.accountName}} ({{withdrawal.accountNumber}})</text>
+        <text class="info-value">{{withdrawal.accountName}}（{{withdrawal.accountNumber}}）</text>
       </view>
       <view class="info-row">
         <text class="info-label">申请时间</text>
@@ -61,20 +52,19 @@
       </view>
     </view>
 
-    <view class="amount-card">
-      <view class="card-title">金额明细</view>
-      <view class="amount-row">
-        <text class="amount-label">提现金额</text>
-        <text class="amount-value">¥{{withdrawal.amountText}}</text>
+    <view class="section-card">
+      <view class="section-title">金额明细</view>
+      <view class="info-row">
+        <text class="info-label">提现金额</text>
+        <text class="info-value">¥{{withdrawal.amountText}}</text>
       </view>
-      <view class="amount-row">
-        <text class="amount-label">手续费</text>
-        <text class="amount-value">-¥{{withdrawal.feeText}}</text>
+      <view class="info-row">
+        <text class="info-label">手续费</text>
+        <text class="info-value">-¥{{withdrawal.feeText}}</text>
       </view>
-      <view class="amount-divider"></view>
-      <view class="amount-row total">
-        <text class="amount-label">实际到账</text>
-        <text class="amount-value highlight">¥{{withdrawal.actualAmountText}}</text>
+      <view class="info-row total-row">
+        <text class="info-label">实际到账</text>
+        <text class="info-value highlight">¥{{withdrawal.actualAmountText}}</text>
       </view>
     </view>
 
@@ -85,6 +75,7 @@
   </view>
 
   <view class="loading" wx:if="{{!withdrawal}}">
-    <text class="loading-text">加载中...</text>
+    <text class="loading-title">加载中...</text>
+    <text class="loading-text">正在获取提现详情，请稍候。</text>
   </view>
 </view>

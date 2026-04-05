@@ -1,31 +1,27 @@
-﻿<!-- pages/wallet/bill/index.wxml -->
 <view class="page">
-  <view class="nav-bar">
-    <view class="nav-back" bindtap="onBack">
-      <text class="nav-arrow">返回</text>
-    </view>
-    <text class="nav-title">月度账单</text>
-    <view class="nav-placeholder"></view>
-  </view>
-
   <view class="month-selector">
     <picker mode="selector" range="{{monthList}}" range-key="label" value="{{selectedMonthIndex}}" bindchange="onMonthChange">
       <view class="selector-box">
-        <text class="selector-text">{{selectedMonthLabel}}</text>
-        <text class="selector-arrow">v</text>
+        <text class="selector-label">账单月份</text>
+        <view class="selector-main">
+          <text class="selector-text">{{selectedMonthLabel}}</text>
+          <text class="selector-arrow">></text>
+        </view>
       </view>
     </picker>
   </view>
 
   <view class="bill-summary" wx:if="{{bill}}">
     <view class="summary-card">
-      <view class="summary-title">本月收支</view>
+      <view class="summary-head">
+        <view class="summary-title">{{selectedMonthLabel}}</view>
+        <view class="summary-count">共 {{bill.summary.transactionCount}} 笔交易</view>
+      </view>
       <view class="summary-row">
         <view class="summary-col">
           <text class="summary-label">总收入</text>
           <text class="summary-value income">¥{{bill.summary.totalIncome}}</text>
         </view>
-        <view class="summary-divider"></view>
         <view class="summary-col">
           <text class="summary-label">总支出</text>
           <text class="summary-value expense">¥{{bill.summary.totalExpense}}</text>
@@ -37,13 +33,10 @@
           {{bill.summary.netIncomeValue >= 0 ? '+' : '-'}}¥{{bill.summary.netIncome}}
         </text>
       </view>
-      <view class="summary-info">
-        <text class="info-text">共 {{bill.summary.transactionCount}} 笔交易</text>
-      </view>
     </view>
   </view>
 
-  <view class="category-section" wx:if="{{bill && bill.categoryStats.length}}">
+  <view class="section-card" wx:if="{{bill && bill.categoryStats.length}}">
     <view class="section-title">分类统计</view>
     <view class="category-list">
       <view class="category-item" wx:for="{{bill.categoryStats}}" wx:key="name">
@@ -51,14 +44,12 @@
           <text class="category-name">{{item.name}}</text>
           <text class="category-count">{{item.count}} 笔</text>
         </view>
-        <view class="category-amount">
-          <text class="amount-value {{item.amountClass}}">{{item.amountText}}</text>
-        </view>
+        <text class="category-amount {{item.amountClass}}">{{item.amountText}}</text>
       </view>
     </view>
   </view>
 
-  <view class="daily-section" wx:if="{{bill && bill.dailyStats.length}}">
+  <view class="section-card" wx:if="{{bill && bill.dailyStats.length}}">
     <view class="section-title">每日收支</view>
     <view class="daily-chart">
       <view class="chart-row" wx:for="{{bill.dailyStats}}" wx:key="dateLabel">
@@ -75,7 +66,7 @@
     </view>
   </view>
 
-  <view class="transactions-section" wx:if="{{bill && bill.transactions.length}}">
+  <view class="section-card" wx:if="{{bill && bill.transactions.length}}">
     <view class="section-title">交易明细</view>
     <view class="transaction-list">
       <view class="transaction-item" wx:for="{{bill.transactions}}" wx:key="id" bindtap="onTransactionTap" data-id="{{item.id}}">
@@ -90,6 +81,7 @@
   </view>
 
   <view class="empty-state" wx:if="{{bill && bill.transactions.length === 0}}">
-    <text class="empty-text">本月暂无交易记录</text>
+    <text class="empty-title">本月暂无交易记录</text>
+    <text class="empty-text">切换月份后可查看其他月份的账单数据。</text>
   </view>
 </view>

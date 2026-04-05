@@ -1,241 +1,237 @@
-/* pages/wallet/bill/index.wxss */
-.page {
+page {
   min-height: 100vh;
-  background: #f5f5f5;
-  padding-bottom: 40rpx;
+  background: #f4f6fb;
 }
 
-/* 导航栏 */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 30rpx;
+.page {
+  padding: 24rpx 20rpx 40rpx;
+}
+
+.month-selector,
+.section-card {
   background: #ffffff;
+  border-radius: 28rpx;
+  box-shadow: 0 14rpx 34rpx rgba(15, 23, 42, 0.06);
 }
 
-.nav-back {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-arrow {
-  font-size: 36rpx;
-  color: #333;
-  font-weight: 700;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #333;
-}
-
-.nav-placeholder {
-  width: 60rpx;
-}
-
-/* 月份选择器 */
 .month-selector {
-  padding: 20rpx 30rpx;
-  background: #ffffff;
-  margin-bottom: 20rpx;
+  padding: 20rpx;
 }
 
 .selector-box {
+  padding: 22rpx 24rpx;
+  border-radius: 22rpx;
+  background: #f8fafc;
+}
+
+.selector-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.selector-main {
+  margin-top: 10rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-  padding: 24rpx;
-  background: #f5f5f5;
-  border-radius: 12rpx;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .selector-text {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #333;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .selector-arrow {
-  font-size: 20rpx;
-  color: #999;
+  font-size: 26rpx;
+  color: #94a3b8;
 }
 
-/* 账单汇总 */
 .bill-summary {
-  padding: 0 20rpx;
-  margin-bottom: 20rpx;
+  margin-top: 20rpx;
 }
 
 .summary-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20rpx;
-  padding: 40rpx 30rpx;
+  padding: 32rpx 30rpx;
+  border-radius: 30rpx;
+  background: linear-gradient(135deg, #312e81 0%, #4f46e5 52%, #6366f1 100%);
   color: #ffffff;
+  box-shadow: 0 18rpx 38rpx rgba(79, 70, 229, 0.2);
+}
+
+.summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .summary-title {
-  font-size: 26rpx;
-  opacity: 0.9;
-  margin-bottom: 30rpx;
-  text-align: center;
-}
-
-.summary-row {
-  display: flex;
-  gap: 40rpx;
-  margin-bottom: 30rpx;
-}
-
-.summary-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.summary-label {
-  font-size: 24rpx;
-  opacity: 0.9;
-}
-
-.summary-value {
-  font-size: 40rpx;
+  font-size: 32rpx;
   font-weight: 700;
 }
 
-.summary-divider {
-  width: 1rpx;
-  background: rgba(255, 255, 255, 0.3);
+.summary-count {
+  font-size: 22rpx;
+  opacity: 0.84;
+}
+
+.summary-row {
+  margin-top: 26rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+}
+
+.summary-col {
+  padding: 22rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.summary-label {
+  display: block;
+  font-size: 22rpx;
+  opacity: 0.88;
+}
+
+.summary-value {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+}
+
+.summary-value.income {
+  color: #dcfce7;
+}
+
+.summary-value.expense {
+  color: #fee2e2;
 }
 
 .summary-net {
-  text-align: center;
-  padding: 24rpx 0;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12rpx;
-  margin-bottom: 20rpx;
+  margin-top: 22rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .net-label {
   font-size: 24rpx;
-  opacity: 0.9;
-  margin-right: 12rpx;
+  opacity: 0.88;
 }
 
 .net-value {
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: 700;
 }
 
 .net-value.income {
-  color: #07c160;
+  color: #dcfce7;
 }
 
 .net-value.expense {
-  color: #ff4444;
+  color: #fee2e2;
 }
 
-.summary-info {
-  text-align: center;
-}
-
-.info-text {
-  font-size: 22rpx;
-  opacity: 0.8;
-}
-
-/* 分类统计 */
-.category-section {
-  background: #ffffff;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
+.section-card {
+  margin-top: 20rpx;
+  padding: 28rpx;
 }
 
 .section-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 24rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.category-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.category-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx;
-  background: #f9f9f9;
-  border-radius: 12rpx;
-}
-
-.category-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.category-name {
-  font-size: 28rpx;
-  color: #333;
-}
-
-.category-count {
-  font-size: 22rpx;
-  color: #999;
-}
-
-.category-amount {
-  text-align: right;
-}
-
-.amount-value {
-  font-size: 32rpx;
-  font-weight: 600;
-}
-
-.amount-value.income {
-  color: #07c160;
-}
-
-.amount-value.expense {
-  color: #ff4444;
-}
-
-/* 每日统计 */
-.daily-section {
-  background: #ffffff;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-}
-
+.category-list,
+.transaction-list,
 .daily-chart {
+  margin-top: 22rpx;
+}
+
+.category-list,
+.transaction-list {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
+  gap: 14rpx;
+}
+
+.category-item,
+.transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 22rpx;
+  border-radius: 22rpx;
+  background: #f8fafc;
+}
+
+.category-info,
+.transaction-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-name,
+.transaction-type {
+  display: block;
+  font-size: 28rpx;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.category-count,
+.transaction-desc,
+.transaction-time {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.category-amount,
+.transaction-amount {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.category-amount.income,
+.transaction-amount.income,
+.amount.income {
+  color: #16a34a;
+}
+
+.category-amount.expense,
+.transaction-amount.expense,
+.amount.expense {
+  color: #dc2626;
 }
 
 .chart-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 14rpx;
+  padding: 16rpx 0;
+}
+
+.chart-row + .chart-row {
+  border-top: 1rpx solid #eef2f7;
 }
 
 .row-date {
-  width: 80rpx;
+  width: 86rpx;
   font-size: 22rpx;
-  color: #666;
+  color: #64748b;
   text-align: right;
 }
 
@@ -243,115 +239,58 @@
   flex: 1;
   display: flex;
   gap: 4rpx;
-  height: 24rpx;
-  background: #f5f5f5;
-  border-radius: 12rpx;
+  height: 22rpx;
+  background: #eef2f7;
+  border-radius: 999rpx;
   overflow: hidden;
 }
 
 .row-bar {
   height: 100%;
-  min-width: 2rpx;
-  border-radius: 12rpx;
-  transition: width 0.3s;
+  min-width: 4rpx;
+  border-radius: 999rpx;
 }
 
 .row-bar.income {
-  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
 }
 
 .row-bar.expense {
-  background: linear-gradient(135deg, #ff4444 0%, #ff6666 100%);
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
 }
 
 .row-amounts {
+  min-width: 132rpx;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-  min-width: 120rpx;
+  gap: 6rpx;
 }
 
-.row-amounts .amount {
-  font-size: 20rpx;
+.amount {
+  display: block;
   text-align: right;
+  font-size: 20rpx;
 }
 
-.row-amounts .amount.income {
-  color: #07c160;
-}
-
-.row-amounts .amount.expense {
-  color: #ff4444;
-}
-
-/* 交易明细 */
-.transactions-section {
-  background: #ffffff;
-  padding: 30rpx;
-}
-
-.transaction-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.transaction-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx;
-  background: #f9f9f9;
-  border-radius: 12rpx;
-}
-
-.transaction-left {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.transaction-type {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #333;
-}
-
-.transaction-desc {
-  font-size: 24rpx;
-  color: #666;
-}
-
-.transaction-time {
-  font-size: 22rpx;
-  color: #999;
-}
-
-.transaction-amount {
-  font-size: 32rpx;
-  font-weight: 600;
-}
-
-.transaction-amount.income {
-  color: #07c160;
-}
-
-.transaction-amount.expense {
-  color: #ff4444;
-}
-
-/* 空状态 */
 .empty-state {
-  padding: 120rpx 0;
+  margin-top: 20rpx;
+  padding: 80rpx 30rpx;
+  border-radius: 28rpx;
+  background: #ffffff;
   text-align: center;
 }
 
-.empty-icon {
-  font-size: 80rpx;
-  margin-bottom: 20rpx;
+.empty-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .empty-text {
-  font-size: 26rpx;
-  color: #999;
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
 }
