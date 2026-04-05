@@ -8,6 +8,7 @@ import { OrderStatus, RefundType, calculateOrderCompletionSplit, calculateRefund
 import { UserType, TransactionType, changeBalance, unfreezeBalance, getUserBalance, ChangeBalanceParams } from './balance-service';
 import { sendNotification } from './notification-service';
 import { getAccountById, restoreAccountAvailabilityIfNoBlockingOrders } from './account-service';
+import type { Account } from './account-service';
 import { chatManager } from '@/storage/database/chatManager';
 import { accounts, db, orders, users } from '@/lib/db';
 import { eq, and, desc, or } from 'drizzle-orm';
@@ -252,6 +253,56 @@ export function transformDbOrderToApiFormat(dbOrder: any): any {
     dispute_reason: dbOrder.disputeReason,
     disputeEvidence: dbOrder.disputeEvidence,
     dispute_evidence: dbOrder.disputeEvidence
+  };
+}
+
+function resolveAccountImage(account: Account | null): string {
+  if (!account || !account.screenshots) {
+    return '/images/default-account.png';
+  }
+
+  if (Array.isArray(account.screenshots)) {
+    return account.screenshots.find((item: unknown) => typeof item === 'string' && item.trim()) || '/images/default-account.png';
+  }
+
+  if (typeof account.screenshots === 'string') {
+    try {
+      const parsed = JSON.parse(account.screenshots);
+      if (Array.isArray(parsed)) {
+        return parsed.find((item: unknown) => typeof item === 'string' && item.trim()) || '/images/default-account.png';
+      }
+    } catch {
+      if (account.screenshots.trim()) {
+        return account.screenshots.trim();
+      }
+    }
+  }
+
+  return '/images/default-account.png';
+}
+
+export async function transformDbOrderToApiFormatWithAccount(dbOrder: any): Promise<any> {
+  const base = transformDbOrderToApiFormat(dbOrder);
+  const account = await getAccountById(dbOrder.accountId);
+
+  if (!account) {
+    return base;
+  }
+
+  const rentalRatio = account.rentalRatio ?? base.rentalRatio ?? base.price_ratio;
+
+  return {
+    ...base,
+    accountName: account.title || base.accountName,
+    accountImage: resolveAccountImage(account),
+    coinsM: account.coinsM ?? base.coinsM,
+    coins_million: account.coinsM ?? base.coins_million,
+    rentalRatio,
+    price_ratio: rentalRatio,
+    safeboxCount: account.safeboxCount ?? base.safeboxCount,
+    staminaValue: account.staminaValue ?? base.staminaValue,
+    energyValue: account.energyValue ?? base.energyValue,
+    tags: Array.isArray(account.tags) ? account.tags : [],
   };
 }
 
@@ -823,7 +874,7 @@ export async function getUserOrders(userId: string, status?: OrderStatus): Promi
   }
 
   const orderData = await query;
-  return orderData.map(order => transformDbOrderToApiFormat(order));
+  return Promise.all(orderData.map(order => transformDbOrderToApiFormatWithAccount(order)));
 }
 
 /**
@@ -856,7 +907,9 @@ export async function getUserOrdersWithCounts(userId: string, status?: OrderStat
   }
 
   const orderData = await query;
-  const transformedOrders = orderData.map(order => transformDbOrderToApiFormat(order));
+  const transformedOrders = await Promise.all(
+    orderData.map(order => transformDbOrderToApiFormatWithAccount(order))
+  );
 
   // 计算各状态数量
   const counts: Record<string, number> = {};

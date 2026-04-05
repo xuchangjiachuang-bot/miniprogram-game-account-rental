@@ -4,7 +4,7 @@ import { accounts, balanceTransactions, db, orders, paymentRecords, userBalances
 import { getLatestConsumptionSettlement } from '@/lib/order-consumption-service';
 import { getOrderDispute } from '@/lib/dispute-service';
 import { syncSingleOrderLifecycle } from '@/lib/order-lifecycle-service';
-import { cancelOrder, transformDbOrderToApiFormat } from '@/lib/order-service';
+import { cancelOrder, transformDbOrderToApiFormatWithAccount } from '@/lib/order-service';
 import { getPaymentTimeoutSeconds, isOrderTimeout } from '@/lib/order-timeout-service';
 import { safeLogFinanceAuditEvent } from '@/lib/finance-audit-service';
 import { sendAccountRentedNotification } from '@/lib/notification-service';
@@ -80,7 +80,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        ...transformDbOrderToApiFormat(order),
+        ...(await transformDbOrderToApiFormatWithAccount(order)),
         dispute,
         consumptionSettlement,
         paymentTimeoutSeconds,
