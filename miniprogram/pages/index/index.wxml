@@ -33,7 +33,7 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">哈夫币 (M)</view>
+        <view class="field-label">哈夫币(M)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
           <text class="range-separator">-</text>
@@ -92,7 +92,7 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">租金 (元)</view>
+        <view class="field-label">租金(元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
           <text class="range-separator">-</text>
@@ -101,7 +101,7 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">押金 (元)</view>
+        <view class="field-label">押金(元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
           <text class="range-separator">-</text>
@@ -110,7 +110,7 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">总价 (元)</view>
+        <view class="field-label">总价(元)</view>
         <view class="range-row">
           <input class="range-input" type="number" placeholder="最小值" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
           <text class="range-separator">-</text>

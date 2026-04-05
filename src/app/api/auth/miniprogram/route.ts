@@ -10,14 +10,8 @@ type Jscode2SessionResponse = {
 };
 
 function resolveMiniProgramConfig() {
-  const appId =
-    process.env.WECHAT_MINIPROGRAM_APPID
-    || process.env.WECHAT_MP_APPID
-    || '';
-  const appSecret =
-    process.env.WECHAT_MINIPROGRAM_APP_SECRET
-    || process.env.WECHAT_MP_APP_SECRET
-    || '';
+  const appId = process.env.WECHAT_MINIPROGRAM_APPID || process.env.WECHAT_MP_APPID || '';
+  const appSecret = process.env.WECHAT_MINIPROGRAM_APP_SECRET || process.env.WECHAT_MP_APP_SECRET || '';
 
   return {
     appId: appId.trim(),
@@ -53,6 +47,60 @@ async function exchangeCodeForSession(code: string) {
   }
 
   return data;
+}
+
+function normalizeMiniProgramLoginError(error: unknown) {
+  const rawMessage = error instanceof Error ? error.message : String(error || '');
+
+  if (!rawMessage || rawMessage === 'WECHAT_JSCODE2SESSION_FAILED') {
+    return {
+      status: 500,
+      message: '小程序登录失败，微信登录服务暂时不可用，请稍后重试。',
+    };
+  }
+
+  if (rawMessage === 'WECHAT_MINIPROGRAM_CONFIG_INCOMPLETE') {
+    return {
+      status: 500,
+      message: '小程序登录配置不完整，请检查云托管环境变量 WECHAT_MINIPROGRAM_APPID 和 WECHAT_MINIPROGRAM_APP_SECRET。',
+    };
+  }
+
+  const invalidIpMatch = rawMessage.match(/invalid ip\s+([0-9.]+)/i);
+  if (/not in whitelist/i.test(rawMessage) || invalidIpMatch) {
+    const ip = invalidIpMatch?.[1] || '当前服务端出口 IP';
+    return {
+      status: 500,
+      message: `小程序登录失败：服务端 IP 未加入微信白名单。当前服务端出口 IP 为 ${ip}。请到微信公众平台的小程序后台，在“开发管理 -> 开发设置”中将该 IP 加入白名单后再重试。`,
+    };
+  }
+
+  const httpStatusMatch = rawMessage.match(/^WECHAT_JSCODE2SESSION_HTTP_(\d{3})$/);
+  if (httpStatusMatch) {
+    return {
+      status: 502,
+      message: `小程序登录失败：微信登录服务返回 HTTP ${httpStatusMatch[1]}，请稍后重试。`,
+    };
+  }
+
+  if (/code been used/i.test(rawMessage)) {
+    return {
+      status: 400,
+      message: '小程序登录失败：本次微信登录凭证已失效，请重新发起登录。',
+    };
+  }
+
+  if (/invalid code/i.test(rawMessage)) {
+    return {
+      status: 400,
+      message: '小程序登录失败：微信登录凭证无效，请重新发起登录。',
+    };
+  }
+
+  return {
+    status: 500,
+    message: rawMessage,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -95,14 +143,15 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
+    const normalized = normalizeMiniProgramLoginError(error);
     console.error('[auth/miniprogram] login failed:', error);
+
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : '微信小程序登录失败',
+        error: normalized.message,
       },
-      { status: 500 },
+      { status: normalized.status },
     );
   }
 }
-
