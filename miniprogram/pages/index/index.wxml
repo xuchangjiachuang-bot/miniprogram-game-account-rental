@@ -2,14 +2,14 @@
 <view class="page">
   <view class="hero-section">
     <view class="hero-container">
-      <swiper wx:if="{{carousels.length > 0}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff">
-        <swiper-item wx:for="{{carousels}}" wx:key="id">
-          <view class="carousel-item" bindtap="onCarouselTap" data-url="{{item.linkUrl || item.link}}">
+      <swiper wx:if="{{hasCarousels}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff">
+        <swiper-item wx:for="{{carouselView}}" wx:key="id">
+          <view class="carousel-item" bindtap="onCarouselTap" data-url="{{item.targetUrl}}">
             <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
             <view class="carousel-overlay"></view>
             <view class="carousel-content">
               <view class="carousel-title">{{item.title}}</view>
-              <view class="carousel-desc" wx:if="{{item.description}}">{{item.description}}</view>
+              <view class="carousel-desc" wx:if="{{item.hasDescription}}">{{item.description}}</view>
             </view>
           </view>
         </swiper-item>
@@ -25,7 +25,7 @@
     <view class="publish-section" bindtap="onPublishTap">
       <view class="publish-btn">
         <text class="publish-icon">+</text>
-        <text class="publish-text">{{fallbackTitle.buttonText || '发布账号'}}</text>
+        <text class="publish-text">{{fallbackTitle.buttonText}}</text>
       </view>
     </view>
   </view>
@@ -49,7 +49,7 @@
           <view class="filter-label">登录方式</view>
           <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
             <view class="picker-box">
-              <text>{{platformOptions[filters.platformIndex]}}</text>
+              <text>{{selectedPlatformText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
@@ -59,7 +59,7 @@
           <view class="filter-label">段位</view>
           <picker mode="selector" range="{{rankOptions}}" value="{{filters.rankIndex}}" bindchange="onRankChange">
             <view class="picker-box">
-              <text>{{rankOptions[filters.rankIndex]}}</text>
+              <text>{{selectedRankText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
@@ -69,7 +69,7 @@
           <view class="filter-label">保险箱</view>
           <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
             <view class="picker-box">
-              <text>{{safeboxOptions[filters.safeboxIndex]}}</text>
+              <text>{{selectedSafeboxText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
@@ -79,7 +79,7 @@
           <view class="filter-label">地区</view>
           <picker mode="selector" range="{{provinceOptions}}" value="{{filters.provinceIndex}}" bindchange="onProvinceChange">
             <view class="picker-box">
-              <text>{{provinceOptions[filters.provinceIndex]}}</text>
+              <text>{{selectedProvinceText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
@@ -107,17 +107,17 @@
       </view>
 
       <view class="action-row">
-        <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{showMoreFilters ? '收起皮肤筛选' : '展开皮肤筛选'}}</text></view>
+        <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{skinToggleText}}</text></view>
         <view class="btn-reset" bindtap="onResetFilters"><text>重置</text></view>
       </view>
 
       <view class="skin-filter" wx:if="{{showMoreFilters}}">
         <view class="skin-header">
           <text class="skin-label">皮肤筛选（可多选）</text>
-          <text class="skin-count" wx:if="{{selectedSkins.length > 0}}">已选 {{selectedSkins.length}} 项</text>
+          <text class="skin-count" wx:if="{{showSelectedSkinCount}}">{{selectedSkinCountText}}</text>
         </view>
         <view class="skin-list">
-          <view class="skin-tag {{item.selected ? 'active' : ''}}" wx:for="{{skinOptionsView}}" wx:key="id" bindtap="onSkinTap" data-name="{{item.name}}">
+          <view class="skin-tag {{item.className}}" wx:for="{{skinOptionsView}}" wx:key="id" bindtap="onSkinTap" data-name="{{item.name}}">
             <text class="skin-check" wx:if="{{item.selected}}">√</text>
             <text>{{item.name}}</text>
           </view>
@@ -128,15 +128,15 @@
 
   <view class="account-section">
     <view class="account-container">
-      <view class="list-header"><text class="account-count">共 {{displayAccounts.length}} 个账号</text></view>
+      <view class="list-header"><text class="account-count">{{accountCountText}}</text></view>
 
-      <view class="state-card" wx:if="{{loading && displayAccounts.length === 0}}">
+      <view class="state-card" wx:if="{{showLoadingState}}">
         <view class="loading-spinner"></view>
         <view class="state-title">正在加载账号</view>
         <view class="state-hint">筛选结果稍后就会显示出来。</view>
       </view>
 
-      <view class="state-card error" wx:elif="{{!loading && listErrorText && displayAccounts.length === 0}}">
+      <view class="state-card error" wx:elif="{{showErrorState}}">
         <view class="state-icon">!</view>
         <view class="state-title">账号列表加载失败</view>
         <view class="state-hint">{{listErrorText}}</view>
@@ -144,15 +144,15 @@
       </view>
 
       <block wx:else>
-        <view class="inline-error" wx:if="{{listErrorText && displayAccounts.length > 0}}">
+        <view class="inline-error" wx:if="{{showInlineError}}">
           <text class="inline-error-text">{{listErrorText}}</text>
           <text class="inline-error-action" bindtap="onRetryAccounts">重试</text>
         </view>
 
-        <view class="account-grid" wx:if="{{displayAccounts.length > 0}}">
-          <view class="account-card" wx:for="{{displayAccounts}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
+        <view class="account-grid" wx:if="{{hasAccounts}}">
+          <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
             <view class="card-image">
-              <image class="card-img" src="{{item.images[0] || '/images/default-account.png'}}" mode="aspectFill" />
+              <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" />
               <view class="card-status {{item.status}}">{{item.statusText}}</view>
               <view class="platform-badge">{{item.login_method}}</view>
             </view>
@@ -185,14 +185,14 @@
                 </view>
               </view>
 
-              <view class="kd-region-row" wx:if="{{item.kd > 0 || item.regionText}}">
-                <text class="kd-text" wx:if="{{item.kd > 0}}">KD: {{item.kd}}</text>
-                <text class="region-text">{{item.regionText}}</text>
+              <view class="kd-region-row" wx:if="{{item.showKdOrRegion}}">
+                <text class="kd-text" wx:if="{{item.showKd}}">KD: {{item.kd}}</text>
+                <text class="region-text" wx:if="{{item.showRegion}}">{{item.regionText}}</text>
               </view>
 
-              <view class="skins-row" wx:if="{{item.tagPreview.length > 0}}">
+              <view class="skins-row" wx:if="{{item.showSkinPreview}}">
                 <text class="skin-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
-                <text class="skin-more" wx:if="{{item.moreTagCount > 0}}">+{{item.moreTagCount}}</text>
+                <text class="skin-more" wx:if="{{item.showMoreTagCount}}">+{{item.moreTagCount}}</text>
               </view>
 
               <view class="price-row">
@@ -218,14 +218,14 @@
           </view>
         </view>
 
-        <view class="load-more" wx:if="{{hasMore && !loading}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
+        <view class="load-more" wx:if="{{hasMore}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
 
-        <view class="loading inline-loading" wx:if="{{loading && displayAccounts.length > 0}}">
+        <view class="loading inline-loading" wx:if="{{showInlineLoading}}">
           <view class="loading-spinner"></view>
           <text>正在刷新列表...</text>
         </view>
 
-        <view class="empty" wx:if="{{!loading && !listErrorText && displayAccounts.length === 0}}">
+        <view class="empty" wx:if="{{showEmptyState}}">
           <view class="empty-icon">空</view>
           <view class="empty-text">暂无账号</view>
           <view class="empty-hint">调整筛选条件后再试试。</view>
@@ -238,3 +238,4 @@
   <customer-service-float visible="{{showCustomerService}}" bind:tap="onCustomerServiceTap" bind:close="onCustomerServiceClose" />
   <login-modal visible="{{showLoginModal}}" bind:loginSuccess="onLoginSuccess" />
 </view>
+
