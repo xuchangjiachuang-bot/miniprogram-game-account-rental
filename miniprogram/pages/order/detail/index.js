@@ -2,6 +2,7 @@ const api = require('../../../utils/api.js');
 const config = require('../../../utils/config.js');
 const orderTransformer = require('../../../utils/order-transformer.js');
 const navigation = require('../../../utils/navigation.js');
+const cloudFile = require('../../../utils/cloud-file.js');
 
 function buildAccountFromOrder(orderData = {}) {
   return {
@@ -135,16 +136,20 @@ Page({
     this.setData({ loading: true, errorText: '' });
 
     return api.getOrderDetail(this.data.orderId)
-      .then((res) => {
+      .then(async (res) => {
         const source = res && res.data ? res.data : {};
         const orderSource = source.order || source;
         const transformedOrder = orderTransformer.transformOrder(orderSource) || {};
         const accountSource = source.account || buildAccountFromOrder(orderSource);
         const account = normalizeAccount(accountSource);
+        const [avatar] = await cloudFile.resolveImageList([account.avatar]);
 
         this.setData({
           order: transformedOrder,
-          account,
+          account: {
+            ...account,
+            avatar: avatar || account.avatar,
+          },
           orderInfoRows: buildOrderInfoRows(transformedOrder),
           rentRows: buildRentRows(transformedOrder),
           gameAccountRows: buildGameAccountRows(account),

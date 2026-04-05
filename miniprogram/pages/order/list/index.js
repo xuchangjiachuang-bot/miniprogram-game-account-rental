@@ -3,6 +3,7 @@ const storage = require('../../../utils/storage.js');
 const config = require('../../../utils/config.js');
 const orderTransformer = require('../../../utils/order-transformer.js');
 const navigation = require('../../../utils/navigation.js');
+const cloudFile = require('../../../utils/cloud-file.js');
 
 const TAB_KEYS = ['all', 'pending_payment', 'active', 'pending_verification', 'completed', 'cancelled', 'disputed'];
 
@@ -53,20 +54,30 @@ Page({
 
     this.setData({ loading: true });
     return api.getOrders({ status: this.data.currentTab === 'all' ? undefined : this.data.currentTab })
-      .then((res) => {
+      .then(async (res) => {
         const data = res?.data || {};
         const orders = data.list || data.orders || [];
         const processedOrders = orderTransformer.transformOrderList(orders);
+        const resolvedImages = await cloudFile.resolveImageList(
+          processedOrders.map((item) => item.account && item.account.image).filter(Boolean)
+        );
+        const processedOrdersView = processedOrders.map((item, index) => ({
+          ...item,
+          account: {
+            ...item.account,
+            image: resolvedImages[index] || item.account.image,
+          },
+        }));
         const totalCount = data.counts
           ? Object.keys(data.counts).reduce((sum, key) => sum + Number(data.counts[key] || 0), 0)
-          : processedOrders.length;
+          : processedOrdersView.length;
 
         const tabs = this.data.tabs.map((tab) => ({
           ...tab,
           count: tab.key === 'all' ? totalCount : Number(data?.counts?.[tab.key] || 0),
         }));
 
-        this.setData({ orders: processedOrders, tabs });
+        this.setData({ orders: processedOrdersView, tabs });
       })
       .catch((error) => {
         console.error('加载订单失败:', error);

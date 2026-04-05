@@ -1,5 +1,6 @@
 const api = require('../../../utils/api.js');
 const navigation = require('../../../utils/navigation.js');
+const cloudFile = require('../../../utils/cloud-file.js');
 
 function formatMoney(amount) {
   const value = Number(amount || 0);
@@ -119,10 +120,11 @@ Page({
 
   loadOrderDetail() {
     return api.getOrderDetail(this.data.orderId)
-      .then((res) => {
+      .then(async (res) => {
         const source = res && res.data ? res.data : {};
         const order = source.order || source;
         const account = normalizeAccount(source.account, order);
+        const [avatar] = await cloudFile.resolveImageList([account.avatar]);
 
         if (order.status && order.status !== 'pending_payment') {
           wx.redirectTo({ url: `/pages/order/detail/index?id=${this.data.orderId}` });
@@ -137,7 +139,13 @@ Page({
           paymentTimeoutSeconds: Number(order.paymentTimeoutSeconds || 900),
         };
 
-        this.setData({ order: normalizedOrder, account });
+        this.setData({
+          order: normalizedOrder,
+          account: {
+            ...account,
+            avatar: avatar || account.avatar,
+          },
+        });
         this.startCountdown(normalizedOrder.paymentTimeoutSeconds);
         this.checkBalance();
         return true;

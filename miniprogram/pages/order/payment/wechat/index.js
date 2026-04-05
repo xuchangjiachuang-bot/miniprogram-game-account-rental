@@ -1,6 +1,7 @@
 const api = require('../../../../utils/api.js');
 const dataTransformer = require('../../../../utils/data-transformer.js');
 const navigation = require('../../../../utils/navigation.js');
+const cloudFile = require('../../../../utils/cloud-file.js');
 
 function formatMoney(value) {
   const amount = Number(value || 0);
@@ -52,7 +53,7 @@ Page({
 
   loadOrderDetail() {
     return api.getOrderDetail(this.data.orderId)
-      .then((res) => {
+      .then(async (res) => {
         const source = res?.data || {};
         const order = source.order || source;
         const account = dataTransformer.transformAccount(source.account || {}) || {
@@ -61,6 +62,9 @@ Page({
           coins_display: order.coinsM ? `${order.coinsM}M` : '-',
           images: [order.accountImage || order.account_image || '/images/default-account.png'],
         };
+        const images = await cloudFile.resolveImageList(
+          Array.isArray(account.images) ? account.images : [order.accountImage || order.account_image]
+        );
 
         this.setData({
           orderId: order.id || this.data.orderId,
@@ -69,7 +73,7 @@ Page({
           accountInfo: {
             id: account.id,
             title: account.fullTitle || account.title || '游戏账号',
-            image: (account.images && account.images[0]) || '/images/default-account.png',
+            image: (images && images[0]) || '/images/default-account.png',
             coins: account.coins_display || '-',
           },
           rentalPrice: formatMoney(order.rentalPrice || order.rent_amount || 0),
@@ -86,17 +90,18 @@ Page({
     const { accountId, rentalHours } = this.data;
 
     return api.getAccountDetail(accountId)
-      .then((res) => {
+      .then(async (res) => {
         const account = dataTransformer.transformAccount(res?.data) || {};
         const dailyRental = Number(account.actual_rental || 0);
         const rentalPrice = rentalHours > 0 ? (dailyRental * (rentalHours / 24)) : dailyRental;
         const deposit = Number(account.deposit || 0);
+        const images = await cloudFile.resolveImageList(account.images || []);
 
         this.setData({
           accountInfo: {
             id: account.id || accountId,
             title: account.fullTitle || account.title || '游戏账号',
-            image: (account.images && account.images[0]) || '/images/default-account.png',
+            image: (images && images[0]) || '/images/default-account.png',
             coins: account.coins_display || '-',
           },
           rentalPrice: formatMoney(rentalPrice),
