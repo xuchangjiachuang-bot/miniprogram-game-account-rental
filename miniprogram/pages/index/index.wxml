@@ -1,8 +1,11 @@
 <view class="page">
   <view class="hero-section">
     <view class="hero-inner">
-      <view class="hero-title">三角洲行动 <text class="hero-highlight">哈夫币出租</text></view>
-      <view class="hero-subtitle">安全快捷的哈夫币租赁服务 | 担保交易 | 押金保障 | 安全快捷</view>
+      <view class="hero-title">
+        三角洲行动
+        <text class="hero-highlight">哈夫币出租</text>
+      </view>
+      <view class="hero-subtitle">安全便捷的哈夫币租赁服务，担保交易，支持快速筛选与下单。</view>
       <view class="hero-action">
         <view class="publish-btn" bindtap="onPublishTap">
           <text class="publish-icon">+</text>
@@ -14,13 +17,13 @@
 
   <view class="filter-section">
     <view class="filter-header-row">
-      <text class="filter-shield">盾</text>
+      <text class="filter-shield">筛</text>
       <text class="filter-title">筛选账号</text>
     </view>
 
     <view class="filter-panel">
       <view class="field-block">
-        <view class="field-label">平台·上号方式</view>
+        <view class="field-label">平台 / 上号方式</view>
         <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
           <view class="select-box">
             <text>{{selectedPlatformText}}</text>
@@ -30,11 +33,11 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">哈夫币(M)</view>
+        <view class="field-label">哈夫币 (M)</view>
         <view class="range-row">
-          <input class="range-input" type="number" placeholder="最小" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
+          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minCoins}}" bindinput="onMinCoinsInput" />
           <text class="range-separator">-</text>
-          <input class="range-input" type="number" placeholder="最大" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
+          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxCoins}}" bindinput="onMaxCoinsInput" />
         </view>
       </view>
 
@@ -89,29 +92,29 @@
       </view>
 
       <view class="field-block">
-        <view class="field-label">租金(元)</view>
+        <view class="field-label">租金 (元)</view>
         <view class="range-row">
-          <input class="range-input" type="number" placeholder="最小" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
+          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
           <text class="range-separator">-</text>
-          <input class="range-input" type="number" placeholder="最大" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
+          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
         </view>
       </view>
 
       <view class="field-block">
-        <view class="field-label">押金(元)</view>
+        <view class="field-label">押金 (元)</view>
         <view class="range-row">
-          <input class="range-input" type="number" placeholder="最小" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
+          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
           <text class="range-separator">-</text>
-          <input class="range-input" type="number" placeholder="最大" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
+          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
         </view>
       </view>
 
       <view class="field-block">
-        <view class="field-label">总价(元)</view>
+        <view class="field-label">总价 (元)</view>
         <view class="range-row">
-          <input class="range-input" type="number" placeholder="最小" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
+          <input class="range-input" type="number" placeholder="最小值" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
           <text class="range-separator">-</text>
-          <input class="range-input" type="number" placeholder="最大" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
+          <input class="range-input" type="number" placeholder="最大值" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
         </view>
       </view>
 
@@ -124,8 +127,12 @@
       </view>
 
       <view class="action-row">
-        <view class="btn-toggle" bindtap="onShowMoreFilters"><text>{{skinToggleText}}</text></view>
-        <view class="btn-reset" bindtap="onResetFilters"><text>重置筛选</text></view>
+        <view class="btn-toggle" bindtap="onShowMoreFilters">
+          <text>{{skinToggleText}}</text>
+        </view>
+        <view class="btn-reset" bindtap="onResetFilters">
+          <text>重置筛选</text>
+        </view>
       </view>
 
       <view class="skin-filter" wx:if="{{showMoreFilters}}">
@@ -135,7 +142,7 @@
         </view>
         <view class="skin-list">
           <view class="skin-tag {{item.className}}" wx:for="{{skinOptionsView}}" wx:key="id" bindtap="onSkinTap" data-name="{{item.name}}">
-            <text class="skin-check" wx:if="{{item.selected}}">√</text>
+            <text class="skin-check" wx:if="{{item.selected}}">选</text>
             <text>{{item.name}}</text>
           </view>
         </view>
@@ -145,7 +152,9 @@
 
   <view class="account-section">
     <view class="account-container">
-      <view class="list-header"><text class="account-count">{{accountCountText}}</text></view>
+      <view class="list-header">
+        <text class="account-count">{{accountCountText}}</text>
+      </view>
 
       <view class="state-card" wx:if="{{showLoadingState}}">
         <view class="loading-spinner"></view>
@@ -226,7 +235,7 @@
               <view class="summary-footer">
                 <view class="summary-pricing">
                   <text class="summary-label">租金/押金</text>
-                  <text class="summary-value">¥{{item.actual_rental}} / ¥{{item.deposit}}</text>
+                  <text class="summary-value">￥{{item.actual_rental}} / ￥{{item.deposit}}</text>
                 </view>
                 <view class="summary-duration">
                   <text class="summary-label">租期</text>
@@ -234,7 +243,7 @@
                 </view>
                 <view class="summary-total">
                   <text class="summary-label">总价</text>
-                  <text class="summary-total-value">¥{{item.total_price}}</text>
+                  <text class="summary-total-value">￥{{item.total_price}}</text>
                 </view>
               </view>
 
@@ -248,7 +257,9 @@
           </view>
         </view>
 
-        <view class="load-more" wx:if="{{hasMore}}"><view class="btn-load-more" bindtap="onLoadMore">加载更多</view></view>
+        <view class="load-more" wx:if="{{hasMore}}">
+          <view class="btn-load-more" bindtap="onLoadMore">加载更多</view>
+        </view>
 
         <view class="loading inline-loading" wx:if="{{showInlineLoading}}">
           <view class="loading-spinner"></view>

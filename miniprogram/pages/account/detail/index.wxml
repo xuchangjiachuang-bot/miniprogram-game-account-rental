@@ -44,15 +44,15 @@
           </view>
           <view class="metric-card money">
             <text class="metric-card-label">租金</text>
-            <text class="metric-card-value compact">¥{{account.actual_rental}}</text>
+            <text class="metric-card-value compact">￥{{account.actual_rental}}</text>
           </view>
           <view class="metric-card money">
             <text class="metric-card-label">押金</text>
-            <text class="metric-card-value compact">¥{{account.deposit}}</text>
+            <text class="metric-card-value compact">￥{{account.deposit}}</text>
           </view>
           <view class="metric-card total">
             <text class="metric-card-label">总价</text>
-            <text class="metric-card-value compact">¥{{account.total_price}}</text>
+            <text class="metric-card-value compact">￥{{account.total_price}}</text>
           </view>
           <view class="metric-card duration">
             <text class="metric-card-label">租期</text>
