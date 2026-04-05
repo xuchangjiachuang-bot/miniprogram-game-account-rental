@@ -1,16 +1,13 @@
-<!-- pages/profile/edit/index.wxml -->
 <view class="page">
-  <view class="avatar-section">
-    <image
-      class="avatar-image"
-      src="{{userInfo.avatar || '/images/default-avatar.png'}}"
-      mode="aspectFill"
-      bindtap="onAvatarTap"
-    />
-    <view class="avatar-tip">点击更换头像</view>
+  <view class="hero-card">
+    <view class="hero-badge">编辑资料</view>
+    <view class="avatar-wrap" bindtap="onAvatarTap">
+      <image class="avatar-image" src="{{userInfo.avatar || '/images/default-avatar.png'}}" mode="aspectFill" />
+      <view class="avatar-tip">点击更换头像</view>
+    </view>
   </view>
 
-  <view class="form-section">
+  <view class="form-card">
     <view class="form-item">
       <text class="form-label">昵称</text>
       <input
@@ -25,33 +22,27 @@
 
     <view class="form-item">
       <text class="form-label">性别</text>
-      <picker
-        mode="selector"
-        range="{{genderOptions}}"
-        range-key="label"
-        value="{{form.genderIndex}}"
-        bindchange="onGenderChange"
-      >
+      <picker mode="selector" range="{{genderOptions}}" range-key="label" value="{{form.genderIndex}}" bindchange="onGenderChange">
         <view class="picker-value">
-          {{genderOptions[form.genderIndex].label}}
-          <text class="picker-arrow">›</text>
+          <text>{{genderOptions[form.genderIndex].label}}</text>
+          <text class="picker-arrow">></text>
         </view>
       </picker>
     </view>
 
     <view class="form-item">
       <text class="form-label">手机号</text>
-      <view class="form-value">
-        {{userInfo.phone || '未绑定'}}
-        <text class="bind-link" bindtap="onBindPhone" wx:if="{{!userInfo.phone}}">去绑定</text>
+      <view class="picker-value">
+        <text>{{userInfo.phone || '未绑定手机号'}}</text>
+        <text class="bind-link" bindtap="onBindPhone">{{userInfo.phone ? '修改绑定' : '去绑定'}}</text>
       </view>
     </view>
 
-    <view class="form-item">
+    <view class="form-item textarea-item">
       <text class="form-label">个性签名</text>
       <textarea
         class="form-textarea"
-        placeholder="介绍一下自己吧"
+        placeholder="介绍一下自己，方便卖家和平台识别你的需求"
         value="{{form.bio}}"
         bindinput="onBioInput"
         maxlength="100"
@@ -63,7 +54,7 @@
 
   <view class="action-section">
     <button class="btn-save" bindtap="onSave" disabled="{{saving}}">
-      {{saving ? '保存中...' : '保存'}}
+      {{saving ? '保存中...' : '保存资料'}}
     </button>
   </view>
 </view>

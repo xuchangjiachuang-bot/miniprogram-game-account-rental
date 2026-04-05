@@ -1,159 +1,172 @@
-// pages/order/payment/wechat/index.js
 const api = require('../../../../utils/api.js');
-const storage = require('../../../../utils/storage.js');
+const dataTransformer = require('../../../../utils/data-transformer.js');
+
+function formatMoney(value) {
+  const amount = Number(value || 0);
+  if (Number.isNaN(amount)) {
+    return '0.00';
+  }
+  return amount.toFixed(2);
+}
 
 Page({
   data: {
     orderId: '',
     accountId: '',
-    rentalHours: '',
+    rentalHours: 0,
     accountInfo: null,
     totalPrice: '0.00',
     rentalPrice: '0.00',
     deposit: '0.00',
-    loading: false
+    paymentDescription: '请确认订单信息后发起微信支付。',
+    loading: false,
   },
 
   onLoad(options) {
-    console.log('微信支付页面加载', options);
-    
-    const { orderId, accountId, rentalHours } = options;
-    
-    if (!orderId || !accountId || !rentalHours) {
-      wx.showToast({
-        title: '参数错误',
-        icon: 'none'
-      });
-      setTimeout(() => {
-        wx.navigateBack();
-      }, 1500);
+    const { orderId = '', accountId = '', rentalHours = 0 } = options || {};
+    if (!orderId && !accountId) {
+      wx.showToast({ title: '支付参数不完整', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    
+
     this.setData({
       orderId,
       accountId,
-      rentalHours
+      rentalHours: Number(rentalHours || 0),
     });
-    
-    // 获取账号信息
-    this.loadAccountInfo();
+
+    this.loadPaymentInfo();
   },
 
-  /**
-   * 获取账号信息
-   */
-  loadAccountInfo() {
-    const that = this;
-    const { accountId, rentalHours } = this.data;
-    
-    api.getAccountDetail(accountId)
-      .then(res => {
-        const account = res.data;
-        
-        // 计算价格
-        const rentalPrice = (parseFloat(account.recommendedRental || 0) * (rentalHours / 24)).toFixed(2);
-        const deposit = parseFloat(account.deposit || 0).toFixed(2);
-        const totalPrice = (parseFloat(rentalPrice) + parseFloat(deposit)).toFixed(2);
-        
-        that.setData({
-          accountInfo: account,
-          rentalPrice,
-          deposit,
-          totalPrice
+  loadPaymentInfo() {
+    if (this.data.orderId) {
+      return this.loadOrderDetail();
+    }
+    return this.loadAccountInfo();
+  },
+
+  loadOrderDetail() {
+    return api.getOrderDetail(this.data.orderId)
+      .then((res) => {
+        const source = res?.data || {};
+        const order = source.order || source;
+        const account = dataTransformer.transformAccount(source.account || {}) || {
+          id: order.accountId || order.account_id || this.data.accountId,
+          fullTitle: order.accountName || order.account_name || '游戏账号',
+          coins_display: order.coinsM ? `${order.coinsM}M` : '-',
+          images: [order.accountImage || order.account_image || '/images/default-account.png'],
+        };
+
+        this.setData({
+          orderId: order.id || this.data.orderId,
+          accountId: account.id || this.data.accountId,
+          rentalHours: Number(order.rentalDuration || order.rent_hours || this.data.rentalHours || 0),
+          accountInfo: {
+            id: account.id,
+            title: account.fullTitle || account.title || '游戏账号',
+            image: (account.images && account.images[0]) || '/images/default-account.png',
+            coins: account.coins_display || '-',
+          },
+          rentalPrice: formatMoney(order.rentalPrice || order.rent_amount || 0),
+          deposit: formatMoney(order.deposit || order.deposit_amount || 0),
+          totalPrice: formatMoney(order.totalPrice || order.total_price || 0),
         });
       })
-      .catch(error => {
-        wx.showToast({
-          title: error.error || '获取账号信息失败',
-          icon: 'none'
-        });
+      .catch((error) => {
+        wx.showToast({ title: error.error || '加载订单失败', icon: 'none' });
       });
   },
 
-  /**
-   * 发起支付
-   */
+  loadAccountInfo() {
+    const { accountId, rentalHours } = this.data;
+
+    return api.getAccountDetail(accountId)
+      .then((res) => {
+        const account = dataTransformer.transformAccount(res?.data) || {};
+        const dailyRental = Number(account.actual_rental || 0);
+        const rentalPrice = rentalHours > 0 ? (dailyRental * (rentalHours / 24)) : dailyRental;
+        const deposit = Number(account.deposit || 0);
+
+        this.setData({
+          accountInfo: {
+            id: account.id || accountId,
+            title: account.fullTitle || account.title || '游戏账号',
+            image: (account.images && account.images[0]) || '/images/default-account.png',
+            coins: account.coins_display || '-',
+          },
+          rentalPrice: formatMoney(rentalPrice),
+          deposit: formatMoney(deposit),
+          totalPrice: formatMoney(rentalPrice + deposit),
+        });
+      })
+      .catch((error) => {
+        wx.showToast({ title: error.error || '加载账号信息失败', icon: 'none' });
+      });
+  },
+
   onPayment() {
     const { loading, orderId, accountId, rentalHours } = this.data;
-    
     if (loading) {
       return;
     }
-    
-    const that = this;
-    that.setData({ loading: true });
-    
-    // 创建支付订单
+    if (!orderId) {
+      wx.showToast({ title: '缺少订单编号，无法发起支付', icon: 'none' });
+      return;
+    }
+
+    this.setData({ loading: true });
+
     api.createMinipPayment({
       orderId,
       accountId,
-      rentalHours: parseInt(rentalHours)
+      rentalHours: Number(rentalHours || 0),
     })
-    .then(res => {
-      const { timeStamp, nonceStr, package: pkg, signType, paySign } = res.data;
-      
-      // 调用微信支付
-      wx.requestPayment({
-        timeStamp,
-        nonceStr,
-        package: pkg,
-        signType,
-        paySign,
-        success(res) {
-          console.log('支付成功:', res);
-          wx.showToast({
-            title: '支付成功',
-            icon: 'success'
-          });
-          
-          setTimeout(() => {
-            wx.redirectTo({
-              url: `/pages/order/detail/index?id=${orderId}`
-            });
-          }, 1500);
-        },
-        fail(err) {
-          console.error('支付失败:', err);
-          that.setData({ loading: false });
-          
-          if (err.errMsg === 'requestPayment:fail cancel') {
+      .then((res) => {
+        const data = res?.data || {};
+        const paymentArgs = {
+          timeStamp: data.timeStamp,
+          nonceStr: data.nonceStr,
+          package: data.package,
+          signType: data.signType,
+          paySign: data.paySign,
+        };
+
+        wx.requestPayment({
+          ...paymentArgs,
+          success: () => {
+            wx.showToast({ title: '支付成功', icon: 'success' });
+            setTimeout(() => {
+              wx.redirectTo({ url: `/pages/order/detail/index?id=${orderId}` });
+            }, 1000);
+          },
+          fail: (error) => {
+            console.error('微信支付失败:', error);
+            this.setData({ loading: false });
+            const canceled = (error.errMsg || '').includes('cancel');
             wx.showToast({
-              title: '取消支付',
-              icon: 'none'
+              title: canceled ? '已取消支付' : '支付失败，请重试',
+              icon: 'none',
             });
-          } else {
-            wx.showToast({
-              title: '支付失败',
-              icon: 'none'
-            });
-          }
-        }
+          },
+        });
+      })
+      .catch((error) => {
+        console.error('创建微信支付订单失败:', error);
+        this.setData({ loading: false });
+        wx.showToast({ title: error.error || '拉起支付失败', icon: 'none' });
       });
-    })
-    .catch(error => {
-      console.error('创建支付订单失败:', error);
-      that.setData({ loading: false });
-      
-      wx.showToast({
-        title: error.error || '创建支付订单失败',
-        icon: 'none'
-      });
-    });
   },
 
-  /**
-   * 取消支付
-   */
   onCancel() {
     wx.showModal({
-      title: '提示',
-      content: '确定要取消支付吗？',
-      success(res) {
+      title: '确认暂不支付',
+      content: '返回后可在订单详情中继续完成支付。',
+      success: (res) => {
         if (res.confirm) {
           wx.navigateBack();
         }
-      }
+      },
     });
-  }
+  },
 });

@@ -1,20 +1,25 @@
 const api = require('../../../utils/api.js');
 const storage = require('../../../utils/storage.js');
 
+const genderOptions = [
+  { label: '暂不填写', value: '' },
+  { label: '男', value: 'male' },
+  { label: '女', value: 'female' },
+  { label: '保密', value: 'secret' },
+];
+
 Page({
   data: {
-    userInfo: {},
+    userInfo: {
+      avatar: '/images/default-avatar.png',
+      phone: '',
+    },
     form: {
       nickname: '',
       genderIndex: 0,
       bio: '',
     },
-    genderOptions: [
-      { label: '请选择', value: '' },
-      { label: '男', value: 'male' },
-      { label: '女', value: 'female' },
-      { label: '保密', value: 'secret' },
-    ],
+    genderOptions,
     saving: false,
   },
 
@@ -32,18 +37,18 @@ Page({
       .then((res) => {
         const userInfo = res?.data || {};
         storage.setUserInfo({ ...localUserInfo, ...userInfo });
-        this.setUserForm(userInfo);
+        this.setUserForm({ ...localUserInfo, ...userInfo });
       })
       .catch((error) => {
-        console.error('加载用户信息失败:', error);
+        console.error('加载用户资料失败:', error);
       });
   },
 
   setUserForm(userInfo = {}) {
     this.setData({
       userInfo: {
-        ...this.data.userInfo,
-        ...userInfo,
+        avatar: userInfo.avatar || '/images/default-avatar.png',
+        phone: userInfo.phone || '',
       },
       form: {
         nickname: userInfo.nickname || '',
@@ -77,63 +82,53 @@ Page({
       sourceType: ['album', 'camera'],
       success: (res) => {
         const tempFilePath = res?.tempFiles?.[0]?.tempFilePath;
-        if (!tempFilePath) return;
+        if (!tempFilePath) {
+          return;
+        }
         this.uploadAvatar(tempFilePath);
       },
     });
   },
 
   uploadAvatar(filePath) {
-    wx.showLoading({
-      title: '上传中...',
-      mask: true,
-    });
+    wx.showLoading({ title: '上传中', mask: true });
 
     api.uploadFile(filePath, 'avatar')
       .then((res) => {
-        const avatarUrl = res?.data?.url || '';
-        this.setData({
-          'userInfo.avatar': avatarUrl,
-        });
-        wx.showToast({
-          title: '头像上传成功',
-          icon: 'success',
-        });
+        const avatarUrl = res?.data?.url || res?.data || '';
+        if (!avatarUrl) {
+          throw new Error('未返回头像地址');
+        }
+        this.setData({ 'userInfo.avatar': avatarUrl });
+        wx.showToast({ title: '头像上传成功', icon: 'success' });
       })
       .catch((error) => {
         console.error('上传头像失败:', error);
-        wx.showToast({
-          title: error.error || '上传失败',
-          icon: 'none',
-        });
+        wx.showToast({ title: error.error || error.message || '上传失败', icon: 'none' });
       })
-      .finally(() => {
-        wx.hideLoading();
-      });
+      .finally(() => wx.hideLoading());
   },
 
   onBindPhone() {
-    wx.navigateTo({
-      url: '/pages/auth/bind-phone/index',
-    });
+    wx.navigateTo({ url: '/pages/auth/bind-phone/index' });
   },
 
   onSave() {
-    const { form, userInfo, genderOptions } = this.data;
-    if (!form.nickname.trim()) {
-      wx.showToast({
-        title: '请输入昵称',
-        icon: 'none',
-      });
+    const { form, userInfo, genderOptions: options } = this.data;
+    const nickname = (form.nickname || '').trim();
+    if (!nickname) {
+      wx.showToast({ title: '请输入昵称', icon: 'none' });
       return;
     }
 
-    if (this.data.saving) return;
+    if (this.data.saving) {
+      return;
+    }
 
     const updateData = {
-      nickname: form.nickname.trim(),
-      gender: genderOptions[form.genderIndex]?.value || '',
-      bio: form.bio || '',
+      nickname,
+      gender: options[form.genderIndex]?.value || '',
+      bio: (form.bio || '').trim(),
       avatar: userInfo.avatar || '',
     };
 
@@ -142,29 +137,21 @@ Page({
     api.updateUserInfo(updateData)
       .then((res) => {
         const updatedUserInfo = {
-          ...userInfo,
+          ...(storage.getUserInfo() || {}),
           ...(res?.data || {}),
           ...updateData,
+          phone: userInfo.phone || storage.getUserInfo()?.phone || '',
         };
 
         storage.setUserInfo(updatedUserInfo);
-        this.setData({ userInfo: updatedUserInfo });
+        this.setUserForm(updatedUserInfo);
 
-        wx.showToast({
-          title: '保存成功',
-          icon: 'success',
-        });
-
-        setTimeout(() => {
-          wx.navigateBack();
-        }, 1200);
+        wx.showToast({ title: '资料已保存', icon: 'success' });
+        setTimeout(() => wx.navigateBack(), 1000);
       })
       .catch((error) => {
         console.error('保存资料失败:', error);
-        wx.showToast({
-          title: error.error || '保存失败',
-          icon: 'none',
-        });
+        wx.showToast({ title: error.error || '保存失败，请稍后重试', icon: 'none' });
       })
       .finally(() => {
         this.setData({ saving: false });
