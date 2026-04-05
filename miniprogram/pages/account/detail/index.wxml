@@ -1,4 +1,11 @@
 <view class="page">
+  <view class="error-card" wx:if="{{error && !loading}}">
+    <view class="error-title">页面加载失败</view>
+    <view class="error-text">{{error}}</view>
+    <button class="error-btn" bindtap="onRetry">重新加载</button>
+  </view>
+
+  <block wx:else>
   <view class="hero-gallery" wx:if="{{account.images && account.images.length > 0}}">
     <swiper class="account-swiper" current="{{currentImageIndex}}" bindchange="onSwiperChange" circular="{{account.images.length > 1}}">
       <swiper-item wx:for="{{account.images}}" wx:key="*this">
@@ -97,4 +104,5 @@
     bind:loginSuccess="onLoginSuccess"
     bind:close="onLoginModalClose"
   />
+  </block>
 </view>

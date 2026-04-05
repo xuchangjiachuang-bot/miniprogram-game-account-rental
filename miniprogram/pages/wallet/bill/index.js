@@ -83,6 +83,8 @@ Page({
     monthList: [],
     selectedMonthIndex: 0,
     selectedMonthLabel: '',
+    loading: false,
+    errorText: '',
   },
 
   onLoad(options) {
@@ -122,6 +124,7 @@ Page({
   loadBill() {
     const year = this.data.year;
     const month = this.data.month;
+    this.setData({ loading: true, errorText: '' });
 
     return api.getMonthlyBill(year, month)
       .then((res) => {
@@ -168,7 +171,15 @@ Page({
               ],
             }, year, month),
           });
+          return;
         }
+        this.setData({
+          bill: null,
+          errorText: error.error || '账单加载失败，请稍后重试',
+        });
+      })
+      .finally(() => {
+        this.setData({ loading: false });
       });
   },
 
@@ -199,5 +210,9 @@ Page({
       fallbackUrl: '/pages/wallet/index',
       fallbackType: 'redirectTo',
     });
+  },
+
+  onRetry() {
+    this.loadBill();
   },
 });

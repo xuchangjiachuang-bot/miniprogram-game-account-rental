@@ -138,7 +138,7 @@ Page({
       return Promise.resolve();
     }
 
-    this.setData({ loading: true });
+    this.setData({ loading: true, error: null });
     wx.showLoading({ title: '加载中', mask: true });
 
     return api.getAccountDetail(this.data.id)
@@ -266,5 +266,9 @@ Page({
 
   onLoginModalClose() {
     this.setData({ showLoginModal: false });
+  },
+
+  onRetry() {
+    this.loadAccountDetail();
   },
 });

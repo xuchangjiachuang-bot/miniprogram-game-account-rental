@@ -7,6 +7,48 @@ page {
   padding: 24rpx 20rpx 40rpx;
 }
 
+.loading-state,
+.error-state {
+  padding: 80rpx 30rpx;
+  border-radius: 28rpx;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 14rpx 34rpx rgba(15, 23, 42, 0.06);
+}
+
+.loading-title,
+.error-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.loading-text,
+.error-text {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.error-btn {
+  width: 100%;
+  height: 92rpx;
+  margin-top: 28rpx;
+  padding: 0;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.error-btn::after {
+  border: none;
+}
+
 .month-selector,
 .section-card {
   background: #ffffff;

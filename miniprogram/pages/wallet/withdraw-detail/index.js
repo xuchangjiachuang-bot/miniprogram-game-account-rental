@@ -100,6 +100,8 @@ Page({
   data: {
     id: '',
     withdrawal: null,
+    loading: false,
+    errorText: '',
   },
 
   onLoad(options) {
@@ -117,6 +119,7 @@ Page({
   },
 
   loadWithdrawalDetail() {
+    this.setData({ loading: true, errorText: '' });
     return api.getWithdrawalDetail(this.data.id)
       .then((res) => {
         const raw = res && res.data ? res.data : null;
@@ -143,7 +146,15 @@ Page({
               createdAt: '2026-04-04 10:30:00',
             }, this.data.id),
           });
+          return;
         }
+        this.setData({
+          withdrawal: null,
+          errorText: error.error || '提现详情加载失败，请稍后重试',
+        });
+      })
+      .finally(() => {
+        this.setData({ loading: false });
       });
   },
 
@@ -173,5 +184,9 @@ Page({
       fallbackUrl: '/pages/wallet/index',
       fallbackType: 'redirectTo',
     });
+  },
+
+  onRetry() {
+    this.loadWithdrawalDetail();
   },
 });

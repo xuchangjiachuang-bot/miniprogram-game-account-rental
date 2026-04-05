@@ -1,4 +1,16 @@
 <view class="page">
+  <view class="loading-state" wx:if="{{loading}}">
+    <text class="loading-title">加载中...</text>
+    <text class="loading-text">正在整理本月账单数据，请稍候。</text>
+  </view>
+
+  <view class="error-state" wx:elif="{{errorText}}">
+    <text class="error-title">账单暂时无法加载</text>
+    <text class="error-text">{{errorText}}</text>
+    <button class="error-btn" bindtap="onRetry">重新加载</button>
+  </view>
+
+  <block wx:else>
   <view class="month-selector">
     <picker mode="selector" range="{{monthList}}" range-key="label" value="{{selectedMonthIndex}}" bindchange="onMonthChange">
       <view class="selector-box">
@@ -84,4 +96,5 @@
     <text class="empty-title">本月暂无交易记录</text>
     <text class="empty-text">切换月份后可查看其他月份的账单数据。</text>
   </view>
+  </block>
 </view>

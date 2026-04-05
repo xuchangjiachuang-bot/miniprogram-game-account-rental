@@ -100,6 +100,7 @@ Page({
     rentRows: [],
     gameAccountRows: [],
     paymentRows: [],
+    errorText: '',
   },
 
   onLoad(options) {
@@ -131,7 +132,7 @@ Page({
       return Promise.resolve();
     }
 
-    this.setData({ loading: true });
+    this.setData({ loading: true, errorText: '' });
 
     return api.getOrderDetail(this.data.orderId)
       .then((res) => {
@@ -177,6 +178,9 @@ Page({
         wx.showToast({
           title: error.error || '加载失败，请稍后重试',
           icon: 'none',
+        });
+        this.setData({
+          errorText: error.error || '订单详情加载失败，请稍后重试',
         });
       })
       .finally(() => {
@@ -390,5 +394,9 @@ Page({
     }
 
     wx.navigateTo({ url: `/pages/account/detail/index?id=${this.data.account.id}` });
+  },
+
+  onRetry() {
+    this.loadData();
   },
 });

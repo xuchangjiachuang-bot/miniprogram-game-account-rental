@@ -236,6 +236,9 @@ page {
   margin-top: 20rpx;
   padding: 80rpx 30rpx;
   text-align: center;
+  border-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: 0 14rpx 34rpx rgba(15, 23, 42, 0.06);
 }
 
 .loading-title {
@@ -250,4 +253,20 @@ page {
   margin-top: 12rpx;
   font-size: 24rpx;
   color: #64748b;
+}
+
+.error-btn {
+  width: 100%;
+  height: 92rpx;
+  margin-top: 28rpx;
+  padding: 0;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.error-btn::after {
+  border: none;
 }

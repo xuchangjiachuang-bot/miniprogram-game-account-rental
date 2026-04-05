@@ -1,4 +1,11 @@
 <view class="page">
+  <view class="error-card" wx:if="{{errorText && !loading}}">
+    <view class="error-title">订单暂时打不开</view>
+    <view class="error-text">{{errorText}}</view>
+    <button class="error-btn" bindtap="onRetry">重新加载</button>
+  </view>
+
+  <block wx:else>
   <view class="status-header status-{{orderStatusKey}}">
     <view class="status-chip">订单状态</view>
     <view class="status-main">
@@ -97,4 +104,5 @@
       {{item.text}}
     </button>
   </view>
+  </block>
 </view>
