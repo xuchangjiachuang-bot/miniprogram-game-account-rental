@@ -58,9 +58,8 @@ Page({
         const data = res?.data || {};
         const orders = data.list || data.orders || [];
         const processedOrders = orderTransformer.transformOrderList(orders);
-        const resolvedImages = await cloudFile.resolveImageList(
-          processedOrders.map((item) => item.account && item.account.image).filter(Boolean)
-        );
+        const orderImages = processedOrders.map((item) => (item.account && item.account.image) || '');
+        const resolvedImages = await cloudFile.resolveImageList(orderImages);
         const processedOrdersView = processedOrders.map((item, index) => ({
           ...item,
           account: {
