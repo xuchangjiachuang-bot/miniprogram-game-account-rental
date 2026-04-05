@@ -5,7 +5,7 @@
       <swiper wx:if="{{hasCarousels}}" class="carousel" indicator-dots autoplay interval="3000" circular indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff">
         <swiper-item wx:for="{{carouselView}}" wx:key="id">
           <view class="carousel-item" bindtap="onCarouselTap" data-url="{{item.targetUrl}}">
-            <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
+            <image class="carousel-image" src="{{item.imageUrl}}" mode="aspectFill" binderror="onCarouselImageError" data-id="{{item.id}}" />
             <view class="carousel-overlay"></view>
             <view class="carousel-content">
               <view class="carousel-title">{{item.title}}</view>
@@ -86,7 +86,7 @@
         </view>
       </view>
 
-      <view class="filter-row">
+      <view class="filter-row compact-row">
         <view class="filter-item">
           <view class="filter-label">哈夫币（M）</view>
           <view class="range-box">
@@ -152,13 +152,17 @@
         <view class="account-grid" wx:if="{{hasAccounts}}">
           <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
             <view class="card-image">
-              <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" />
-              <view class="card-status {{item.status}}">{{item.statusText}}</view>
+              <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" binderror="onCardImageError" data-id="{{item.id}}" />
               <view class="platform-badge">{{item.login_method}}</view>
+              <view class="card-status {{item.status}}">{{item.statusText}}</view>
             </view>
 
             <view class="card-content">
-              <view class="card-title">{{item.fullTitle}}</view>
+              <view class="card-top-row">
+                <view class="card-title">{{item.fullTitle}}</view>
+                <view class="card-region" wx:if="{{item.showRegion}}">{{item.regionText}}</view>
+              </view>
+
               <view class="info-row">
                 <view class="info-box coins">
                   <text class="info-label">哈夫币</text>
@@ -185,13 +189,12 @@
                 </view>
               </view>
 
-              <view class="kd-region-row" wx:if="{{item.showKdOrRegion}}">
-                <text class="kd-text" wx:if="{{item.showKd}}">KD: {{item.kd}}</text>
-                <text class="region-text" wx:if="{{item.showRegion}}">{{item.regionText}}</text>
+              <view class="meta-row" wx:if="{{item.showKdOrRegion}}">
+                <text class="meta-pill" wx:if="{{item.showKd}}">KD {{item.kd}}</text>
               </view>
 
               <view class="skins-row" wx:if="{{item.showSkinPreview}}">
-                <text class="skin-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
+                <text class="card-tag" wx:for="{{item.tagPreview}}" wx:key="*this">{{item}}</text>
                 <text class="skin-more" wx:if="{{item.showMoreTagCount}}">+{{item.moreTagCount}}</text>
               </view>
 
@@ -204,7 +207,7 @@
                   <text class="price-label">押金</text>
                   <text class="price-value">¥{{item.deposit}}</text>
                 </view>
-                <view class="price-box">
+                <view class="price-box total-box">
                   <text class="price-label">总价</text>
                   <text class="price-value total">¥{{item.total_price}}</text>
                 </view>
@@ -238,4 +241,3 @@
   <customer-service-float visible="{{showCustomerService}}" bind:tap="onCustomerServiceTap" bind:close="onCustomerServiceClose" />
   <login-modal visible="{{showLoginModal}}" bind:loginSuccess="onLoginSuccess" />
 </view>
-

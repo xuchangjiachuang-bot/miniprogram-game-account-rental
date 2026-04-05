@@ -19,6 +19,8 @@
             src="{{item}}"
             mode="aspectFill"
             bindtap="onImagePreview"
+            binderror="onGalleryImageError"
+            data-index="{{index}}"
             data-urls="{{account.images}}"
             data-current="{{item}}"
           />
@@ -26,10 +28,7 @@
       </swiper>
 
       <view class="gallery-mask"></view>
-
-      <view class="gallery-counter" wx:if="{{showGalleryControls}}">
-        {{imageCounterText}}
-      </view>
+      <view class="gallery-counter" wx:if="{{showGalleryControls}}">{{imageCounterText}}</view>
 
       <view class="swiper-indicators" wx:if="{{showGalleryControls}}">
         <view class="indicator-dot {{item.className}}" wx:for="{{galleryIndicators}}" wx:key="id"></view>
@@ -99,7 +98,7 @@
         <text class="btn-side-sub">收藏</text>
       </button>
       <button class="btn-rent" bindtap="onRentNow" wx:if="{{canRent}}">立即租号</button>
-      <button class="btn-rent" bindtap="onRentNow" disabled wx:else>暂不可租</button>
+      <button class="btn-rent" disabled wx:else>暂不可租</button>
     </view>
 
     <login-modal
@@ -110,4 +109,3 @@
     />
   </block>
 </view>
-

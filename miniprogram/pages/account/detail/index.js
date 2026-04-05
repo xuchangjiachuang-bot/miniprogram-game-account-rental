@@ -4,6 +4,8 @@ const config = require('../../../utils/config.js');
 const dataTransformer = require('../../../utils/data-transformer.js');
 const navigation = require('../../../utils/navigation.js');
 
+const DEFAULT_ACCOUNT_IMAGE = dataTransformer.DEFAULT_ACCOUNT_IMAGE || '/images/default-account.png';
+
 function buildQuickFacts(account = {}) {
   return [
     { label: '哈夫币', value: account.coins_display || '-', className: 'coins' },
@@ -14,21 +16,14 @@ function buildQuickFacts(account = {}) {
 }
 
 function appendDetailItem(list, label, value) {
-  if (value === undefined || value === null || value === '') {
-    return;
-  }
-
+  if (value === undefined || value === null || value === '') return;
   const text = String(value).trim();
-  if (!text || text === '-' || text === '0' || text === '0.00' || text === '0/0') {
-    return;
-  }
-
+  if (!text || text === '-' || text === '0' || text === '0.00' || text === '0/0') return;
   list.push({ label, value: text });
 }
 
 function buildDetailItems(account = {}) {
   const list = [];
-
   appendDetailItem(list, '段位', account.rank_display);
   appendDetailItem(list, '体力 / 负重', `${account.stamina_level || '-'} / ${account.load_level || '-'}`);
   appendDetailItem(list, 'KD', account.kd);
@@ -39,16 +34,15 @@ function buildDetailItems(account = {}) {
   appendDetailItem(list, '浏览次数', account.view_count);
   appendDetailItem(list, '成交次数', account.trade_count);
   appendDetailItem(list, '上架时间', account.listed_at);
-
   return list;
 }
 
 function buildPriceRows(account = {}) {
   return [
-    { label: '租金', value: account.actual_rental || '0.00', displayValue: `¥${account.actual_rental || '0.00'}`, rowClassName: '' },
-    { label: '押金', value: account.deposit || '0.00', displayValue: `¥${account.deposit || '0.00'}`, rowClassName: '' },
-    { label: '租期', value: account.rental_description || '-', displayValue: account.rental_description || '-', rowClassName: '' },
-    { label: '合计', value: account.total_price || '0.00', displayValue: `¥${account.total_price || '0.00'}`, rowClassName: 'total' },
+    { label: '租金', displayValue: `¥${account.actual_rental || '0.00'}`, rowClassName: '' },
+    { label: '押金', displayValue: `¥${account.deposit || '0.00'}`, rowClassName: '' },
+    { label: '租期', displayValue: account.rental_description || '-', rowClassName: '' },
+    { label: '合计', displayValue: `¥${account.total_price || '0.00'}`, rowClassName: 'total' },
   ];
 }
 
@@ -60,10 +54,7 @@ function buildGalleryIndicators(images = [], currentIndex = 0) {
 }
 
 function normalizeAccount(account = {}) {
-  const images = Array.isArray(account.images) && account.images.length > 0
-    ? account.images
-    : ['/images/default-account.png'];
-
+  const images = Array.isArray(account.images) && account.images.length > 0 ? account.images : [DEFAULT_ACCOUNT_IMAGE];
   return {
     ...account,
     images,
@@ -80,7 +71,7 @@ Page({
     id: '',
     account: {
       id: '',
-      images: [],
+      images: [DEFAULT_ACCOUNT_IMAGE],
       region: {},
       skins: [],
       tagPreview: [],
@@ -88,14 +79,13 @@ Page({
     currentImageIndex: 0,
     imageCounterText: '1 / 1',
     galleryIndicators: [],
-    hasImages: false,
+    hasImages: true,
     showGalleryControls: false,
     hasDetailItems: false,
     hasSkins: false,
     showErrorState: false,
     showInitialLoading: false,
     canRent: false,
-    rentButtonText: '暂不可租',
     loading: false,
     creatingOrder: false,
     error: '',
@@ -131,7 +121,7 @@ Page({
     return {
       title: account.fullTitle || '游戏账号租赁',
       path: `/pages/account/detail/index?id=${this.data.id}`,
-      imageUrl: (account.images && account.images[0]) || '',
+      imageUrl: (account.images && account.images[0]) || DEFAULT_ACCOUNT_IMAGE,
     };
   },
 
@@ -140,7 +130,7 @@ Page({
   },
 
   syncStateFlags(account, errorText, loading) {
-    const images = account && Array.isArray(account.images) ? account.images : [];
+    const images = account && Array.isArray(account.images) && account.images.length > 0 ? account.images : [DEFAULT_ACCOUNT_IMAGE];
     const detailItems = this.data.detailItems || [];
     const skins = account && Array.isArray(account.skins) ? account.skins : [];
     const hasAccountContent = Boolean(account && (account.id || images.length));
@@ -153,16 +143,15 @@ Page({
       showErrorState: Boolean(errorText) && !loading,
       showInitialLoading: Boolean(loading) && !hasAccountContent,
       canRent: account && account.status === 'available',
-      rentButtonText: account && account.status === 'available' ? '立即租号' : '暂不可租',
     });
   },
 
   updateGalleryState(account, index) {
-    const images = account && Array.isArray(account.images) ? account.images : [];
-    const safeIndex = images.length > 0 ? Math.min(Math.max(index, 0), images.length - 1) : 0;
+    const images = account && Array.isArray(account.images) && account.images.length > 0 ? account.images : [DEFAULT_ACCOUNT_IMAGE];
+    const safeIndex = Math.min(Math.max(index, 0), images.length - 1);
     this.setData({
       currentImageIndex: safeIndex,
-      imageCounterText: `${safeIndex + 1} / ${images.length || 1}`,
+      imageCounterText: `${safeIndex + 1} / ${images.length}`,
       galleryIndicators: buildGalleryIndicators(images, safeIndex),
     });
     this.syncStateFlags(account, this.data.error, this.data.loading);
@@ -221,10 +210,21 @@ Page({
     this.updateGalleryState(this.data.account, nextIndex);
   },
 
+  onGalleryImageError(e) {
+    const index = Number(e.currentTarget.dataset.index || 0);
+    const images = (this.data.account.images || []).slice();
+    images[index] = DEFAULT_ACCOUNT_IMAGE;
+    const account = {
+      ...this.data.account,
+      images,
+    };
+    this.setData({ account });
+    this.updateGalleryState(account, this.data.currentImageIndex);
+  },
+
   onPrevImage() {
     const imageCount = (this.data.account.images || []).length;
     if (imageCount <= 1) return;
-
     const nextIndex = (this.data.currentImageIndex - 1 + imageCount) % imageCount;
     this.updateGalleryState(this.data.account, nextIndex);
   },
@@ -232,7 +232,6 @@ Page({
   onNextImage() {
     const imageCount = (this.data.account.images || []).length;
     if (imageCount <= 1) return;
-
     const nextIndex = (this.data.currentImageIndex + 1) % imageCount;
     this.updateGalleryState(this.data.account, nextIndex);
   },
@@ -240,17 +239,12 @@ Page({
   onImagePreview(e) {
     const urls = e.currentTarget.dataset.urls || [];
     const current = e.currentTarget.dataset.current || '';
-    if (!Array.isArray(urls) || urls.length === 0) {
-      return;
-    }
-
+    if (!Array.isArray(urls) || urls.length === 0) return;
     wx.previewImage({ urls, current });
   },
 
   onRentNow() {
-    if (this.data.creatingOrder) {
-      return;
-    }
+    if (this.data.creatingOrder) return;
 
     const userInfo = storage.getUserInfo();
     if (!userInfo) {
@@ -268,21 +262,14 @@ Page({
     this.setData({ creatingOrder: true });
 
     const rentHours = Number(account.rental_hours || 0) || 24;
-
-    api.createOrder({
-      account_id: account.id,
-      rent_hours: rentHours,
-    })
+    api.createOrder({ account_id: account.id, rent_hours: rentHours })
       .then((res) => {
         const data = res && res.data ? res.data : {};
         const orderId = data.id || data.orderId;
         if (!orderId) {
           throw new Error('订单创建成功，但未返回订单编号');
         }
-
-        wx.navigateTo({
-          url: `/pages/order/payment/index?id=${orderId}`,
-        });
+        wx.navigateTo({ url: `/pages/order/payment/index?id=${orderId}` });
       })
       .catch((error) => {
         wx.showToast({

@@ -4,6 +4,8 @@ const config = require('../../utils/config.js');
 const mockData = require('../../utils/mock-data.js');
 const dataTransformer = require('../../utils/data-transformer.js');
 
+const DEFAULT_ACCOUNT_IMAGE = dataTransformer.DEFAULT_ACCOUNT_IMAGE || '/images/default-account.png';
+
 const fallbackHomepageConfig = {
   carousels: [],
   skinOptions: [],
@@ -15,15 +17,22 @@ const fallbackHomepageConfig = {
   },
 };
 
+function sanitizeCarouselImage(src) {
+  return dataTransformer.sanitizeImageSource ? dataTransformer.sanitizeImageSource(src) : src;
+}
+
 function buildCarouselView(carousels = []) {
-  return carousels.map((item, index) => ({
-    id: item.id || `carousel_${index}`,
-    title: item.title || '',
-    description: item.description || '',
-    hasDescription: Boolean(item.description),
-    imageUrl: item.imageUrl || item.image || '/images/default-account.png',
-    targetUrl: item.linkUrl || item.link || '',
-  }));
+  return carousels.map((item, index) => {
+    const imageUrl = sanitizeCarouselImage(item.imageUrl || item.image || '') || DEFAULT_ACCOUNT_IMAGE;
+    return {
+      id: item.id || `carousel_${index}`,
+      title: item.title || '',
+      description: item.description || '',
+      hasDescription: Boolean(item.description),
+      imageUrl,
+      targetUrl: item.linkUrl || item.link || '',
+    };
+  });
 }
 
 function buildSkinOptionsView(options = [], selectedSkins = []) {
@@ -38,7 +47,7 @@ function buildSkinOptionsView(options = [], selectedSkins = []) {
 function buildAccountView(accounts = []) {
   return accounts.map((item) => ({
     ...item,
-    coverImage: item.images && item.images.length > 0 ? item.images[0] : '/images/default-account.png',
+    coverImage: item.images && item.images.length > 0 ? item.images[0] : DEFAULT_ACCOUNT_IMAGE,
     showKd: Number(item.kd || 0) > 0,
     showRegion: Boolean(item.regionText),
     showKdOrRegion: Number(item.kd || 0) > 0 || Boolean(item.regionText),
@@ -266,18 +275,32 @@ Page({
     wx.navigateTo({ url: url.startsWith('/') ? url : `/${url}` });
   },
 
+  onCarouselImageError(e) {
+    const id = e.currentTarget.dataset.id;
+    const nextList = this.data.carouselView.map((item) => (
+      item.id === id ? { ...item, imageUrl: DEFAULT_ACCOUNT_IMAGE } : item
+    ));
+    this.setData({ carouselView: nextList });
+  },
+
+  onCardImageError(e) {
+    const id = e.currentTarget.dataset.id;
+    const nextList = this.data.displayAccountsView.map((item) => (
+      item.id === id ? { ...item, coverImage: DEFAULT_ACCOUNT_IMAGE } : item
+    ));
+    this.setData({ displayAccountsView: nextList });
+  },
+
   onPublishTap() {
     const userInfo = storage.getUserInfo();
     if (!userInfo) {
       this.setData({ showLoginModal: true });
       return;
     }
-
     if (!(userInfo.isVerified || userInfo.isRealNameVerified || userInfo.verifyStatus === 'approved')) {
       wx.showToast({ title: '请先完成实名认证', icon: 'none' });
       return;
     }
-
     wx.navigateTo({ url: '/pages/account/publish/index' });
   },
 

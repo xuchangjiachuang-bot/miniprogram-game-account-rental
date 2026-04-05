@@ -2,6 +2,8 @@
  * Mini program account data transformer.
  */
 
+const DEFAULT_ACCOUNT_IMAGE = '/images/default-account.png';
+
 const rankMap = {
   none: '无段位',
   bronze: '青铜',
@@ -28,12 +30,31 @@ const statusMap = {
   deleted: '已删除',
   pending: '审核中',
   off_shelf: '已下架',
+  archived: '已归档',
 };
 
 function formatMoney(value) {
   const amount = Number(value || 0);
   if (Number.isNaN(amount)) return '0.00';
   return amount.toFixed(2);
+}
+
+function sanitizeImageSource(src) {
+  if (!src) return '';
+  const value = String(src).trim();
+  if (!value) return '';
+
+  const lowerValue = value.toLowerCase();
+  if (value.includes('<') || value.includes('>')) return '';
+  if (lowerValue.includes('javascript:')) return '';
+  if (lowerValue.includes('data:text/html')) return '';
+  if (lowerValue.includes('<url>')) return '';
+  if (lowerValue.includes('undefined') || lowerValue.includes('null')) return '';
+  if (lowerValue.endsWith('.html') || lowerValue.endsWith('.htm')) return '';
+
+  const supportedPrefixes = ['http://', 'https://', '/', 'wxfile://', 'cloud://', 'data:image/'];
+  const hasSupportedPrefix = supportedPrefixes.some((prefix) => lowerValue.startsWith(prefix));
+  return hasSupportedPrefix ? value : '';
 }
 
 function normalizeImages(account = {}) {
@@ -45,8 +66,12 @@ function normalizeImages(account = {}) {
   if (account.cover_image) candidates.push(account.cover_image);
   if (account.imageUrl) candidates.push(account.imageUrl);
 
-  const deduped = candidates.filter(Boolean).filter((item, index, arr) => arr.indexOf(item) === index);
-  return deduped.length > 0 ? deduped : ['/images/default-account.png'];
+  const deduped = candidates
+    .map((item) => sanitizeImageSource(item))
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index);
+
+  return deduped.length > 0 ? deduped : [DEFAULT_ACCOUNT_IMAGE];
 }
 
 function getRankText(rank) {
@@ -111,8 +136,9 @@ function transformAccount(account) {
   const deposit = Number(account.deposit || account.deposit_amount || 0);
   const totalPrice = Number(account.totalPrice || account.total_price || (rentalPrice + deposit));
   const tags = Array.isArray(account.tags) ? account.tags.filter(Boolean) : [];
-  const regionProvince = customAttributes.province || account.province || account.region?.province || '';
-  const regionCity = customAttributes.city || account.city || account.region?.city || '';
+  const regionProvince = customAttributes.province || account.province || (account.region && account.region.province) || '';
+  const regionCity = customAttributes.city || account.city || (account.region && account.region.city) || '';
+  const status = account.status || 'available';
 
   return {
     id: account.id || account.accountId || account.account_id,
@@ -150,8 +176,8 @@ function transformAccount(account) {
     rental_days: rentalHours > 0 ? Number((rentalHours / 24).toFixed(2)) : 0,
     rental_hours: rentalHours,
     description: account.description || '',
-    status: account.status || 'available',
-    statusText: getStatusText(account.status || 'available'),
+    status,
+    statusText: getStatusText(status),
     seller_id: account.sellerId || account.seller_id || '',
     view_count: Number(account.viewCount || account.view_count || 0),
     trade_count: Number(account.tradeCount || account.trade_count || 0),
@@ -169,6 +195,8 @@ function transformAccountList(accounts) {
 }
 
 module.exports = {
+  DEFAULT_ACCOUNT_IMAGE,
+  sanitizeImageSource,
   transformAccount,
   transformAccountList,
   getRankText,
