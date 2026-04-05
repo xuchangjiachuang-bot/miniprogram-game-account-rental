@@ -3,6 +3,7 @@ const storage = require('../../utils/storage.js');
 const config = require('../../utils/config.js');
 const mockData = require('../../utils/mock-data.js');
 const dataTransformer = require('../../utils/data-transformer.js');
+const cloudFile = require('../../utils/cloud-file.js');
 
 const DEFAULT_ACCOUNT_IMAGE = dataTransformer.DEFAULT_ACCOUNT_IMAGE || '/images/default-account.png';
 
@@ -227,10 +228,12 @@ Page({
 
   loadHomepageConfig() {
     return api.getHomepageConfig()
-      .then((res) => {
+      .then(async (res) => {
         const data = res && res.data ? res.data : {};
         const skinOptions = Array.isArray(data.skinOptions) ? data.skinOptions : [];
-        const carouselView = buildCarouselView(Array.isArray(data.carousels) ? data.carousels : []);
+        const carouselView = await cloudFile.resolveCarouselImages(
+          buildCarouselView(Array.isArray(data.carousels) ? data.carousels : []),
+        );
         this.setData({
           carouselView,
           hasCarousels: carouselView.length > 0,
@@ -243,14 +246,16 @@ Page({
         console.error('加载首页配置失败:', error);
         const homepageConfig = mockData.homepageConfig || fallbackHomepageConfig;
         const skinOptions = homepageConfig.skinOptions || [];
-        const carouselView = buildCarouselView(homepageConfig.carousels || []);
-        this.setData({
-          carouselView,
-          hasCarousels: carouselView.length > 0,
-          skinOptions,
-          fallbackTitle: homepageConfig.fallbackTitle || fallbackHomepageConfig.fallbackTitle,
-        });
-        this.syncSkinState();
+        return cloudFile.resolveCarouselImages(buildCarouselView(homepageConfig.carousels || []))
+          .then((carouselView) => {
+            this.setData({
+              carouselView,
+              hasCarousels: carouselView.length > 0,
+              skinOptions,
+              fallbackTitle: homepageConfig.fallbackTitle || fallbackHomepageConfig.fallbackTitle,
+            });
+            this.syncSkinState();
+          });
       });
   },
 
@@ -263,10 +268,12 @@ Page({
       status: 'available',
       auditStatus: 'approved',
     })
-      .then((res) => {
+      .then(async (res) => {
         const payload = res && res.data ? res.data : {};
         const sourceList = Array.isArray(payload) ? payload : (payload.list || payload.accounts || []);
-        const accounts = dataTransformer.transformAccountList(sourceList);
+        const accounts = await cloudFile.resolveAccountListImages(
+          dataTransformer.transformAccountList(sourceList),
+        );
         this.setData({
           accounts,
           listErrorText: '',
@@ -278,15 +285,16 @@ Page({
       .catch((error) => {
         console.error('加载账号列表失败:', error);
         if (config.useMockData && Array.isArray(mockData.accounts)) {
-          const accounts = dataTransformer.transformAccountList(mockData.accounts);
-          this.setData({
-            accounts,
-            listErrorText: '',
-            hasMore: false,
-          });
-          this.updateProvinceOptions(accounts);
-          this.applyFilters();
-          return;
+          return cloudFile.resolveAccountListImages(dataTransformer.transformAccountList(mockData.accounts))
+            .then((accounts) => {
+              this.setData({
+                accounts,
+                listErrorText: '',
+                hasMore: false,
+              });
+              this.updateProvinceOptions(accounts);
+              this.applyFilters();
+            });
         }
 
         this.setData({

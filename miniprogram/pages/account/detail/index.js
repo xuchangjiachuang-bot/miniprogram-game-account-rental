@@ -4,6 +4,7 @@ const config = require('../../../utils/config.js');
 const mockData = require('../../../utils/mock-data.js');
 const dataTransformer = require('../../../utils/data-transformer.js');
 const navigation = require('../../../utils/navigation.js');
+const cloudFile = require('../../../utils/cloud-file.js');
 
 const DEFAULT_ACCOUNT_IMAGE = dataTransformer.DEFAULT_ACCOUNT_IMAGE || '/images/default-account.png';
 
@@ -181,8 +182,10 @@ Page({
     this.syncStateFlags(this.data.account, '', true);
 
     return api.getAccountDetail(this.data.id)
-      .then((res) => {
-        const account = dataTransformer.transformAccount(res && res.data ? res.data : null);
+      .then(async (res) => {
+        const account = await cloudFile.resolveAccountImages(
+          dataTransformer.transformAccount(res && res.data ? res.data : null),
+        );
         this.applyAccount(account || {});
       })
       .catch((error) => {
@@ -191,8 +194,10 @@ Page({
         if (config.useMockData) {
           const source = (mockData.accounts || []).find((item) => String(item.id) === String(this.data.id)) || (mockData.accounts || [])[0];
           if (source) {
-            this.applyAccount(dataTransformer.transformAccount(source) || {});
-            return;
+            return cloudFile.resolveAccountImages(dataTransformer.transformAccount(source) || {})
+              .then((account) => {
+                this.applyAccount(account);
+              });
           }
         }
 

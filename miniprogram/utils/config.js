@@ -41,6 +41,7 @@ const config = {
     pageSize: 10,
     maxPageSize: 50,
   },
+  cloudEnvId: 'hfb-0gv08jmpa261d9fc',
   upload: {
     maxSize: 5 * 1024 * 1024,
     allowedTypes: ['jpg', 'jpeg', 'png', 'webp'],

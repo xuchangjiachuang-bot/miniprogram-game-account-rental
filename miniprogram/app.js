@@ -1,6 +1,7 @@
 const storage = require('./utils/storage.js');
 const api = require('./utils/api.js');
 const config = require('./utils/config.js');
+const cloudFile = require('./utils/cloud-file.js');
 
 App({
   globalData: {
@@ -13,6 +14,7 @@ App({
   },
 
   onLaunch() {
+    cloudFile.initCloud();
     console.log('小程序启动');
     this.collectSystemInfo();
     this.checkLogin();
