@@ -33,6 +33,15 @@ const SAFEBOX_OPTIONS = [
   { label: '3x3', value: 9 },
 ];
 
+const LEVEL_OPTIONS = [
+  { label: '全部', value: 0 },
+  { label: '3级', value: 3 },
+  { label: '4级', value: 4 },
+  { label: '5级', value: 5 },
+  { label: '6级', value: 6 },
+  { label: '7级', value: 7 },
+ ];
+
 const fallbackHomepageConfig = {
   carousels: [],
   skinOptions: [],
@@ -81,6 +90,9 @@ function buildAccountView(accounts = []) {
     coverImage: item.images && item.images.length > 0 ? item.images[0] : DEFAULT_ACCOUNT_IMAGE,
     showKd: item.kd !== '-' && item.kd !== '0',
     showRegion: Boolean(item.regionText),
+    showLoginMethod: Boolean(item.login_method),
+    levelText: item.account_level ? `Lv.${item.account_level}` : '-',
+    platformBadgeText: item.platformText || item.login_method,
     showSkinPreview: Array.isArray(item.tagPreview) && item.tagPreview.length > 0,
     showMoreTagCount: Number(item.moreTagCount || 0) > 0,
   }));
@@ -98,17 +110,27 @@ Page({
       maxCoins: '',
       rankIndex: 0,
       safeboxIndex: 0,
+      staminaIndex: 0,
+      loadIndex: 0,
       provinceIndex: 0,
       minRental: '',
       maxRental: '',
+      minDeposit: '',
+      maxDeposit: '',
+      minTotal: '',
+      maxTotal: '',
     },
     platformOptions: PLATFORM_OPTIONS.map((item) => item.label),
     rankOptions: RANK_OPTIONS.map((item) => item.label),
     safeboxOptions: SAFEBOX_OPTIONS.map((item) => item.label),
+    staminaOptions: LEVEL_OPTIONS.map((item) => item.label),
+    loadOptions: LEVEL_OPTIONS.map((item) => item.label),
     provinceOptions: ['全部'],
     selectedPlatformText: '全部',
     selectedRankText: '全部',
     selectedSafeboxText: '全部',
+    selectedStaminaText: '全部',
+    selectedLoadText: '全部',
     selectedProvinceText: '全部',
     skinOptions: [],
     skinOptionsView: [],
@@ -159,6 +181,8 @@ Page({
       selectedPlatformText: this.data.platformOptions[this.data.filters.platformIndex] || '全部',
       selectedRankText: this.data.rankOptions[this.data.filters.rankIndex] || '全部',
       selectedSafeboxText: this.data.safeboxOptions[this.data.filters.safeboxIndex] || '全部',
+      selectedStaminaText: this.data.staminaOptions[this.data.filters.staminaIndex] || '全部',
+      selectedLoadText: this.data.loadOptions[this.data.filters.loadIndex] || '全部',
       selectedProvinceText: this.data.provinceOptions[this.data.filters.provinceIndex] || '全部',
     });
   },
@@ -286,9 +310,15 @@ Page({
     const maxCoins = Number(this.data.filters.maxCoins || 0);
     const minRental = Number(this.data.filters.minRental || 0);
     const maxRental = Number(this.data.filters.maxRental || 0);
+    const minDeposit = Number(this.data.filters.minDeposit || 0);
+    const maxDeposit = Number(this.data.filters.maxDeposit || 0);
+    const minTotal = Number(this.data.filters.minTotal || 0);
+    const maxTotal = Number(this.data.filters.maxTotal || 0);
     const selectedPlatform = PLATFORM_OPTIONS[this.data.filters.platformIndex] || PLATFORM_OPTIONS[0];
     const selectedRank = RANK_OPTIONS[this.data.filters.rankIndex] || RANK_OPTIONS[0];
     const selectedSafebox = SAFEBOX_OPTIONS[this.data.filters.safeboxIndex] || SAFEBOX_OPTIONS[0];
+    const selectedStamina = LEVEL_OPTIONS[this.data.filters.staminaIndex] || LEVEL_OPTIONS[0];
+    const selectedLoad = LEVEL_OPTIONS[this.data.filters.loadIndex] || LEVEL_OPTIONS[0];
     const selectedProvince = this.data.provinceOptions[this.data.filters.provinceIndex] || '全部';
     const selectedSkins = this.data.selectedSkins;
 
@@ -305,9 +335,15 @@ Page({
       if (maxCoins && account.coinsValue > maxCoins) return false;
       if (minRental && account.actualRentalValue < minRental) return false;
       if (maxRental && account.actualRentalValue > maxRental) return false;
+      if (minDeposit && account.depositValue < minDeposit) return false;
+      if (maxDeposit && account.depositValue > maxDeposit) return false;
+      if (minTotal && account.totalPriceValue < minTotal) return false;
+      if (maxTotal && account.totalPriceValue > maxTotal) return false;
       if (selectedPlatform.value && account.loginMethodKey !== selectedPlatform.value) return false;
       if (selectedRank.value && account.rankKey !== selectedRank.value) return false;
       if (selectedSafebox.value && account.safeboxCount !== selectedSafebox.value) return false;
+      if (selectedStamina.value && Number(account.stamina_level) !== selectedStamina.value) return false;
+      if (selectedLoad.value && Number(account.load_level) !== selectedLoad.value) return false;
       if (selectedProvince !== '全部' && account.province !== selectedProvince) return false;
       if (selectedSkins.length > 0 && !selectedSkins.some((skin) => (account.tags || []).includes(skin))) return false;
       return true;
@@ -385,6 +421,18 @@ Page({
     this.applyFilters();
   },
 
+  onStaminaChange(e) {
+    this.setData({ 'filters.staminaIndex': Number(e.detail.value) || 0 });
+    this.syncFilterLabels();
+    this.applyFilters();
+  },
+
+  onLoadChange(e) {
+    this.setData({ 'filters.loadIndex': Number(e.detail.value) || 0 });
+    this.syncFilterLabels();
+    this.applyFilters();
+  },
+
   onProvinceChange(e) {
     this.setData({ 'filters.provinceIndex': Number(e.detail.value) || 0 });
     this.syncFilterLabels();
@@ -411,6 +459,26 @@ Page({
     this.applyFilters();
   },
 
+  onMinDepositInput(e) {
+    this.setData({ 'filters.minDeposit': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMaxDepositInput(e) {
+    this.setData({ 'filters.maxDeposit': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMinTotalInput(e) {
+    this.setData({ 'filters.minTotal': e.detail.value });
+    this.applyFilters();
+  },
+
+  onMaxTotalInput(e) {
+    this.setData({ 'filters.maxTotal': e.detail.value });
+    this.applyFilters();
+  },
+
   onSearchInput(e) {
     this.setData({ searchQuery: e.detail.value });
     this.applyFilters();
@@ -434,9 +502,15 @@ Page({
         maxCoins: '',
         rankIndex: 0,
         safeboxIndex: 0,
+        staminaIndex: 0,
+        loadIndex: 0,
         provinceIndex: 0,
         minRental: '',
         maxRental: '',
+        minDeposit: '',
+        maxDeposit: '',
+        minTotal: '',
+        maxTotal: '',
       },
       selectedSkins: [],
     });

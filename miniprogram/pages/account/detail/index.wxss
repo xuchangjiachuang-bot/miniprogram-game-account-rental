@@ -209,6 +209,22 @@ page {
   font-weight: 700;
 }
 
+.summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.summary-pill {
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
 .info-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

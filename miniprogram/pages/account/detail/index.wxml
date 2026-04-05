@@ -40,6 +40,11 @@
         </view>
 
         <view class="platform-badge">{{account.login_method}}</view>
+        <view class="summary-pills">
+          <text class="summary-pill">{{account.platformText}}</text>
+          <text class="summary-pill" wx:if="{{account.regionText}}">{{account.regionText}}</text>
+          <text class="summary-pill" wx:if="{{account.availableTimeText}}">可上号 {{account.availableTimeText}}</text>
+        </view>
 
         <view class="info-card-grid">
           <view class="info-card {{item.className}}" wx:for="{{quickFacts}}" wx:key="label">

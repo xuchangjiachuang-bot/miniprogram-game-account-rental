@@ -25,9 +25,12 @@ function appendDetailItem(list, label, value) {
 
 function buildDetailItems(account = {}) {
   const list = [];
+  appendDetailItem(list, '平台', account.platformText);
+  appendDetailItem(list, '登录方式', account.login_method);
   appendDetailItem(list, '段位', account.rank_display);
   appendDetailItem(list, '体力 / 负重', `${account.stamina_level || '-'} / ${account.load_level || '-'}`);
   appendDetailItem(list, 'KD', account.kd);
+  appendDetailItem(list, '可上号时间', account.availableTimeText);
   appendDetailItem(list, 'AWM 子弹', account.awmBullets);
   appendDetailItem(list, '六级甲', account.level6Armor);
   appendDetailItem(list, '六级头', account.level6Helmet);
@@ -60,7 +63,7 @@ function normalizeAccount(account = {}) {
     ...account,
     images,
     fullTitle: account.fullTitle || account.title || account.account_name || '游戏账号',
-    subtitle: account.account_name || '平台担保发号，支持快速租用',
+    subtitle: account.regionText || account.account_name || '平台担保发号，支持快速租用',
     login_method: account.login_method || '未知登录方式',
     statusText: account.statusText || '可出租',
     description: account.description || '卖家暂未补充描述，可先查看属性、皮肤标签与租期后再决定是否下单。',

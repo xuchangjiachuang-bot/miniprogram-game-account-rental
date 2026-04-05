@@ -27,6 +27,13 @@ const loginMethodMap = {
   steam: 'Steam账号密码',
 };
 
+const platformMap = {
+  wegame: 'Wegame',
+  steam: 'Steam',
+  qq: 'QQ',
+  wechat: '微信',
+};
+
 const statusMap = {
   available: '可出租',
   rented: '已出租',
@@ -105,6 +112,11 @@ function getLoginMethodText(loginMethod) {
 
 function getStatusText(status) {
   return statusMap[status] || status || '未知状态';
+}
+
+function getPlatformText(platform) {
+  const key = String(platform || '').toLowerCase();
+  return platformMap[key] || platform || '未知平台';
 }
 
 function getSafeboxText(safeboxCount) {
@@ -188,6 +200,9 @@ function transformAccount(account) {
   const loginMethodKey = String(customAttributes.loginMethod || account.loginMethod || account.login_method || '').trim().toLowerCase();
   const description = String(account.description || customAttributes.remark || '').trim();
   const status = account.status || 'available';
+  const startTime = String(customAttributes.startTime || account.startTime || '').trim();
+  const endTime = String(customAttributes.endTime || account.endTime || '').trim();
+  const platformKey = String(customAttributes.platform || account.platform || '').trim().toLowerCase();
 
   return {
     id: account.id || account.accountId || account.account_id,
@@ -212,6 +227,8 @@ function transformAccount(account) {
     awmBullets: String(customAttributes.awmBullets || account.awmBullets || account.awm_bullets || '').trim(),
     level6Armor: String(customAttributes.level6Armor || account.level6Armor || account.level_6_armor || '').trim(),
     level6Helmet: String(customAttributes.level6Helmet || account.level6Helmet || account.level_6_helmet || '').trim(),
+    platformKey,
+    platformText: getPlatformText(platformKey),
     login_method: getLoginMethodText(loginMethodKey),
     loginMethodKey,
     region: {
@@ -237,6 +254,7 @@ function transformAccount(account) {
     rental_duration: rentalHours,
     rental_days: rentalHours > 0 ? Number((rentalHours / 24).toFixed(2)) : 0,
     rental_hours: rentalHours,
+    availableTimeText: startTime && endTime ? `${startTime} - ${endTime}` : '',
     description: description || '卖家暂未补充描述，可先查看属性和价格后再决定。',
     status,
     statusText: getStatusText(status),
@@ -263,6 +281,7 @@ module.exports = {
   getRankText,
   getLoginMethodText,
   getStatusText,
+  getPlatformText,
   getRentalDescription,
   getSafeboxText,
   rankMap,

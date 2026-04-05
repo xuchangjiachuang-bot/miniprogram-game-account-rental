@@ -44,7 +44,7 @@
 
       <view class="filter-row">
         <view class="filter-item">
-          <view class="filter-label">登录方式</view>
+          <view class="filter-label">平台·上号方式</view>
           <picker mode="selector" range="{{platformOptions}}" value="{{filters.platformIndex}}" bindchange="onPlatformChange">
             <view class="picker-box">
               <text>{{selectedPlatformText}}</text>
@@ -68,6 +68,26 @@
           <picker mode="selector" range="{{safeboxOptions}}" value="{{filters.safeboxIndex}}" bindchange="onSafeboxChange">
             <view class="picker-box">
               <text>{{selectedSafeboxText}}</text>
+              <text class="picker-arrow">v</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="filter-item">
+          <view class="filter-label">体力等级</view>
+          <picker mode="selector" range="{{staminaOptions}}" value="{{filters.staminaIndex}}" bindchange="onStaminaChange">
+            <view class="picker-box">
+              <text>{{selectedStaminaText}}</text>
+              <text class="picker-arrow">v</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="filter-item">
+          <view class="filter-label">负重等级</view>
+          <picker mode="selector" range="{{loadOptions}}" value="{{filters.loadIndex}}" bindchange="onLoadChange">
+            <view class="picker-box">
+              <text>{{selectedLoadText}}</text>
               <text class="picker-arrow">v</text>
             </view>
           </picker>
@@ -100,6 +120,26 @@
             <input class="range-input" type="number" placeholder="最低" value="{{filters.minRental}}" bindinput="onMinRentalInput" />
             <text class="range-separator">-</text>
             <input class="range-input" type="number" placeholder="最高" value="{{filters.maxRental}}" bindinput="onMaxRentalInput" />
+          </view>
+        </view>
+      </view>
+
+      <view class="filter-row compact-row">
+        <view class="filter-item">
+          <view class="filter-label">押金（元）</view>
+          <view class="range-box">
+            <input class="range-input" type="number" placeholder="最低" value="{{filters.minDeposit}}" bindinput="onMinDepositInput" />
+            <text class="range-separator">-</text>
+            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxDeposit}}" bindinput="onMaxDepositInput" />
+          </view>
+        </view>
+
+        <view class="filter-item">
+          <view class="filter-label">总价（元）</view>
+          <view class="range-box">
+            <input class="range-input" type="number" placeholder="最低" value="{{filters.minTotal}}" bindinput="onMinTotalInput" />
+            <text class="range-separator">-</text>
+            <input class="range-input" type="number" placeholder="最高" value="{{filters.maxTotal}}" bindinput="onMaxTotalInput" />
           </view>
         </view>
       </view>
@@ -151,7 +191,7 @@
           <view class="account-card" wx:for="{{displayAccountsView}}" wx:key="id" bindtap="onAccountTap" data-id="{{item.id}}">
             <view class="card-image">
               <image class="card-img" src="{{item.coverImage}}" mode="aspectFill" binderror="onCardImageError" data-id="{{item.id}}" />
-              <view class="platform-badge">{{item.login_method}}</view>
+              <view class="platform-badge">{{item.platformBadgeText}}</view>
               <view class="card-status {{item.status}}">{{item.statusText}}</view>
             </view>
 
@@ -182,13 +222,18 @@
                   <text class="attr-value">{{item.stamina_level}}/{{item.load_level}}</text>
                 </view>
                 <view class="attribute">
+                  <text class="attr-label">等级</text>
+                  <text class="attr-value">{{item.levelText}}</text>
+                </view>
+                <view class="attribute">
                   <text class="attr-label">段位</text>
                   <text class="attr-value">{{item.rank_display}}</text>
                 </view>
               </view>
 
-              <view class="meta-row" wx:if="{{item.showKd}}">
-                <text class="meta-pill">KD {{item.kd}}</text>
+              <view class="meta-row" wx:if="{{item.showKd || item.showLoginMethod}}">
+                <text class="meta-pill" wx:if="{{item.showKd}}">KD {{item.kd}}</text>
+                <text class="meta-pill login" wx:if="{{item.showLoginMethod}}">{{item.login_method}}</text>
               </view>
 
               <view class="skins-row" wx:if="{{item.showSkinPreview}}">

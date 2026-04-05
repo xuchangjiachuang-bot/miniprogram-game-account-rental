@@ -477,7 +477,7 @@
 
 .attributes-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
   margin-top: 18rpx;
   padding: 18rpx;
@@ -517,6 +517,11 @@
   color: #4f46e5;
   font-size: 22rpx;
   font-weight: 700;
+}
+
+.meta-pill.login {
+  background: #ecfeff;
+  color: #0f766e;
 }
 
 .skins-row {
