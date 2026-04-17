@@ -121,9 +121,10 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
         .insert(userBalances)
         .values({
           id: crypto.randomUUID(),
-          userId: order.sellerId,
-          availableBalance: '0',
-          frozenBalance: '0',
+            userId: order.sellerId,
+            availableBalance: '0',
+            feeExemptBalance: '0',
+            frozenBalance: '0',
           totalWithdrawn: '0',
           totalEarned: '0',
           createdAt: now,
@@ -191,6 +192,7 @@ export async function executeAutoSplit(orderId: string): Promise<SplitResult> {
             id: crypto.randomUUID(),
             userId: order.buyerId,
             availableBalance: '0',
+            feeExemptBalance: '0',
             frozenBalance: '0',
             totalWithdrawn: '0',
             totalEarned: '0',

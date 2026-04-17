@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
         available_balance: balance.availableBalance,
         withdrawable_balance: withdrawableBalance,
         non_withdrawable_balance: balance.nonWithdrawableBalance,
+        fee_exempt_balance: balance.feeExemptBalance,
         frozen_balance: balance.frozenBalance,
         total_balance: balance.availableBalance + balance.frozenBalance,
         total_withdrawn: balance.totalWithdrawn,

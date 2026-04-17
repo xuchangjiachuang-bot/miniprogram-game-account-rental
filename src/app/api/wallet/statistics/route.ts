@@ -139,6 +139,7 @@ export async function GET(request: NextRequest) {
         endDate: now.toISOString(),
         balance: {
           availableBalance: balance.availableBalance,
+          feeExemptBalance: balance.feeExemptBalance,
           frozenBalance: balance.frozenBalance,
           totalEarned: balance.totalEarned,
           totalWithdrawn: balance.totalWithdrawn,

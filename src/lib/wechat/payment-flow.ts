@@ -402,6 +402,7 @@ export async function markWechatWalletRechargePaid(params: {
         id: crypto.randomUUID(),
         userId: paymentRecord.userId,
         availableBalance: '0',
+        feeExemptBalance: '0',
         frozenBalance: '0',
         totalWithdrawn: '0',
         totalEarned: '0',

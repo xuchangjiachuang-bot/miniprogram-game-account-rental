@@ -248,6 +248,7 @@ export async function createWechatRechargePayment(options: CreateRechargePayment
       id: crypto.randomUUID(),
       userId: user.id,
       availableBalance: '0',
+      feeExemptBalance: '0',
       frozenBalance: '0',
       totalWithdrawn: '0',
       totalEarned: '0',

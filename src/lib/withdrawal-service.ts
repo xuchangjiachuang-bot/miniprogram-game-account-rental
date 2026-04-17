@@ -169,6 +169,11 @@ function buildTransferAccountInfo(
   };
 }
 
+function getFeeExemptUsed(withdrawal: WithdrawalRow) {
+  const accountInfo = parseAccountInfo(withdrawal);
+  return Math.max(0, toAmount(accountInfo.feeExemptUsed));
+}
+
 async function finalizeWithdrawalAccounting(tx: any, withdrawal: WithdrawalRow, now: string) {
   const amount = toAmount(withdrawal.amount);
   const actualAmount = toAmount(withdrawal.actualAmount);
@@ -246,6 +251,7 @@ async function moveFinalizedWithdrawalBackToProcessing(tx: any, withdrawal: With
 async function failWithdrawalAccounting(tx: any, withdrawal: WithdrawalRow, now: string, finalized: boolean) {
   const amount = toAmount(withdrawal.amount);
   const actualAmount = toAmount(withdrawal.actualAmount);
+  const feeExemptUsed = getFeeExemptUsed(withdrawal);
   const balance = await getUserBalanceRecord(tx, withdrawal.userId);
   const availableBalance = toAmount(balance.availableBalance);
   const nextAvailableBalance = availableBalance + amount;
@@ -255,6 +261,7 @@ async function failWithdrawalAccounting(tx: any, withdrawal: WithdrawalRow, now:
       .update(userBalances)
       .set({
         availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        feeExemptBalance: sql`${userBalances.feeExemptBalance} + ${feeExemptUsed.toFixed(2)}`,
         totalWithdrawn: sql`${userBalances.totalWithdrawn} - ${actualAmount}`,
         updatedAt: now,
       })
@@ -264,6 +271,7 @@ async function failWithdrawalAccounting(tx: any, withdrawal: WithdrawalRow, now:
       .update(userBalances)
       .set({
         availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        feeExemptBalance: sql`${userBalances.feeExemptBalance} + ${feeExemptUsed.toFixed(2)}`,
         frozenBalance: sql`${userBalances.frozenBalance} - ${amount}`,
         updatedAt: now,
       })
@@ -292,6 +300,7 @@ async function failWithdrawalAccounting(tx: any, withdrawal: WithdrawalRow, now:
     balanceAfter: nextAvailableBalance,
     details: {
       actualAmount,
+      feeExemptUsed,
       finalized,
       withdrawalNo: withdrawal.withdrawalNo,
     },

@@ -207,6 +207,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [openingSupportChat, setOpeningSupportChat] = useState(false);
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
+  const [afterSaleFormVisible, setAfterSaleFormVisible] = useState(false);
   const [verifyingOrder, setVerifyingOrder] = useState<'pass' | 'reject' | null>(null);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [pendingPaymentMs, setPendingPaymentMs] = useState<number | null>(null);
@@ -227,6 +228,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     setLoginPayload(null);
     setLoginInfoLoaded(false);
+  }, [id]);
+
+  useEffect(() => {
+    setAfterSaleFormVisible(false);
   }, [id]);
 
   useEffect(() => {
@@ -658,6 +663,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       toast.success(result.message || '纠纷已提交，平台会尽快处理');
       setDisputeReason('');
+      setAfterSaleFormVisible(false);
       await loadOrderDetail();
     } catch (error: any) {
       console.error('发起纠纷失败:', error);
@@ -665,6 +671,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     } finally {
       setSubmittingDispute(false);
     }
+  }
+
+  function handleStartAfterSale() {
+    setAfterSaleFormVisible(true);
+    const textarea = document.getElementById('dispute-reason') as HTMLTextAreaElement | null;
+    if (textarea) {
+      textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => textarea.focus(), 250);
+      return;
+    }
+
+    window.setTimeout(() => {
+      const nextTextarea = document.getElementById('dispute-reason') as HTMLTextAreaElement | null;
+      if (nextTextarea) {
+        nextTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nextTextarea.focus();
+        return;
+      }
+      toast.message('当前售后申请已在处理中，请查看页面中的售后信息。');
+    }, 50);
   }
 
   if (loading) {
@@ -694,8 +720,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     isConsumptionPending &&
     order.consumptionSettlement?.status === 'pending_buyer_confirmation';
   const canCreateDispute =
+    order.viewerRole === 'buyer' &&
     ['active', 'pending_verification', 'pending_consumption_confirm', 'disputed'].includes(order.status) &&
     order.dispute?.status !== 'pending';
+  const canBuyerStartAfterSale = canCreateDispute;
 
   return (
     <div className="min-h-screen bg-background">
@@ -1068,19 +1096,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 )}
 
-                {canCreateDispute ? (
+                {canCreateDispute && afterSaleFormVisible ? (
                   <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
-                    <Label htmlFor="dispute-reason">发起纠纷</Label>
+                    <Label htmlFor="dispute-reason">申请退款 / 发起售后</Label>
                     <Textarea
                       id="dispute-reason"
                       value={disputeReason}
                       onChange={(event) => setDisputeReason(event.target.value)}
-                      placeholder="请描述账号异常、售后问题或需要平台介入的原因"
+                      placeholder="请描述账号信息不符、登录异常，或其他需要平台介入处理的原因"
                       className="min-h-[100px]"
                     />
                     <Button onClick={handleCreateDispute} disabled={submittingDispute}>
                       {submittingDispute ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AlertCircle className="mr-2 h-4 w-4" />}
-                      提交纠纷
+                      提交售后申请
                     </Button>
                   </div>
                 ) : null}
@@ -1134,13 +1162,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                       进入订单群聊
                     </Button>
-                    <Button className="w-full" onClick={handleReturnAccount} disabled={completingOrder}>
-                      {completingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                      归还账号
-                    </Button>
-                    <Button variant="outline" className="w-full" disabled>
-                      申请退款
-                    </Button>
+                    {order.viewerRole === 'buyer' ? (
+                      <>
+                        <Button className="w-full" onClick={handleReturnAccount} disabled={completingOrder}>
+                          {completingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                          归还账号
+                        </Button>
+                        <Button variant="outline" className="w-full" onClick={handleStartAfterSale}>
+                          <AlertCircle className="mr-2 h-4 w-4" />
+                          申请退款 / 发起售后
+                        </Button>
+                      </>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1150,24 +1183,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       {openingSupportChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                       进入订单群聊
                     </Button>
-                    <Button
-                      className="w-full"
-                      onClick={() => handleVerifyOrder('pass')}
-                      disabled={verifyingOrder !== null}
-                    >
-                      {verifyingOrder === 'pass' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                      验收通过
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={() => handleVerifyOrder('reject')}
-                      disabled={verifyingOrder !== null}
-                    >
-                      {verifyingOrder === 'reject' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-                      验收不通过
-                    </Button>
+                    {order.viewerRole === 'seller' ? (
+                      <>
+                        <Button
+                          className="w-full"
+                          onClick={() => handleVerifyOrder('pass')}
+                          disabled={verifyingOrder !== null}
+                        >
+                          {verifyingOrder === 'pass' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                          验收通过
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => handleVerifyOrder('reject')}
+                          disabled={verifyingOrder !== null}
+                        >
+                          {verifyingOrder === 'reject' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                          验收不通过
+                        </Button>
+                      </>
+                    ) : null}
+                    {order.viewerRole === 'buyer' ? (
+                      <Button variant="outline" className="w-full" onClick={handleStartAfterSale}>
+                        <AlertCircle className="mr-2 h-4 w-4" />
+                        申请退款 / 发起售后
+                      </Button>
+                    ) : null}
                   </>
+                ) : null}
+
+                {canBuyerStartAfterSale && !['active', 'pending_verification'].includes(order.status) ? (
+                  <Button variant="outline" className="w-full" onClick={handleStartAfterSale}>
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    申请退款 / 发起售后
+                  </Button>
                 ) : null}
               </CardContent>
             </Card>

@@ -14,6 +14,7 @@ export interface UserBalance {
   userId: string;
   availableBalance: number;
   nonWithdrawableBalance: number;
+  feeExemptBalance: number;
   frozenBalance: number;
   totalWithdrawn: number;
   totalEarned: number;
@@ -46,10 +47,15 @@ function toUserBalance(record: typeof userBalances.$inferSelect): UserBalance {
     userId: record.userId,
     availableBalance: toNumber(record.availableBalance),
     nonWithdrawableBalance: toNumber(record.nonWithdrawableBalance),
+    feeExemptBalance: toNumber(record.feeExemptBalance),
     frozenBalance: toNumber(record.frozenBalance),
     totalWithdrawn: toNumber(record.totalWithdrawn),
     totalEarned: toNumber(record.totalEarned),
   };
+}
+
+function toFeeExemptUsed(accountInfo: Record<string, unknown>) {
+  return Math.max(0, toNumber(accountInfo.feeExemptUsed));
 }
 
 function isUniqueConstraintError(error: unknown): error is { code: string } {
@@ -103,6 +109,7 @@ export async function ensureUserBalance(userId: string): Promise<UserBalance> {
       userId,
       availableBalance: '0',
       nonWithdrawableBalance: '0',
+      feeExemptBalance: '0',
       frozenBalance: '0',
       totalWithdrawn: '0',
       totalEarned: '0',
@@ -223,6 +230,66 @@ export async function addNonWithdrawableBalance(
     };
   } catch (error: any) {
     console.error('[user-balance] addNonWithdrawableBalance failed:', error);
+    return {
+      success: false,
+      message: error?.message || 'BALANCE_UPDATE_FAILED',
+      oldBalance: 0,
+      newBalance: 0,
+    };
+  }
+}
+
+export async function addFeeExemptBalance(
+  userId: string,
+  amount: number,
+  description = 'Fee-exempt refund credit',
+): Promise<BalanceUpdateResult> {
+  try {
+    const balance = await ensureUserBalance(userId);
+    const oldBalance = balance.availableBalance;
+    const newBalance = oldBalance + amount;
+    const newFeeExemptBalance = balance.feeExemptBalance + amount;
+
+    await db
+      .update(userBalances)
+      .set({
+        availableBalance: newBalance.toFixed(2),
+        feeExemptBalance: newFeeExemptBalance.toFixed(2),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(userBalances.userId, userId));
+
+    await insertBalanceTransaction({
+      userId,
+      transactionType: 'refund',
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      description,
+    });
+
+    await safeLogFinanceAuditEvent({
+      eventType: 'fee_exempt_refund_credit',
+      status: 'success',
+      userId,
+      amount,
+      balanceBefore: oldBalance,
+      balanceAfter: newBalance,
+      details: {
+        feeExemptBalanceBefore: balance.feeExemptBalance,
+        feeExemptBalanceAfter: newFeeExemptBalance,
+        description,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'BALANCE_UPDATED',
+      oldBalance,
+      newBalance,
+    };
+  } catch (error: any) {
+    console.error('[user-balance] addFeeExemptBalance failed:', error);
     return {
       success: false,
       message: error?.message || 'BALANCE_UPDATE_FAILED',
@@ -358,15 +425,9 @@ export async function requestWithdrawal(
     const settingsRows = await db.select().from(platformSettings).limit(1);
     const settings = settingsRows[0];
     const feeRate = toNumber(settings?.withdrawalFee) || 1;
-    const fee = feeRate > 0 ? Math.max(amount * (feeRate / 100), 1) : 0;
-    const actualAmount = Number((amount - fee).toFixed(2));
-
-    if (actualAmount <= 0) {
-      return {
-        success: false,
-        message: 'WITHDRAWAL_AMOUNT_TOO_SMALL',
-      };
-    }
+    let fee = 0;
+    let actualAmount = 0;
+    let feeExemptUsed = 0;
 
     const withdrawalId = randomUUID();
     const withdrawalNo = `WD${Date.now()}${Math.floor(Math.random() * 1000)
@@ -389,6 +450,7 @@ export async function requestWithdrawal(
           userId,
           availableBalance: '0',
           nonWithdrawableBalance: '0',
+          feeExemptBalance: '0',
           frozenBalance: '0',
           totalWithdrawn: '0',
           totalEarned: '0',
@@ -410,7 +472,16 @@ export async function requestWithdrawal(
 
       const availableBalance = toNumber(balance.availableBalance);
       const nonWithdrawableBalance = toNumber(balance.nonWithdrawableBalance);
+      const feeExemptBalance = toNumber(balance.feeExemptBalance);
       const withdrawableBalance = Math.max(availableBalance - nonWithdrawableBalance, 0);
+      feeExemptUsed = Math.min(amount, feeExemptBalance);
+      const taxableAmount = Math.max(amount - feeExemptUsed, 0);
+      fee = feeRate > 0 && taxableAmount > 0 ? Math.max(taxableAmount * (feeRate / 100), 1) : 0;
+      actualAmount = Number((amount - fee).toFixed(2));
+
+      if (actualAmount <= 0) {
+        throw new Error('WITHDRAWAL_AMOUNT_TOO_SMALL');
+      }
 
       if (withdrawableBalance < amount) {
         throw new Error(
@@ -424,6 +495,7 @@ export async function requestWithdrawal(
         .update(userBalances)
         .set({
           availableBalance: sql`${userBalances.availableBalance} - ${amount.toFixed(2)}`,
+          feeExemptBalance: sql`GREATEST(${userBalances.feeExemptBalance} - ${feeExemptUsed.toFixed(2)}, 0)`,
           frozenBalance: sql`${userBalances.frozenBalance} + ${amount.toFixed(2)}`,
           updatedAt: new Date().toISOString(),
         })
@@ -462,6 +534,7 @@ export async function requestWithdrawal(
         balanceAfter: availableBalance - amount,
         details: {
           fee,
+          feeExemptUsed,
           actualAmount,
           withdrawalNo,
           reviewRequired,
@@ -478,7 +551,10 @@ export async function requestWithdrawal(
         feeAmount: fee.toFixed(2),
         actualAmount: actualAmount.toFixed(2),
         withdrawalType: 'wechat',
-        accountInfo,
+        accountInfo: {
+          ...accountInfo,
+          feeExemptUsed,
+        },
         status: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -585,6 +661,10 @@ export async function reviewWithdrawal(
       amount = toNumber(withdrawal.amount);
       fee = toNumber(withdrawal.feeAmount);
       actualAmount = toNumber(withdrawal.actualAmount);
+      const withdrawalAccountInfo = (typeof withdrawal.accountInfo === 'string'
+        ? JSON.parse(withdrawal.accountInfo || '{}')
+        : (withdrawal.accountInfo || {})) as Record<string, unknown>;
+      const feeExemptUsed = toFeeExemptUsed(withdrawalAccountInfo);
 
       await tx
         .insert(userBalances)
@@ -593,6 +673,7 @@ export async function reviewWithdrawal(
           userId: withdrawal.userId,
           availableBalance: '0',
           nonWithdrawableBalance: '0',
+          feeExemptBalance: '0',
           frozenBalance: '0',
           totalWithdrawn: '0',
           totalEarned: '0',
@@ -670,6 +751,7 @@ export async function reviewWithdrawal(
         .update(userBalances)
         .set({
           availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+          feeExemptBalance: sql`${userBalances.feeExemptBalance} + ${feeExemptUsed.toFixed(2)}`,
           frozenBalance: sql`${userBalances.frozenBalance} - ${amount}`,
           updatedAt: new Date().toISOString(),
         })
@@ -697,6 +779,7 @@ export async function reviewWithdrawal(
         balanceAfter: availableBalance + amount,
         details: {
           fee,
+          feeExemptUsed,
           actualAmount,
           reviewerId,
           remark,

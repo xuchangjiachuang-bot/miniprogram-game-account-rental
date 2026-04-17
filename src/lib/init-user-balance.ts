@@ -19,6 +19,11 @@ export async function ensureUserBalanceSchema() {
       ADD COLUMN IF NOT EXISTS non_withdrawable_balance NUMERIC(10, 2) DEFAULT 0;
     `;
 
+    await schemaClient`
+      ALTER TABLE user_balances
+      ADD COLUMN IF NOT EXISTS fee_exempt_balance NUMERIC(10, 2) DEFAULT 0;
+    `;
+
     isUserBalanceSchemaInitialized = true;
   } catch (error) {
     console.error('[initUserBalanceSchema] 初始化失败:', error);

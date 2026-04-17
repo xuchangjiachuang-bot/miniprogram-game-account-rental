@@ -251,16 +251,20 @@ async function requestWalletFullRefund(order: typeof orders.$inferSelect, reason
     }
 
     const availableBefore = toNumber(balance.availableBalance);
+    const feeExemptBefore = toNumber(balance.feeExemptBalance);
     const frozenBefore = toNumber(balance.frozenBalance);
     const releasedFrozen = Math.min(frozenBefore, depositAmount);
     const availableCredit = Math.max(refundAmount - releasedFrozen, 0);
-    const availableAfter = availableBefore + availableCredit;
+    const availableIncrease = availableCredit + releasedFrozen;
+    const availableAfter = availableBefore + availableIncrease;
+    const feeExemptAfter = feeExemptBefore + availableIncrease;
     const frozenAfter = Math.max(frozenBefore - releasedFrozen, 0);
 
     await tx
       .update(userBalances)
       .set({
         availableBalance: availableAfter.toFixed(2),
+        feeExemptBalance: feeExemptAfter.toFixed(2),
         frozenBalance: frozenAfter.toFixed(2),
         updatedAt: now,
       })
@@ -274,7 +278,7 @@ async function requestWalletFullRefund(order: typeof orders.$inferSelect, reason
         transactionType: 'refund',
         amount: availableCredit.toFixed(2),
         balanceBefore: availableBefore.toFixed(2),
-        balanceAfter: availableAfter.toFixed(2),
+        balanceAfter: (availableBefore + availableCredit).toFixed(2),
         description: `订单 ${order.orderNo} 争议全额退款返还租金`,
         createdAt: now,
       });
@@ -287,7 +291,7 @@ async function requestWalletFullRefund(order: typeof orders.$inferSelect, reason
         orderId: order.id,
         transactionType: 'unfreeze',
         amount: releasedFrozen.toFixed(2),
-        balanceBefore: availableAfter.toFixed(2),
+        balanceBefore: (availableBefore + availableCredit).toFixed(2),
         balanceAfter: availableAfter.toFixed(2),
         description: `订单 ${order.orderNo} 争议全额退款解冻押金`,
         createdAt: now,
@@ -326,13 +330,14 @@ async function requestWalletFullRefund(order: typeof orders.$inferSelect, reason
       amount: refundAmount,
       balanceBefore: availableBefore,
       balanceAfter: availableAfter,
-      details: {
-        orderNo: order.orderNo,
-        reason,
-        releasedFrozen,
-        availableCredit,
-      },
-    }, tx);
+        details: {
+          orderNo: order.orderNo,
+          reason,
+          releasedFrozen,
+          availableCredit,
+          feeExemptIncrease: availableIncrease,
+        },
+      }, tx);
   });
 
   await restoreAccountAvailabilityIfNoBlockingOrders(order.accountId);
@@ -429,6 +434,7 @@ async function requestWalletFullRefundLocked(
       id: randomUUID(),
       userId: order.buyerId,
       availableBalance: '0',
+      feeExemptBalance: '0',
       frozenBalance: '0',
       totalWithdrawn: '0',
       totalEarned: '0',
@@ -449,15 +455,19 @@ async function requestWalletFullRefundLocked(
   }
 
   const availableBefore = toNumber(balance.availableBalance);
+  const feeExemptBefore = toNumber(balance.feeExemptBalance);
   const frozenBefore = toNumber(balance.frozenBalance);
   const releasedFrozen = Math.min(frozenBefore, depositAmount);
   const availableCredit = Math.max(refundAmount - releasedFrozen, 0);
-  const availableAfter = availableBefore + availableCredit;
+  const availableIncrease = availableCredit + releasedFrozen;
+  const availableAfter = availableBefore + availableIncrease;
+  const feeExemptAfter = feeExemptBefore + availableIncrease;
 
   await tx
     .update(userBalances)
     .set({
-      availableBalance: sql`${userBalances.availableBalance} + ${availableCredit.toFixed(2)}`,
+      availableBalance: sql`${userBalances.availableBalance} + ${availableIncrease.toFixed(2)}`,
+      feeExemptBalance: sql`${userBalances.feeExemptBalance} + ${availableIncrease.toFixed(2)}`,
       frozenBalance: sql`GREATEST(${userBalances.frozenBalance} - ${releasedFrozen.toFixed(2)}, 0)`,
       updatedAt: now,
     })
@@ -471,7 +481,7 @@ async function requestWalletFullRefundLocked(
       transactionType: 'refund',
       amount: availableCredit.toFixed(2),
       balanceBefore: availableBefore.toFixed(2),
-      balanceAfter: availableAfter.toFixed(2),
+      balanceAfter: (availableBefore + availableCredit).toFixed(2),
       description: `Order ${order.orderNo} full refund`,
       createdAt: now,
     });
@@ -484,7 +494,7 @@ async function requestWalletFullRefundLocked(
       orderId: order.id,
       transactionType: 'unfreeze',
       amount: releasedFrozen.toFixed(2),
-      balanceBefore: availableAfter.toFixed(2),
+      balanceBefore: (availableBefore + availableCredit).toFixed(2),
       balanceAfter: availableAfter.toFixed(2),
       description: `Order ${order.orderNo} unfreeze deposit`,
       createdAt: now,
@@ -528,6 +538,8 @@ async function requestWalletFullRefundLocked(
       reason,
       releasedFrozen,
       availableCredit,
+      feeExemptBalanceBefore: feeExemptBefore,
+      feeExemptBalanceAfter: feeExemptAfter,
     },
   }, tx);
 

@@ -148,6 +148,7 @@ export async function POST(
             id: crypto.randomUUID(),
             userId,
             availableBalance: '0',
+            feeExemptBalance: '0',
             frozenBalance: '0',
             totalWithdrawn: '0',
             totalEarned: '0',
