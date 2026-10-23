@@ -698,7 +698,7 @@ pnpm start
 
 ```env
 # 数据库
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://rental:local_development_only@127.0.0.1:5432/rental
 
 # 微信小程序
 WECHAT_APP_ID=wx...

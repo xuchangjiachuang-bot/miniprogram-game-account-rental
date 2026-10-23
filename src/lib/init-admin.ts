@@ -33,8 +33,12 @@ export async function initAdminTable() {
       .limit(1);
 
     if (existingAdmins.length === 0) {
+      const initialPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+      if (!initialPassword || initialPassword.length < 16) {
+        throw new Error('Set BOOTSTRAP_ADMIN_PASSWORD to at least 16 characters to create the first admin.');
+      }
       // 生成密码hash
-      const passwordHash = await bcrypt.hash('admin123', 10);
+      const passwordHash = await bcrypt.hash(initialPassword, 10);
 
       // 插入默认管理员账号（不指定ID，让数据库自动生成UUID）
       await db.insert(admins).values({
@@ -47,7 +51,6 @@ export async function initAdminTable() {
       });
 
       console.log('[initAdminTable] 默认管理员账号创建成功');
-      console.log('[initAdminTable] 用户名: admin, 密码: admin123');
     } else {
       console.log('[initAdminTable] 默认管理员账号已存在');
     }

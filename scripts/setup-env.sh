@@ -51,7 +51,7 @@ else
     echo "⚠️  小程序 AppID 未配置"
 fi
 
-if grep -q "f00d1a872e63be6e72b7ccc63eaa8a2d" .env.production; then
+if grep -q "CONFIGURE_LOCALLY" .env.production; then
     echo "✅ 小程序 AppSecret 已配置"
 else
     echo "⚠️  小程序 AppSecret 未配置"

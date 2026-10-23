@@ -68,7 +68,7 @@ npm run upload
 
 ```bash
 cd /workspace/projects/miniprogram
-npx miniprogram-ci upload --appid wx2382e1949d031ba6 --project-path . --private-key-path private.wx2382e1949d031ba6.key --upload-version 1.0.20260227.1530 --upload-description "版本描述" --use-project-config
+npx miniprogram-ci upload --appid wx2382e1949d031ba6 --project-path . --private-key-path CONFIGURE_LOCALLY --upload-version 1.0.20260227.1530 --upload-description "版本描述" --use-project-config
 ```
 
 ---

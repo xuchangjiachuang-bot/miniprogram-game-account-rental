@@ -54,13 +54,13 @@ nano .env.production
 ```bash
 # 微信小程序配置
 WECHAT_MINIPROGRAM_APP_ID=wx2382e1949d031ba6
-WECHAT_MINIPROGRAM_APP_SECRET=f00d1a872e63be6e72b7ccc63eaa8a2d
+WECHAT_MINIPROGRAM_APP_SECRET=CONFIGURE_LOCALLY
 
 # 应用配置
 NEXT_PUBLIC_BASE_URL=https://hfb.yugioh.top
 
 # 数据库配置
-PGDATABASE_URL=postgresql://user_7602973286103941146:6d1a5e86-6de8-4164-a92d-73b867d5e94a@cp-sharp-tower-5511e9e0.pg4.aidap-global.cn-beijing.volces.com:5432/Database_1770207199429?sslmode=require&channel_binding=require
+PGDATABASE_URL=postgresql://rental:local_development_only@127.0.0.1:5432/rental
 ```
 
 ## 🎯 部署流程

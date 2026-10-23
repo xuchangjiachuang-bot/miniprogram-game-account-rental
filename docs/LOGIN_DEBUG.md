@@ -113,7 +113,7 @@ const environments = {
 | **IP白名单** | 开发设置 → 服务器IP白名单 | `101.126.24.20` 和 `180.184.66.251` | ✅ 已配置 |
 | **request域名** | 开发设置 → 服务器域名 → request合法域名 | `https://hfb.yugioh.top` | ⚠️ 待确认 |
 | **AppID** | 微信小程序后台 | `wx2382e1949d031ba6` | ⚠️ 待确认 |
-| **AppSecret** | 微信小程序后台 | `f00d1a872e63be6e72b7ccc63eaa8a2d` | ⚠️ 待确认 |
+| **AppSecret** | 微信小程序后台 | `CONFIGURE_LOCALLY` | ⚠️ 待确认 |
 
 ## 🔧 如何确认登录是否成功
 
@@ -123,7 +123,7 @@ const environments = {
 ```
 获取用户信息成功: { nickName: "...", avatarUrl: "..." }
 获取到登录code: 071xxx...
-登录成功: { token: "eyJhbGciOiJIUzI1NiIs...", user: {...} }
+登录成功: { token: "CONFIGURE_LOCALLY", user: {...} }
 ```
 
 2. **UI显示**：

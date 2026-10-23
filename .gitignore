@@ -69,3 +69,9 @@ miniprogram/miniprogram_npm/
 
 # 上传文件
 upload-latest*.js
+
+# Local credentials and scans
+.env.*.local
+*.pfx
+*.jks
+.gitleaks-report*

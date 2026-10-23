@@ -11,8 +11,11 @@ import { smsConfigManager } from '../storage/database/smsConfigManager';
 import * as adminSchema from '../storage/database/shared/admin-schema';
 
 const DATABASE_URL = process.env.PGDATABASE_URL
-  || process.env.DATABASE_URL
-  || 'postgresql://user_7602973286103941146:6d1a5e86-6de8-4164-a92d-73b867d5e94a@cp-sharp-tower-5511e9e0.pg4.aidap-global.cn-beijing.volces.com:5432/Database_1770207199429?sslmode=require&channel_binding=require';
+  || process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  throw new Error('Configure PGDATABASE_URL or DATABASE_URL for your own database.');
+}
 
 const client = postgres(DATABASE_URL, {
   max: 10,

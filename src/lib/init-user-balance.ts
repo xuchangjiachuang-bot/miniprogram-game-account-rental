@@ -1,7 +1,10 @@
 import postgres from 'postgres';
 
 let isUserBalanceSchemaInitialized = false;
-const DATABASE_URL = process.env.PGDATABASE_URL || process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/database';
+const DATABASE_URL = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error('Configure PGDATABASE_URL or DATABASE_URL for your own database.');
+}
 const schemaClient = postgres(DATABASE_URL, {
   max: 1,
   idle_timeout: 20,

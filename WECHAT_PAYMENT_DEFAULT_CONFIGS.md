@@ -33,7 +33,7 @@ WECHAT_MCH_ID=1106605743
 WECHAT_API_KEY=your_api_key_here
 WECHAT_NOTIFY_URL=https://hfb.yugioh.top/api/payment/wechat/jsapi/callback
 WECHAT_MP_APPID=wx0831611146088354
-WECHAT_MP_SECRET=59dddd04e2a748379f32b73f88e63527
+WECHAT_MP_SECRET=CONFIGURE_LOCALLY
 WECHAT_CERT_P12_PASSWORD=your_cert_password_here
 ```
 
@@ -75,7 +75,7 @@ WECHAT_CERT_P12_PASSWORD=your_cert_password_here
 {
   configType: 'wechat',
   configKey: 'mp_secret',
-  configValue: process.env.WECHAT_MP_SECRET || '',  // 59dddd04e2a748379f32b73f88e63527
+  configValue: process.env.WECHAT_MP_SECRET || '',  // CONFIGURE_LOCALLY
   description: '公众号AppSecret',
 },
 {
@@ -130,7 +130,7 @@ WECHAT_CERT_P12_PASSWORD=your_cert_password_here
 | api_key | `your***here` | `your_api_key_here` | ⚠️ 占位符，需要修改 |
 | notify_url | `https://hfb.yugioh.top/api/payment/wechat/jsapi/callback` | `https://hfb.yugioh.top/api/payment/wechat/jsapi/callback` | ✅ 一致 |
 | mp_appid | `wx083161***` | `wx0831611146088354` | ✅ 一致（显示时隐藏） |
-| mp_secret | `59dd***3527` | `59dddd04e2a748379f32b73f88e63527` | ✅ 一致（显示时隐藏） |
+| mp_secret | `59dd***3527` | `CONFIGURE_LOCALLY` | ✅ 一致（显示时隐藏） |
 
 ## 需要修改的配置
 
@@ -151,7 +151,7 @@ WECHAT_CERT_P12_PASSWORD=your_cert_password_here
 - 商户号: `1106605743`
 - 回调地址: `https://hfb.yugioh.top/api/payment/wechat/jsapi/callback`
 - 公众号 AppID: `wx0831611146088354`
-- 公众号 AppSecret: `59dddd04e2a748379f32b73f88e63527`
+- 公众号 AppSecret: `CONFIGURE_LOCALLY`
 - 证书路径: `certs/wechat/apiclient_cert.p12`
 - 密钥路径: `certs/wechat/apiclient_key.pem`
 - 证书密码: `1106605743`

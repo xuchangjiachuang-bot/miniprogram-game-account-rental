@@ -4,7 +4,7 @@
 
 ✅ APPID：wx0831611146088354
 ✅ 商户号ID：1106605743
-✅ AppSecret：59dddd04e2a748379f32b73f88e63527
+✅ AppSecret：CONFIGURE_LOCALLY
 ✅ 授权回调域：hfb.yugioh.top
 ✅ 支付授权目录：https://hfb.yugioh.top/
 

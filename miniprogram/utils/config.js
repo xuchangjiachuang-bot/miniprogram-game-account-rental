@@ -1,5 +1,5 @@
 // utils/config.js
-const ENV = 'production';
+const ENV = 'development';
 
 const environments = {
   development: {
@@ -9,8 +9,8 @@ const environments = {
     useMockData: false,
   },
   production: {
-    baseUrl: 'https://hfb.yugioh.top/api',
-    wsUrl: 'wss://hfb.yugioh.top',
+    baseUrl: 'https://example.com/api',
+    wsUrl: 'wss://example.com',
     debug: false,
     useMockData: false,
   },
@@ -41,7 +41,7 @@ const config = {
     pageSize: 10,
     maxPageSize: 50,
   },
-  cloudEnvId: 'hfb-0gv08jmpa261d9fc',
+  cloudEnvId: '',
   upload: {
     maxSize: 5 * 1024 * 1024,
     allowedTypes: ['jpg', 'jpeg', 'png', 'webp'],

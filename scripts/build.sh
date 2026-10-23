@@ -35,10 +35,7 @@ else
 fi
 
 # 设置默认环境变量
-set_default_env "WECHAT_MINIPROGRAM_APP_ID" "wx2382e1949d031ba6"
-set_default_env "WECHAT_MINIPROGRAM_APP_SECRET" "f00d1a872e63be6e72b7ccc63eaa8a2d"
 set_default_env "NEXT_PUBLIC_BASE_URL" "http://127.0.0.1:5000"
-set_default_env "PGDATABASE_URL" "postgresql://user_7602973286103941146:6d1a5e86-6de8-4164-a92d-73b867d5e94a@cp-sharp-tower-5511e9e0.pg4.aidap-global.cn-beijing.volces.com:5432/Database_1770207199429?sslmode=require&channel_binding=require"
 set_default_env "INTERNAL_API_URL" "http://localhost:5000"
 set_default_env "NODE_ENV" "production"
 
@@ -53,13 +50,13 @@ fi
 
 if [ -z "${WECHAT_MINIPROGRAM_APP_SECRET:-}" ]; then
     echo "❌ 错误：未配置 WECHAT_MINIPROGRAM_APP_SECRET"
-    echo "💡 请在环境变量文件中添加：WECHAT_MINIPROGRAM_APP_SECRET=f00d1a872e63be6e72b7ccc63eaa8a2d"
+    echo "💡 请在环境变量文件中添加：WECHAT_MINIPROGRAM_APP_SECRET=CONFIGURE_LOCALLY"
     exit 1
 fi
 
 if [ -z "${PGDATABASE_URL:-}" ]; then
     echo "❌ 错误：未配置 PGDATABASE_URL"
-    echo "💡 请在环境变量文件中添加：PGDATABASE_URL=postgresql://..."
+    echo "💡 请在环境变量文件中添加：PGDATABASE_URL=postgresql://rental:local_development_only@127.0.0.1:5432/rental"
     exit 1
 fi
 

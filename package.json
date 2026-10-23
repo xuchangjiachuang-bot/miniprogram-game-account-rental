@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "check:opensource": "node scripts/check-open-source-config.cjs",
     "build": "bash ./scripts/build.sh",
     "dev": "bash ./scripts/dev.sh",
     "preinstall": "npx only-allow pnpm",
@@ -112,5 +113,6 @@
     "overrides": {
       "esbuild": "^0.25.12"
     }
-  }
+  },
+  "license": "MIT"
 }

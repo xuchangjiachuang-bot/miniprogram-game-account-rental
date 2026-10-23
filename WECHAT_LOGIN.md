@@ -10,7 +10,7 @@
 
 ```
 WECHAT_APPID=wx0831611146088354
-WECHAT_APPSECRET=59dddd04e2a748379f32b73f88e63527
+WECHAT_APPSECRET=CONFIGURE_LOCALLY
 WECHAT_REDIRECT_URI=https://hfb.yugioh.top/api/auth/wechat/callback
 ```
 
@@ -18,7 +18,7 @@ WECHAT_REDIRECT_URI=https://hfb.yugioh.top/api/auth/wechat/callback
 
 - **授权回调域**: hfb.yugioh.top
 - **APPID**: wx0831611146088354
-- **AppSecret**: 59dddd04e2a748379f32b73f88e63527
+- **AppSecret**: CONFIGURE_LOCALLY
 
 ## 功能流程
 
